@@ -1,0 +1,88 @@
+package com.mopl.mopl.entity;
+
+import com.mopl.mopl.entity.base.BaseEntity;
+import com.mopl.mopl.entity.enums.Role;
+import com.mopl.mopl.entity.enums.Social;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "users")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class User  extends BaseEntity {
+    @Column(length = 50, nullable = false)
+    private String name;
+
+    @Column(length = 100, nullable = false, unique = true)
+    private String email;
+
+    @Column(length = 255, nullable = true)
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10, nullable = false)
+    private Role role;
+
+    @Column(nullable = false)
+    private boolean isLocked;
+
+    @Column(length = 255, nullable = true)
+    private String profileImageKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 8, nullable = true)
+    private Social socialType;
+
+    @Column(length = 100, nullable = true)
+    private String socialId;
+
+    @Builder
+    public User(String name, String email, String password, String profileImageKey, Social socialType, String socialId) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.role = Role.USER;
+        this.isLocked = false;
+        this.profileImageKey = profileImageKey;
+        this.socialType = socialType != null ? socialType : null;
+        this.socialId = socialId;
+    }
+
+    public User updateName(String newName) {
+        this.name = newName;
+        return this;
+    }
+
+    public User updatePassword(String encryptedPassword) {
+        this.password = encryptedPassword;
+        return this;
+    }
+
+    public User updateProfileImage(String newProfileImageKey) {
+        this.profileImageKey = newProfileImageKey;
+        return this;
+    }
+
+    public User updateRole(Role newRole) {
+        this.role = newRole;
+        return this;
+    }
+
+    public User lock() {
+        this.isLocked = true;
+        return this;
+    }
+
+    public User unlock() {
+        this.isLocked = false;
+        return this;
+    }
+}

@@ -39,3 +39,8 @@ management:
   info:
     env:
       enabled: true
+
+# 인터셉터 정지, 인증헤더를 검사 안하게 합니다.
+auth:
+  interceptor:
+    enabled: false # 정지

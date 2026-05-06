@@ -1,6 +1,6 @@
 package com.mopl.mopl.entity;
 
-import com.mopl.mopl.entity.base.BaseEntity;
+import com.mopl.mopl.global.base.BaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;

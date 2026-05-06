@@ -1,4 +1,4 @@
-package com.mopl.mopl.entity.base;
+package com.mopl.mopl.global.base;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

@@ -1,4 +1,4 @@
-package com.mopl.mopl.entity.enums;
+package com.mopl.mopl.entity;
 
 public enum ContentType {
     movie,

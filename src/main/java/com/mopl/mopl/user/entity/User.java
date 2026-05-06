@@ -1,8 +1,6 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.user.entity;
 
-import com.mopl.mopl.entity.base.BaseEntity;
-import com.mopl.mopl.entity.enums.Role;
-import com.mopl.mopl.entity.enums.Social;
+import com.mopl.mopl.global.base.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

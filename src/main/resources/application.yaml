@@ -54,3 +54,7 @@ jwt:
   refresh-token:
     secret: Zq4t7w!z%C*F-JaNdRgUkXp2s5v8x/A?D(G+KbPeShVmYq3t6w9z
     exp: 3600000
+
+initAdmin:
+  create:
+    admin: admin@admin.com

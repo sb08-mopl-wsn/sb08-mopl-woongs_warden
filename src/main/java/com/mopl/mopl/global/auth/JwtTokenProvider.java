@@ -186,17 +186,6 @@ public class JwtTokenProvider {
         }
     }
 
-    public Date getIssuedAt(String token) {
-        try {
-            SignedJWT signedJWT = SignedJWT.parse(token);
-            Date iat = signedJWT.getJWTClaimsSet().getIssueTime();
-            return iat;
-
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid JWT token", e);
-        }
-    }
-
     public Date getExpiration(String token) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);

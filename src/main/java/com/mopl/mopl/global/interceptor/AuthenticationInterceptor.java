@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.UUID;
@@ -19,12 +20,12 @@ public class AuthenticationInterceptor implements HandlerInterceptor {
       Object handler
   ) throws Exception {
     // todo 여기도 수정해야함
-    String userIdHeader = request.getHeader("일단 임시");
+    String userIdHeader = request.getHeader("X-User-Id");
 
     // 헤더 누락 확인
     if (userIdHeader == null || userIdHeader.isEmpty()) {
       // TODO 여기 예러처리 수정 필요
-      throw new IllegalArgumentException("일단 임시 예러처리");
+      throw new MissingRequestHeaderException("X-User-Id", null);
 //      throw new AuthenticationException();
     }
 
@@ -38,7 +39,7 @@ public class AuthenticationInterceptor implements HandlerInterceptor {
 
       return true;
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("일단 임시 예러처리");
+      throw new MissingRequestHeaderException("X-User-Id", null);
 //      throw new AuthenticationException();
     }
   }

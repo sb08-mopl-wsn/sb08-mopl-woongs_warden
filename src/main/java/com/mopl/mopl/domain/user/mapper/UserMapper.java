@@ -18,6 +18,7 @@ public abstract class UserMapper {
         if (profileImageKey == null || profileImageKey.isEmpty()) {
             return null;  // 기본 이미지 있다면 그걸로 바꾸기
         }
+        String baseUrl = (imageBaseUrl == null) ? "" : imageBaseUrl;
         return imageBaseUrl + profileImageKey;
     }
 }

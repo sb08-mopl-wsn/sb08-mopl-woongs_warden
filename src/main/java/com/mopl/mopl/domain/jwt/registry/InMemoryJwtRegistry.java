@@ -18,11 +18,13 @@ public class InMemoryJwtRegistry implements JwtRegistry {
     private final JwtTokenProvider jwtTokenProvider;
     private final Map<UUID, Queue<JwtInformation>> origin;
     private final int maxActiveJwtCount;
+    private final Map<String, JwtInformation> tokenIndex;
 
     public InMemoryJwtRegistry(JwtTokenProvider jwtTokenProvider) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.origin = new ConcurrentHashMap<>();
         this.maxActiveJwtCount = 1;
+        this.tokenIndex =  new ConcurrentHashMap<>();
     }
 
     @Override
@@ -33,7 +35,7 @@ public class InMemoryJwtRegistry implements JwtRegistry {
         Queue<JwtInformation> userQueue = origin.get(userId);
 
         while (userQueue.size() >= maxActiveJwtCount) {
-            JwtInformation oldInfo = userQueue.poll();
+            userQueue.poll();
         }
 
         // 3. 새 로그인 정보 메모리(큐)에 추가
@@ -55,11 +57,7 @@ public class InMemoryJwtRegistry implements JwtRegistry {
     @Override
     public boolean hasActiveJwtInformationByAccessToken(String accessToken) {
         if (accessToken == null) return false;
-
-        // 전체 큐를 순회하며 해당 Access Token이 존재하는지 확인
-        return origin.values().stream()
-                .flatMap(Queue::stream)
-                .anyMatch(info -> accessToken.equals(info.getAccessToken()));
+        return tokenIndex.containsKey(accessToken);
     }
 
     @Override

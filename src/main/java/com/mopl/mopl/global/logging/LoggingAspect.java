@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class LoggingAspect {
-    @Around("execution(* com.mopl.mopl.controller..*(..))")
+    @Around("execution(* com.mopl.mopl.domain..controller..*(..))")
     public Object logController(ProceedingJoinPoint joinPoint) throws Throwable {
         String method = joinPoint.getSignature().toShortString();
 
@@ -33,7 +33,7 @@ public class LoggingAspect {
         }
     }
 
-    @Around("execution(* com.mopl.mopl.service.impl..*(..))")
+    @Around("execution(* com.mopl.mopl.domain..service..*(..))")
     public Object logService(ProceedingJoinPoint joinPoint) throws Throwable {
         String method = joinPoint.getSignature().toShortString();
         long start = System.currentTimeMillis();

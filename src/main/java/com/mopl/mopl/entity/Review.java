@@ -1,5 +1,6 @@
 package com.mopl.mopl.entity;
 
+import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.global.base.BaseUpdatableEntity;
 import com.mopl.mopl.user.entity.User;
 import jakarta.persistence.Column;

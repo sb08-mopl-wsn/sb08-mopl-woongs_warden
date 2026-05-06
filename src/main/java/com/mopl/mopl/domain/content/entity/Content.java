@@ -1,4 +1,4 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.domain.content.entity;
 
 import com.mopl.mopl.global.base.BaseUpdatableEntity;
 import jakarta.persistence.Column;
@@ -51,5 +51,19 @@ public class Content extends BaseUpdatableEntity
         this.thumbnailKey = thumbnailKey;
         this.tags = tags != null ? tags : new ArrayList<>();
         this.releaseDate = releaseDate;
+    }
+
+    public void update(String title, String description, List<String> tags) {
+        if (title != null) {
+            this.title = title;
+        }
+        
+        if (description != null) {
+            this.description = description;
+        }
+
+        if (tags != null) {
+            this.tags = tags;
+        }
     }
 }

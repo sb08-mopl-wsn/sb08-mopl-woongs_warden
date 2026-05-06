@@ -1,5 +1,6 @@
 package com.mopl.mopl.entity;
 
+import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.global.base.BaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

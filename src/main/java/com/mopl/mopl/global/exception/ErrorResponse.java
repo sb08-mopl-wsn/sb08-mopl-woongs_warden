@@ -1,6 +1,7 @@
 package com.mopl.mopl.global.exception;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import org.springframework.http.HttpStatus;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,7 +19,8 @@ public record ErrorResponse(
         String message, // 에러 제목 (예: 잘못된 요청입니다.)
         String details, // 에러 상세 내용 (예: 부서 코드는 필수입니다.) - 프론트엔드 팝업용
         List<Detail> fieldErrors, // 유효성 검사 에러 목록 (기존 details -> fieldErrors 변경)
-        String hint
+        String hint,
+        HttpStatus status
 ) {
 
     public record Detail(String field, String issue, Object rejected) {
@@ -36,7 +38,8 @@ public record ErrorResponse(
                 code.getMessage(), // message에는 에러 코드의 기본 메시지(제목)를 넣음
                 message,           // details에는 인자로 받은 상세 메시지를 넣음
                 null,
-                null
+                null,
+                code.getHttpStatus()
         );
     }
 
@@ -52,7 +55,8 @@ public record ErrorResponse(
                 code.getMessage(), // message에는 에러 코드의 기본 메시지(제목)를 넣음
                 message,           // details에는 인자로 받은 상세 메시지를 넣음
                 fieldErrors,       // 유효성 검사 에러 목록
-                null
+                null,
+                code.getHttpStatus()
         );
     }
 
@@ -67,7 +71,8 @@ public record ErrorResponse(
                 code.getMessage(), // message에는 에러 코드의 기본 메시지(제목)를 넣음
                 message,           // details에는 인자로 받은 상세 메시지를 넣음
                 null,
-                hint
+                hint,
+                code.getHttpStatus()
         );
     }
 }

@@ -4,8 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'       # 정식 버전 태그 허용
-    tags-ignore:
-      - '*-rc.*'       # rc 태그는 프로덕션에서 무시
+      - '!*-rc.*'       # rc 태그는 프로덕션에서 무시
 
 env:
   AWS_REGION: ap-northeast-2                   # 리전 (서울)

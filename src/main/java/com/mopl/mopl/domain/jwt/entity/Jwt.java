@@ -1,13 +1,8 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.domain.jwt.entity;
 
+import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.global.base.BaseEntity;
-import com.mopl.mopl.user.entity.User;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +14,7 @@ import java.time.Instant;
 @Table(name = "jwt")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Jwt  extends BaseEntity {
+public class Jwt extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -34,7 +29,7 @@ public class Jwt  extends BaseEntity {
     private String refreshToken;
 
     @Builder
-    public Jwt(User user, Instant issuedAt, Instant expiresAt, String refreshToken) {
+    public Jwt(User user, Instant expiresAt, String refreshToken) {
         this.user = user;
         this.expiresAt = expiresAt;
         this.refreshToken = refreshToken;

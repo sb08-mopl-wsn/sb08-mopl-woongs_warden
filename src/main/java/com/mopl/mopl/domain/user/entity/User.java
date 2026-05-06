@@ -1,4 +1,4 @@
-package com.mopl.mopl.user.entity;
+package com.mopl.mopl.domain.user.entity;
 
 import com.mopl.mopl.global.base.BaseEntity;
 import jakarta.persistence.Column;
@@ -52,6 +52,19 @@ public class User  extends BaseEntity {
         this.profileImageKey = profileImageKey;
         this.socialType = socialType != null ? socialType : null;
         this.socialId = socialId;
+    }
+
+    @Builder
+    // 어드민 생성용
+    public User(String name, String email, String password) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.role = Role.ADMIN;
+        this.isLocked = false;
+        this.profileImageKey = null;
+        this.socialType =   null;
+        this.socialId = null;
     }
 
     public User updateName(String newName) {

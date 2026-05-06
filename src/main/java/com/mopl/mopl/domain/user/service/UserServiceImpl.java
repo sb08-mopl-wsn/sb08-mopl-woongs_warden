@@ -1,4 +1,4 @@
-package com.mopl.mopl.user.service;
+package com.mopl.mopl.domain.user.service;
 
 import org.springframework.stereotype.Service;
 

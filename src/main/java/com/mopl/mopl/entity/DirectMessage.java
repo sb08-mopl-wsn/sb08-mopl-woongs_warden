@@ -1,7 +1,7 @@
 package com.mopl.mopl.entity;
 
 import com.mopl.mopl.global.base.BaseEntity;
-import com.mopl.mopl.user.entity.User;
+import com.mopl.mopl.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

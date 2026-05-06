@@ -1,6 +1,5 @@
-package com.mopl.mopl.service.impl;
+package com.mopl.mopl.user.service;
 
-import com.mopl.mopl.service.UserService;
 import org.springframework.stereotype.Service;
 
 @Service

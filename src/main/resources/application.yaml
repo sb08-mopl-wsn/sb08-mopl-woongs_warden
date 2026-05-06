@@ -26,6 +26,7 @@ spring:
 logging:
   level:
     root: info
+    org.springframework.web.socket: DEBUG
 
 management:
   endpoints:

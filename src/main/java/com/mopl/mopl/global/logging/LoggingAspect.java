@@ -15,15 +15,15 @@ public class LoggingAspect {
     public Object logController(ProceedingJoinPoint joinPoint) throws Throwable {
         String method = joinPoint.getSignature().toShortString();
 
-        log.info("[REQUEST] {}", method);
+        log.debug("[REQUEST] {}", method);
 
         try {
             Object result = joinPoint.proceed();
 
             if (result instanceof ResponseEntity<?> response) {
-                log.info("[RESPONSE] {} status={}", method, response.getStatusCode());
+                log.debug("[RESPONSE] {} status={}", method, response.getStatusCode());
             } else {
-                log.info("[RESPONSE] {}", method);
+                log.debug("[RESPONSE] {}", method);
             }
 
             return result;

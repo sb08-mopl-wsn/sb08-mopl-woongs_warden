@@ -1,7 +1,6 @@
 package com.mopl.mopl.entity;
 
-import com.mopl.mopl.entity.base.BaseUpdatableEntity;
-import com.mopl.mopl.entity.enums.ContentType;
+import com.mopl.mopl.global.base.BaseUpdatableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

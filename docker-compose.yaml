@@ -15,7 +15,7 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
       TZ: "Asia/Seoul"
     volumes:
-      - domain-db-data:/var/lib/postgresql/data
+      - mopl-db-data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME} -d ${POSTGRES_DB}" ]
       interval: 10s
@@ -23,13 +23,13 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - domain-network
+      - mopl-network
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: domain-app
+    container_name: mopl-app
     restart: unless-stopped
     profiles:
       - develop
@@ -56,11 +56,11 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - domain-network
+      - mopl-network
 
 volumes:
-  domain-db-data:
+  mopl-db-data:
   app_logs:
 
 networks:
-  domain-network:
+  mopl-network:

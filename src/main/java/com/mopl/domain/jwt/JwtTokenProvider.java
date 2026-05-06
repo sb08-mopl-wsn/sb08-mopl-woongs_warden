@@ -1,6 +1,6 @@
 package com.mopl.domain.jwt;
 
-import com.mopl.domain.jwt.details.moplUserDetails;
+import com.mopl.domain.jwt.details.MoplUserDetails;
 import com.mopl.domain.jwt.entity.JwtTokenEntity;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
@@ -50,16 +50,16 @@ public class JwtTokenProvider {
         this.refreshTokenVerifier = new MACVerifier(refreshSecretBytes);
     }
 
-    public String generateAccessToken(moplUserDetails userDetails) throws JOSEException {
+    public String generateAccessToken(MoplUserDetails userDetails) throws JOSEException {
         return generateToken(userDetails, accessTokenExpirationMs, accessTokenSigner, "access");
     }
 
-    public String generateRefreshToken(moplUserDetails userDetails) throws JOSEException {
+    public String generateRefreshToken(MoplUserDetails userDetails) throws JOSEException {
         return generateToken(userDetails, refreshTokenExpirationMs, refreshTokenSigner, "refresh");
     }
 
     private String generateToken(
-            moplUserDetails userDetails,
+            MoplUserDetails userDetails,
             int expirationMs, JWSSigner signer,
             String tokenType
     ) throws JOSEException {

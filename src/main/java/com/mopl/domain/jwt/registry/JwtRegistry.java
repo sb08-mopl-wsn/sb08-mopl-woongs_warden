@@ -1,7 +1,6 @@
 package com.mopl.domain.jwt.registry;
 
-import com.sprint.mission.mopl.security.jwt.JwtInformation;
-
+import com.mopl.domain.jwt.dto.JwtInformation;
 import java.util.UUID;
 
 public interface JwtRegistry {
@@ -15,7 +14,7 @@ public interface JwtRegistry {
 
     boolean hasActiveJwtInformationByRefreshToken(String refreshToken);
 
-    void rotateJwtInformation(String refreshToken,JwtInformation  newJwtInformation);
+    void rotateJwtInformation(String refreshToken, JwtInformation newJwtInformation);
 
     void clearExpiredJwtInformation();
 }

@@ -1,6 +1,6 @@
 package com.mopl.domain.jwt.checker;
 
-import com.mopl.domain.jwt.details.moplUserDetails;
+import com.mopl.domain.jwt.details.MoplUserDetails;
 import com.mopl.domain.user.dto.UserDto;
 import com.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ public class UserAuthChecker {
 
         Object principal = authentication.getPrincipal();
 
-        if (principal instanceof moplUserDetails userDetails) {
+        if (principal instanceof MoplUserDetails userDetails) {
             UserDto userDto = userDetails.getUserDto();
             return userDto.id().equals(userId);
         }

@@ -1,7 +1,7 @@
 package com.mopl.domain.jwt.registry;
 
-import com.sprint.mission.mopl.security.jwt.JwtInformation;
-import com.sprint.mission.mopl.security.jwt.JwtTokenProvider;
+import com.mopl.domain.jwt.JwtTokenProvider;
+import com.mopl.domain.jwt.dto.JwtInformation;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

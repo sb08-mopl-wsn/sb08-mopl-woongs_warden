@@ -1,7 +1,7 @@
 package com.mopl.domain.jwt.handler;
 
 import com.mopl.domain.jwt.JwtTokenProvider;
-import com.mopl.domain.jwt.details.moplUserDetails;
+import com.mopl.domain.jwt.details.MoplUserDetails;
 import com.mopl.domain.jwt.registry.JwtRegistry;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.Cookie;
@@ -29,7 +29,7 @@ public class JwtLogoutHandler implements LogoutHandler {
         UUID userId = null;
 
         // 1. 정상적으로 인증된 상태라면 Authentication 객체에서 바로 추출
-        if (authentication != null && authentication.getPrincipal() instanceof moplUserDetails userDetails) {
+        if (authentication != null && authentication.getPrincipal() instanceof MoplUserDetails userDetails) {
             userId = userDetails.getUserDto().id();
         }
 

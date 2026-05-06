@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class moplUserDetailsService implements UserDetailsService {
+public class MoplUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
@@ -22,7 +22,7 @@ public class moplUserDetailsService implements UserDetailsService {
         return userRepository.findByUsername(username)
                 .map(user -> {
                     UserDto userDto = userMapper.toDto(user);
-                    return new moplUserDetails(userDto, user.getPassword());
+                    return new MoplUserDetails(userDto, user.getPassword());
                 })
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
     }

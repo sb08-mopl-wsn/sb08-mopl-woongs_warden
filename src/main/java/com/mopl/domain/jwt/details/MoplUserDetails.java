@@ -13,7 +13,7 @@ import java.util.Objects;
 
 @Getter
 @RequiredArgsConstructor
-public class moplUserDetails implements UserDetails {
+public class MoplUserDetails implements UserDetails {
     private final UserDto userDto;
     private final String password;
 
@@ -57,7 +57,7 @@ public class moplUserDetails implements UserDetails {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof moplUserDetails that)) return false;
+        if (!(o instanceof MoplUserDetails that)) return false;
         return Objects.equals(userDto.name(), that.userDto.name());}
 
     @Override

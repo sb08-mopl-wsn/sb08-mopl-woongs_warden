@@ -1,7 +1,7 @@
 package com.mopl.domain.jwt.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mopl.domain.jwt.details.moplUserDetails;
+import com.mopl.domain.jwt.details.MoplUserDetails;
 import com.mopl.domain.user.dto.UserDto;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,7 +23,7 @@ public class LoginSuccessHandler  implements AuthenticationSuccessHandler {
             HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException, ServletException {
 
-        if (authentication.getPrincipal() instanceof moplUserDetails moplUserDetails) {
+        if (authentication.getPrincipal() instanceof MoplUserDetails moplUserDetails) {
             UserDto user = moplUserDetails.getUserDto();
             response.setContentType("application/json");
             response.setCharacterEncoding("UTF-8");

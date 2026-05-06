@@ -16,13 +16,13 @@ public class MDCLoggingInterceptor implements HandlerInterceptor {
   public static final String REQUEST_METHOD = "requestMethod";
   public static final String REQUEST_URI = "requestUri";
   // todo 여기도 수정해야함
-//  public static final String DEOKHUGAM_USER_ID = "Deokhugam-Request-User-ID";
+//  public static final String USER_ID = "헤더 ID";
 
   @Override
   public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
       Object handler) {
     String requestId = UUID.randomUUID().toString().replaceAll("-", "");
-//    String deokhugamUserId = request.getHeader(DEOKHUGAM_USER_ID);
+//    String userId = request.getHeader(USER_ID);
     String clientIp = getClientIp(request);
 
     MDC.put(REQUEST_ID, requestId);
@@ -31,9 +31,9 @@ public class MDCLoggingInterceptor implements HandlerInterceptor {
     MDC.put("client-ip", clientIp);
 
     // 요청헤더에 있을 때만 추가
-//    if (deokhugamUserId != null) {
-//      MDC.put(DEOKHUGAM_USER_ID, deokhugamUserId);
-//      response.setHeader(DEOKHUGAM_USER_ID, deokhugamUserId);
+//    if (userId != null) {
+//      MDC.put(USER_ID, userId);
+//      response.setHeader(USER_ID, userId);
 //    }
 
     response.setHeader(REQUEST_ID_HEADER, requestId);
@@ -58,17 +58,12 @@ public class MDCLoggingInterceptor implements HandlerInterceptor {
       String ip = request.getHeader(header);
 
       if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-
-        // AWS에서 로드 벨런스 같은 것을 거치면 IP가 ,(콤마)를 기준으로 여러개가 된다고 함
-        // e.g. X-Forwarded-For: <Client_IP>, <Proxy1_IP>, <Proxy2_IP>
-        // 맨 처음이 사용자의 원본IP이므로 첫 번째만 추출한다.
         if(ip.contains(",")) {
           return ip.split(",")[0];
         }
         return ip;
       }
     }
-
     return request.getRemoteAddr();
   }
 

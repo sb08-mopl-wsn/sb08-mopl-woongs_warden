@@ -1,7 +1,7 @@
 package com.mopl.domain.jwt.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mopl.domain.jwt.details.moplUserDetails;
+import com.mopl.domain.jwt.details.MoplUserDetails;
 import com.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.domain.jwt.JwtTokenProvider;
 import com.mopl.domain.jwt.dto.JwtInformation;
@@ -37,7 +37,7 @@ public class JwtLoginSuccessHandler implements AuthenticationSuccessHandler {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
         // Principal 유효성 확인 및 캐스팅
-        if (authentication.getPrincipal() instanceof moplUserDetails customUserDetails) {
+        if (authentication.getPrincipal() instanceof MoplUserDetails customUserDetails) {
             try {// 사용자 DTO 구성
                 UserDto userDto = customUserDetails.getUserDto();
 

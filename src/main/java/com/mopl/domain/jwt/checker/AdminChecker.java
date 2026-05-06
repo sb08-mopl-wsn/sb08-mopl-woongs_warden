@@ -38,7 +38,7 @@ public class AdminChecker implements CommandLineRunner {
                     () -> {
                         log.warn("어드민으로 지정할 대상 유저([{}])가 DB에 존재하지 않아 어드민 계정을 만듭니다.", TARGET_ADMIN_EMAIL);
                         String encodedPassword = passwordEncoder.encode("Admin1234!");
-                        User admin = new User("admin", "admin@admin.com", encodedPassword, Role.ADMIN, null);
+                        User admin = new User("admin", "admin@admin.com", encodedPassword);
                         userRepository.save(admin);
                     }
             );

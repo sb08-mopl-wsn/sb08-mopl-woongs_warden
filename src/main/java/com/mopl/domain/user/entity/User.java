@@ -54,6 +54,19 @@ public class User  extends BaseEntity {
         this.socialId = socialId;
     }
 
+    @Builder
+    // 어드민 생성용
+    public User(String name, String email, String password) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.role = Role.ADMIN;
+        this.isLocked = false;
+        this.profileImageKey = null;
+        this.socialType =   null;
+        this.socialId = null;
+    }
+
     public User updateName(String newName) {
         this.name = newName;
         return this;

@@ -1,4 +1,4 @@
-package com.mopl.mopl.domain.jwt.checker;
+package com.mopl.mopl.global.auth.checker;
 
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;

@@ -1,11 +1,10 @@
 package com.mopl.mopl.global.config;
 
-import com.mopl.mopl.jwt.JwtAuthenticationFilter;
-import com.mopl.mopl.jwt.handler.*;
+import com.mopl.mopl.global.auth.JwtAuthenticationFilter;
+import com.mopl.mopl.global.auth.handler.*;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -13,7 +12,6 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
@@ -51,7 +49,7 @@ public class SecurityConfig {
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // 문서 관련
+                                // 문서 관련
 //                        .requestMatchers("/", "/index.html").permitAll()
 //                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
 //
@@ -74,7 +72,7 @@ public class SecurityConfig {
 //                        .requestMatchers("/api/**").authenticated()
 //                        .anyRequest().authenticated()
 
-                        .anyRequest().permitAll()
+                                .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

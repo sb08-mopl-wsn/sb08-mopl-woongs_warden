@@ -1,7 +1,7 @@
-package com.mopl.mopl.domain.jwt.handler;
+package com.mopl.mopl.global.auth.handler;
 
-import com.mopl.mopl.domain.jwt.JwtTokenProvider;
-import com.mopl.mopl.domain.jwt.details.MoplUserDetails;
+import com.mopl.mopl.global.auth.JwtTokenProvider;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.Cookie;

@@ -1,7 +1,9 @@
-package com.mopl.mopl.domain.jwt;
+package com.mopl.mopl.global.auth;
 
-import com.mopl.mopl.domain.jwt.details.MoplUserDetails;
-import com.mopl.mopl.domain.jwt.entity.JwtTokenEntity;
+import com.mopl.mopl.domain.jwt.entity.Jwt;
+import com.mopl.mopl.domain.user.entity.User;
+import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
@@ -14,6 +16,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
@@ -30,13 +33,15 @@ public class JwtTokenProvider {
     private final JWSVerifier accessTokenVerifier;
     private final JWSSigner refreshTokenSigner;
     private final JWSVerifier refreshTokenVerifier;
+    private final UserRepository userRepository;  //todo 이거 관해서 수정해야할거 같은데
 
     public JwtTokenProvider(
             // application.yaml 파일에 정의된 프로퍼티 값을 주입받는다.
             @Value("${jwt.access-token.secret}") String accessTokenSecret,
             @Value("${jwt.access-token.exp}") int accessTokenExpirationMs,
             @Value("${jwt.refresh-token.secret}") String refreshTokenSecret,
-            @Value("${jwt.refresh-token.exp}") int refreshTokenExpirationMs
+            @Value("${jwt.refresh-token.exp}") int refreshTokenExpirationMs,
+            UserRepository userRepository
     ) throws JOSEException {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
@@ -48,6 +53,8 @@ public class JwtTokenProvider {
         byte[] refreshSecretBytes = refreshTokenSecret.getBytes(StandardCharsets.UTF_8);
         this.refreshTokenSigner = new MACSigner(refreshSecretBytes);
         this.refreshTokenVerifier = new MACVerifier(refreshSecretBytes);
+
+        this.userRepository = userRepository;
     }
 
     public String generateAccessToken(MoplUserDetails userDetails) throws JOSEException {
@@ -201,17 +208,21 @@ public class JwtTokenProvider {
         }
     }
 
-    public JwtTokenEntity toEntity(String token) {
+    public Jwt toEntity(String token) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
-            String jti = signedJWT.getJWTClaimsSet().getJWTID();
             String username = signedJWT.getJWTClaimsSet().getSubject();
 
             String tokenType = (String) signedJWT.getJWTClaimsSet().getClaim("type");
-            OffsetDateTime issuedAt = OffsetDateTime.ofInstant(signedJWT.getJWTClaimsSet().getIssueTime().toInstant(), ZoneOffset.UTC);
-            OffsetDateTime expiresAt = OffsetDateTime.ofInstant(signedJWT.getJWTClaimsSet().getExpirationTime().toInstant(), ZoneOffset.UTC);
+            Instant issuedAt = signedJWT.getJWTClaimsSet().getIssueTime().toInstant();
+            Instant expiresAt = signedJWT.getJWTClaimsSet().getExpirationTime().toInstant();
 
-            JwtTokenEntity entity = new JwtTokenEntity(jti, username, tokenType, issuedAt, expiresAt);
+            // todo 여기도 수정 필요
+            User user = userRepository.findByName(username)
+                    .orElseThrow(()->new IllegalArgumentException("User not found"));
+
+            //todo 여기 token이 리프레쉬였는지 확인 필요
+            Jwt entity = new Jwt(user, issuedAt,token );
             return entity;
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid JWT token", e);

@@ -1,4 +1,4 @@
-package com.mopl.mopl.domain.jwt.details;
+package com.mopl.mopl.global.auth.details;
 
 import com.mopl.mopl.domain.user.dto.UserDto;
 import lombok.Getter;

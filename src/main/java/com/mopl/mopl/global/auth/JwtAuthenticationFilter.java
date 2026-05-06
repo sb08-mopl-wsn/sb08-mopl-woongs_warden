@@ -1,4 +1,4 @@
-package com.mopl.mopl.domain.jwt;
+package com.mopl.mopl.global.auth;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

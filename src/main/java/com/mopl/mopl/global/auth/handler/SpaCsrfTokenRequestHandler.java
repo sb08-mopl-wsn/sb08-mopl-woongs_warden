@@ -1,4 +1,4 @@
-package com.mopl.mopl.domain.jwt.handler;
+package com.mopl.mopl.global.auth.handler;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

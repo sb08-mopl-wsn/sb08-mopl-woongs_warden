@@ -1,6 +1,6 @@
-package com.mopl.mopl.domain.jwt.checker;
+package com.mopl.mopl.global.auth.checker;
 
-import com.mopl.mopl.domain.jwt.details.MoplUserDetails;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

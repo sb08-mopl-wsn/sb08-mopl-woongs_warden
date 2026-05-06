@@ -1,9 +1,9 @@
-package com.mopl.mopl.domain.jwt.handler;
+package com.mopl.mopl.global.auth.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mopl.mopl.domain.jwt.details.MoplUserDetails;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
-import com.mopl.mopl.domain.jwt.JwtTokenProvider;
+import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;

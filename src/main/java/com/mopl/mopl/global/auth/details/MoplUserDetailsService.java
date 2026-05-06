@@ -1,4 +1,4 @@
-package com.mopl.mopl.domain.jwt.details;
+package com.mopl.mopl.global.auth.details;
 
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
@@ -19,7 +19,7 @@ public class MoplUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByUsername(username)
+        return userRepository.findByName(username)
                 .map(user -> {
                     UserDto userDto = userMapper.toDto(user);
                     return new MoplUserDetails(userDto, user.getPassword());

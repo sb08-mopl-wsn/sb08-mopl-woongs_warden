@@ -1,4 +1,4 @@
-package com.mopl.mopl.domain.jwt.handler;
+package com.mopl.mopl.global.auth.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;

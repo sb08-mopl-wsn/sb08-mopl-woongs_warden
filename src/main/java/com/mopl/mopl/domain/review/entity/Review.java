@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.review.entity;
 
 import com.mopl.mopl.domain.content.entity.Content;
+import com.mopl.mopl.domain.review.exception.InvalidReviewInputException;
 import com.mopl.mopl.domain.review.exception.ReviewErrorCode;
 import com.mopl.mopl.domain.review.exception.ReviewException;
 import com.mopl.mopl.global.base.BaseUpdatableEntity;
@@ -51,7 +52,7 @@ public class Review extends BaseUpdatableEntity {
         // 별점이 0~5 범위를 벗어나지 않는지 확인
         if (rating != null) {
             if (rating < 0 || rating > 5) {
-                throw new ReviewException(ReviewErrorCode.INVALID_REVIEW_INPUT);
+                throw new InvalidReviewInputException();
             }
             this.rating = rating;
         }

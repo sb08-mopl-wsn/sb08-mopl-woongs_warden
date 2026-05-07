@@ -2,6 +2,7 @@ package com.mopl.mopl.domain.review.service.impl;
 
 import com.mopl.mopl.domain.review.dto.request.ReviewCreateRequest;
 import com.mopl.mopl.domain.review.dto.request.ReviewUpdateRequest;
+import com.mopl.mopl.domain.review.dto.response.ReviewDto;
 import com.mopl.mopl.domain.review.entity.Review;
 import com.mopl.mopl.domain.review.exception.ReviewErrorCode;
 import com.mopl.mopl.domain.review.exception.ReviewException;
@@ -26,40 +27,48 @@ public class ReviewServiceImpl implements ReviewService {
 
   @Override
   @Transactional
-  public Review createReview(ReviewCreateRequest request, User user) {
+  public ReviewDto createReview(ReviewCreateRequest request, User user) {
     // TODO: 리뷰 생성 로직 작성해야함
     return null;
   }
 
   @Override
-  public Review findReviewById(UUID reviewId) {
-    return reviewRepository.findById(reviewId)
+  public ReviewDto findReviewById(UUID reviewId) {
+    Review review = reviewRepository.findById(reviewId)
         .orElseThrow(() -> new ReviewNotFoundException(reviewId));
+    return reviewMapper.toDto(review);
   }
 
   @Override
   @Transactional
-  public Review updateReview(UUID reviewId, ReviewUpdateRequest request, User user) {
-    Review review = findReviewById(reviewId);
+  public ReviewDto updateReview(UUID reviewId, ReviewUpdateRequest request, User user) {
+    Review reviewToUpdate = getReviewAndCheckPermission(reviewId, user);
 
-    if (!review.getUser().getId().equals(user.getId())) {
-      throw new ReviewException(ReviewErrorCode.FORBIDDEN);
-    }
+    reviewToUpdate.update(request.text(), request.rating());
 
-    review.update(request.text(), request.rating());
-
-    return review;
+    return reviewMapper.toDto(reviewToUpdate);
   }
 
   @Override
   @Transactional
   public void deleteReview(UUID reviewId, User user) {
-    Review review = findReviewById(reviewId);
+    Review reviewToDelete = getReviewAndCheckPermission(reviewId, user);
+
+    reviewRepository.delete(reviewToDelete);
+  }
+
+  /**
+   * 리뷰를 ID로 조회, 현재 사용자가 해당 리뷰의 작성자인지 확인
+   * @throws ReviewNotFoundException 리뷰를 찾을 수 없는 경우
+   * @throws ReviewException         현재 사용자가 리뷰의 작성자가 아닌 경우 (FORBIDDEN)
+   */
+  private Review getReviewAndCheckPermission(UUID reviewId, User user) {
+    Review review = reviewRepository.findById(reviewId)
+        .orElseThrow(() -> new ReviewNotFoundException(reviewId));
 
     if (!review.getUser().getId().equals(user.getId())) {
       throw new ReviewException(ReviewErrorCode.FORBIDDEN);
     }
-
-    reviewRepository.delete(review);
+    return review;
   }
 }

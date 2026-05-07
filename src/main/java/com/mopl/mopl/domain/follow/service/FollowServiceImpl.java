@@ -3,9 +3,9 @@ package com.mopl.mopl.domain.follow.service;
 import com.mopl.mopl.domain.follow.dto.FollowDto;
 import com.mopl.mopl.domain.follow.dto.FollowRequest;
 import com.mopl.mopl.domain.follow.entity.Follow;
-import com.mopl.mopl.domain.follow.exception.FollowErrorCode;
-import com.mopl.mopl.domain.follow.exception.FollowException;
 import com.mopl.mopl.domain.follow.exception.FollowNotFoundException;
+import com.mopl.mopl.domain.follow.exception.FolloweeNotFoundException;
+import com.mopl.mopl.domain.follow.exception.FollowerNotFoundException;
 import com.mopl.mopl.domain.follow.exception.SelfFollowException;
 import com.mopl.mopl.domain.follow.mapper.FollowMapper;
 import com.mopl.mopl.domain.follow.repository.FollowRepository;
@@ -14,6 +14,7 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,9 +45,9 @@ public class FollowServiceImpl implements FollowService {
 
     // TODO: 추후 유저 관련 exception이 추가되면, 삭제 후 USER쪽에서 만든 exception으로 교체 필요
     User follower = userRepository.findById(followerId)
-        .orElseThrow(() -> new FollowException(FollowErrorCode.USER_NOT_FOUND, "follower를 찾을 수 없습니다."));
+        .orElseThrow(FollowerNotFoundException::new);
     User followee = userRepository.findById(request.followeeId())
-        .orElseThrow(() -> new FollowException(FollowErrorCode.USER_NOT_FOUND, "followee를 찾을 수 없습니다."));
+        .orElseThrow(FolloweeNotFoundException::new);
 
     // 이미 팔로우 중일 땐, 기존 정보 반환
     Optional<Follow> existingFollow = followRepository.findByFollowerAndFollowee(follower, followee);
@@ -59,11 +60,20 @@ public class FollowServiceImpl implements FollowService {
         .followee(followee)
         .build();
 
-    Follow savedFollow = followRepository.save(follow);
+    try {
+      Follow savedFollow = followRepository.save(follow);
+      // TODO: 추후 알림 Event 발행 시 이 곳에 작성
+      return followMapper.toDto(savedFollow);
+    } catch (DataIntegrityViolationException e) {
+      /*
+      동시성 이슈로 두 스레드가 동시에 save 시도 시, 유니크 제약 조건에 걸려서 예외가 발생하면
+      이미 저장된 것으로 간주하고 DB에서 다시 조회해서 반환
+      * */
+      Follow concurrentFollow = followRepository.findByFollowerAndFollowee(follower, followee)
+          .orElseThrow(FollowNotFoundException::new);
 
-    // TODO: 추후 알림 Event 발행 시 이 곳에 작성
-
-    return followMapper.toDto(savedFollow);
+      return followMapper.toDto(concurrentFollow);
+    }
   }
 
   /**

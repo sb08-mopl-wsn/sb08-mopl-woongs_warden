@@ -148,4 +148,75 @@ class FollowServiceImplTest {
 
     verify(followRepository, never()).delete(any());
   }
+
+  @Test
+  @DisplayName("팔로우 여부 확인 - 본인 ID가 null이면 false 반환 (비로그인 상태 방어)")
+  void isFollowedByMe_ReturnsFalse_WhenFollowerIdIsNull() {
+    // when
+    boolean isFollowed = followService.isFollowedByMe(null, followeeId);
+
+    // then
+    assertThat(isFollowed).isFalse();
+    verify(followRepository, never()).existsByFollower_IdAndFollowee_Id(any(), any());
+  }
+
+  @Test
+  @DisplayName("팔로우 여부 확인 - 팔로우 중이면 true, 아니면 false 반환 (Repository 분기)")
+  void isFollowedByMe_ReturnsRepositoryResult() {
+    // given
+    given(followRepository.existsByFollower_IdAndFollowee_Id(followerId, followeeId)).willReturn(true);
+
+    // when
+    boolean isFollowed = followService.isFollowedByMe(followerId, followeeId);
+
+    // then
+    assertThat(isFollowed).isTrue();
+    verify(followRepository).existsByFollower_IdAndFollowee_Id(followerId, followeeId);
+  }
+
+  @Test
+  @DisplayName("팔로워 수 조회 - Repository 로직 위임 검증")
+  void getFollowerCount_DelegatesToRepository() {
+    // given
+    long expectedCount = 5L;
+    given(followRepository.countByFollowee_Id(followeeId)).willReturn(expectedCount);
+
+    // when
+    long count = followService.getFollowerCount(followeeId);
+
+    // then
+    assertThat(count).isEqualTo(expectedCount);
+    verify(followRepository).countByFollowee_Id(followeeId);
+  }
+
+  @Test
+  @DisplayName("팔로우 요청 - 요청한 유저(follower)를 찾을 수 없으면 USER_NOT_FOUND 예외 발생")
+  void follow_FollowerNotFound_ThrowsException() {
+    // given
+    FollowRequest request = new FollowRequest(followeeId);
+    given(userRepository.findById(followerId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> followService.follow(followerId, request))
+        .isInstanceOf(FollowException.class)
+        .hasMessageContaining("follower를 찾을 수 없습니다");
+
+    verify(followRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("팔로우 요청 - 대상 유저(followee)를 찾을 수 없으면 USER_NOT_FOUND 예외 발생")
+  void follow_FolloweeNotFound_ThrowsException() {
+    // given
+    FollowRequest request = new FollowRequest(followeeId);
+    given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
+    given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> followService.follow(followerId, request))
+        .isInstanceOf(FollowException.class)
+        .hasMessageContaining("followee를 찾을 수 없습니다");
+
+    verify(followRepository, never()).save(any());
+  }
 }

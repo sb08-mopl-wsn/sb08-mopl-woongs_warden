@@ -7,7 +7,7 @@ import java.util.UUID;
 public interface FollowService {
 
   FollowDto follow(UUID followerId, FollowRequest request);
-  void unfollow(UUID followerId, UUID followeeId);
+  void unfollow(UUID followerId, UUID followId);
   boolean isFollowedByMe(UUID followerId, UUID followeeId);
   long getFollowerCount(UUID followeeId);
 }

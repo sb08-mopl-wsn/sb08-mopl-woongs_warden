@@ -1,0 +1,3 @@
+ALTER TABLE contents
+    ADD COLUMN review_count  INT NOT NULL DEFAULT 0,
+    ADD COLUMN watcher_count INT NOT NULL DEFAULT 0;

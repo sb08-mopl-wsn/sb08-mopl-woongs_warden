@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +37,15 @@ public class Content extends BaseUpdatableEntity
     @Column(name = "thumbnail_key", length = 255, nullable = false)
     private String thumbnailKey;
 
+    @Column(name = "avg_rating", nullable = false, precision = 2, scale = 1)
+    private BigDecimal avgRating = BigDecimal.ZERO;
+
+    @Column(name = "review_count", nullable = false)
+    private int reviewCount = 0;
+
+    @Column(name = "watcher_count", nullable = false)
+    private int watcherCount = 0;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "tags", columnDefinition = "JSONB", nullable = false)
     private List<String> tags;
@@ -57,7 +67,7 @@ public class Content extends BaseUpdatableEntity
         if (title != null) {
             this.title = title;
         }
-        
+
         if (description != null) {
             this.description = description;
         }
@@ -65,5 +75,14 @@ public class Content extends BaseUpdatableEntity
         if (tags != null) {
             this.tags = tags;
         }
+    }
+
+    public void updateReviewStats(BigDecimal avgRating, int reviewCount) {
+        this.avgRating = avgRating;
+        this.reviewCount = reviewCount;
+    }
+
+    public void updateWatcherCount(int watcherCount) {
+        this.watcherCount = watcherCount;
     }
 }

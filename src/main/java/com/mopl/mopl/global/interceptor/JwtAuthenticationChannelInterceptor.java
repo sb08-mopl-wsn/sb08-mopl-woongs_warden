@@ -29,6 +29,8 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
     private final RoleHierarchy roleHierarchy;
     private final JwtRegistry jwtRegistry;
 
+    private static final String PREFIX = "Bearer ";
+
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
@@ -68,7 +70,7 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
 
     // STOMP 헤더에서 Access Token을 추출
     private Optional<String> resolveToken(StompHeaderAccessor accessor) {
-        String prefix = "Bearer ";
+        String prefix = PREFIX;
 
         String authHeader = accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION);
         if (StringUtils.hasText(authHeader) && authHeader.startsWith(prefix)) {

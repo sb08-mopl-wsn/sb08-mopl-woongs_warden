@@ -1,6 +1,8 @@
 package com.mopl.mopl.global.auth;
 
 import com.mopl.mopl.domain.jwt.entity.Jwt;
+import com.mopl.mopl.domain.user.dto.UserDto;
+import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
@@ -11,6 +13,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
@@ -20,8 +23,10 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class JwtTokenProvider {
 
@@ -214,6 +219,45 @@ public class JwtTokenProvider {
             Jwt entity = new Jwt(user, issuedAt,token );
             return entity;
         } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid JWT token", e);
+        }
+    }
+
+    // JwtToken Claim에서 userId, username, role을 직접 파싱하여 DB조회 없이 가져오기 위함.
+    public MoplUserDetails parseAccessToken(String token) {
+        try {
+            log.info("[TokenProvider] parseAccessToken 호출됨: 토큰 파싱 시작");
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
+
+            String username = claimsSet.getSubject();
+            String userIdString = claimsSet.getStringClaim("userId");
+            UUID userId = userIdString != null ? UUID.fromString(userIdString) : null;
+
+            List<String> roles = claimsSet.getStringListClaim("roles");
+            // 기본 값
+            Role role = Role.USER;
+
+            if (roles != null && !roles.isEmpty()) {
+                String roleString = roles.get(0).replace("ROLE_", "");
+                role = Role.valueOf(roleString);
+            }
+
+            UserDto userDto = new UserDto(
+                    userId,
+                    null,
+                    null, // email
+                    username,
+                    null, // profile
+                    role,
+                    false
+            );
+
+            log.info("[TokenProvider] parseAccessToken 완료: UserDto 생성");
+            return new MoplUserDetails(userDto, null);
+
+        } catch (Exception e) {
+            log.error("[TokenProvider] parseAccessToken 중 예외 발생: {}", e.getMessage());
             throw new IllegalArgumentException("Invalid JWT token", e);
         }
     }

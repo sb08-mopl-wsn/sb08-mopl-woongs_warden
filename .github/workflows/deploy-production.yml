@@ -1,0 +1,85 @@
+name: Production CD (Deploy to AWS ECS)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'       # 정식 버전 태그 허용
+      - '!*-rc.*'       # rc 태그는 프로덕션에서 무시
+
+env:
+  AWS_REGION: ap-northeast-2                   # 리전 (서울)
+  ECR_REPOSITORY: sb08/mopl                    # AWS ECR 리포지토리 이름
+  ECS_SERVICE: mopl-task-service               # AWS ECS 서비스 이름
+  ECS_CLUSTER: mopl-cluster                    # AWS ECS 클러스터 이름
+  ECS_TASK_DEFINITION: ./task-definition.json  # ECS 태스크 정의서 파일 경로
+  CONTAINER_NAME: mopl-container               # 태스크 정의서 안에 있는 컨테이너 이름
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v6
+
+      - name: JDK 21 설치
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: 실행 권한 부여
+        run: chmod +x gradlew
+
+      - name: 빌드 (테스트는 CI에서 했으므로 생략)
+        run: ./gradlew clean build -x test
+
+      - name: AWS 자격 증명 설정
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Amazon ECR 로그인
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 도커 이미지 빌드 및 ECR에 푸시
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.ref_name }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: 새로운 이미지 ID로 태스크 정의서 렌더링
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: AWS ECS에 배포 (새로운 태스크 정의 적용)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Discord 알림
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "프로덕션 CD 배포 결과 (${{ github.ref_name }})"
+          description: |
+            태그 `${{ github.ref_name }}` 기반 실제 서버 배포가 완료되었습니다.
+            by ${{ github.actor }}

@@ -1,11 +1,14 @@
 package com.mopl.mopl.domain.content.controller;
 
 import com.mopl.mopl.domain.content.dto.request.ContentCreateRequest;
+import com.mopl.mopl.domain.content.dto.request.ContentSearchRequest;
 import com.mopl.mopl.domain.content.dto.request.ContentUpdateRequest;
 import com.mopl.mopl.domain.content.dto.response.ContentDto;
+import com.mopl.mopl.domain.content.dto.response.CursorResponseContentDto;
 import com.mopl.mopl.domain.content.service.ContentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +47,14 @@ public class ContentController
         ContentDto contentDto = contentService.getContent(contentId);
 
         return ResponseEntity.status(HttpStatus.OK).body(contentDto);
+    }
+
+    @GetMapping
+    public ResponseEntity<CursorResponseContentDto> getContents(@Valid @ParameterObject ContentSearchRequest contentSearchRequest)
+    {
+        CursorResponseContentDto contents = contentService.getContents(contentSearchRequest);
+
+        return ResponseEntity.status(HttpStatus.OK).body(contents);
     }
 
     @PatchMapping("/{contentId}")

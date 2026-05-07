@@ -1,4 +1,4 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.domain.follow.entity;
 
 import com.mopl.mopl.global.base.BaseEntity;
 import com.mopl.mopl.domain.user.entity.User;

@@ -60,14 +60,19 @@ class ContentServiceTest
         ReflectionTestUtils.setField(content, "id", contentId);
     }
 
-    private Content createContent(String title) {
-        return Content.builder()
+    private Content createContent(String title, int watcherCount) {
+        Content content = Content.builder()
                 .title(title)
                 .description("설명")
                 .contentType(ContentType.movie)
                 .thumbnailKey("thumb.png")
                 .tags(List.of("tag1"))
                 .build();
+
+        ReflectionTestUtils.setField(content, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(content, "watcherCount", watcherCount);
+
+        return content;
     }
 
     private ContentDto createContentDto(String title) {
@@ -168,11 +173,11 @@ class ContentServiceTest
         void givenSliceWithNext_whenGetContents_thenReturnsNextCursor() {
             // given
             ContentSearchRequest contentSearchRequest = new ContentSearchRequest(
-                    null, null, null, null, null, 2, "DESCENDING", "watcherCount"
+                    null, null, null, null, 2, "DESCENDING", "watcherCount"
             );
 
-            Content content1 = createContent("test content1");
-            Content content2 = createContent("test content2");
+            Content content1 = createContent("test content1", 50);
+            Content content2 = createContent("test content2", 42);
 
             Slice<Content> slice = new SliceImpl<>(List.of(content1, content2), Pageable.unpaged(), true);
 
@@ -189,7 +194,7 @@ class ContentServiceTest
             // then
             assertThat(result.data()).hasSize(2);
             assertThat(result.hasNext()).isTrue();
-            assertThat(result.nextCursor()).isEqualTo(String.valueOf(content2.getWatcherCount()));
+            assertThat(result.nextCursor()).isEqualTo("42");
             assertThat(result.nextIdAfter()).isEqualTo(content2.getId());
             assertThat(result.totalCount()).isEqualTo(5L);
         }
@@ -199,10 +204,10 @@ class ContentServiceTest
         void givenSliceWithoutNext_whenGetContents_thenReturnsNullCursor() {
             // given
             ContentSearchRequest request = new ContentSearchRequest(
-                    null, null, null, null, null, 10, "DESCENDING", "watcherCount"
+                    null, null, null, null, 10, "DESCENDING", "watcherCount"
             );
 
-            Content content1 = createContent("콘텐츠1");
+            Content content1 = createContent("콘텐츠1", 50);
             Slice<Content> slice = new SliceImpl<>(List.of(content1), Pageable.unpaged(), false);
 
             given(contentRepository.getContents(request)).willReturn(slice);
@@ -226,7 +231,7 @@ class ContentServiceTest
         void givenEmptySlice_whenGetContents_thenReturnsEmptyList() {
             // given
             ContentSearchRequest request = new ContentSearchRequest(
-                    null, null, null, null, null, 10, "DESCENDING", "watcherCount"
+                    null, null, null, null, 10, "DESCENDING", "watcherCount"
             );
 
             Slice<Content> slice = new SliceImpl<>(List.of(), Pageable.unpaged(), false);

@@ -87,7 +87,7 @@ public class ContentRepositoryCustomImpl implements ContentRepositoryCustom
      */
     private BooleanExpression typeCondition(String typeEqual) {
         if (typeEqual == null || typeEqual.isBlank()) return null;
-        return content.contentType.eq(ContentType.valueOf(typeEqual));
+        return content.contentType.eq(ContentType.from(typeEqual));
     }
 
     /**
@@ -115,7 +115,11 @@ public class ContentRepositoryCustomImpl implements ContentRepositoryCustom
      * @return QueryDSL 조건식
      */
     private BooleanExpression cursorPageCondition(String sortBy, String cursor, UUID idAfter, boolean isAsc) {
-        if (cursor == null || idAfter == null) return null;
+        if ((cursor == null) ^ (idAfter == null)) {
+            throw new ContentCursorException();
+        }
+
+        if (cursor == null) return null;
 
         BooleanExpression primaryEq;
         BooleanExpression primaryGtLt;

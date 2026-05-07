@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.user.mapper;
 
 import com.mopl.mopl.domain.user.dto.UserDto;
+import com.mopl.mopl.domain.user.dto.request.UserCreateRequest;
 import com.mopl.mopl.domain.user.entity.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

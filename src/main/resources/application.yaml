@@ -40,11 +40,8 @@ management:
     env:
       enabled: true
 
-# 인터셉터 정지, 인증헤더를 검사 안하게 합니다.
-auth:
-  interceptor:
-    enabled: false # 정지
 
+# ------------ 나중에 env로 빼두는게 좋다 ------------------------
 # 커스텀 프로퍼티 추가
 # jwt사용을 위해 임시로 만들었습니다. 추후 삭제나 변경이 필요합니다
 jwt:
@@ -54,7 +51,18 @@ jwt:
   refresh-token:
     secret: Zq4t7w!z%C*F-JaNdRgUkXp2s5v8x/A?D(G+KbPeShVmYq3t6w9z
     exp: 3600000
+    cookie:
+      secure: false
+      same-site: Lax
 
+# admin 없으면 초기 admin 생성용
 initAdmin:
   create:
+    # 여기 이메일을 실제 이메일로 바꾸면 해당 계정이 admin이됨
     admin: admin@admin.com
+    pw: Admin1234!
+
+# admin이 유저의 비밀번호를 초기화할 값
+initPassword:
+  init:
+    user: mopl1234**

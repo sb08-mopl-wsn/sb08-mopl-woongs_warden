@@ -30,13 +30,14 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
     private final JwtRegistry jwtRegistry;
 
     private static final String PREFIX = "Bearer ";
+    private static final String HEADER_NAME = "ACCESS_TOKEN";
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
                 message, StompHeaderAccessor.class
         );
-
+        // TODO: 커스텀 예외 처리 필
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
             String token = resolveToken(accessor)
                     .orElseThrow(() -> new RuntimeException("유효하지 않은 토큰입니다."));
@@ -60,6 +61,7 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
                 accessor.setUser(authentication);
                 log.debug("웹 소켓 유저를 위한 인증 설정 완료. user: {}", userDto.name());
             } else {
+                // TODO: 커스텀 예외 처리 필
                 log.debug("웹소켓 통신을 위한 유효하지 않은 JWT 토큰");
                 throw new RuntimeException("INVALID_TOKEN");
             }
@@ -77,7 +79,7 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
             return Optional.of(authHeader.substring(prefix.length()));
         }
 
-        String accessTokenHeader = accessor.getFirstNativeHeader("ACCESS_TOKEN");
+        String accessTokenHeader = accessor.getFirstNativeHeader(HEADER_NAME);
         if (StringUtils.hasText(accessTokenHeader)) {
             return Optional.of(accessTokenHeader);
         }

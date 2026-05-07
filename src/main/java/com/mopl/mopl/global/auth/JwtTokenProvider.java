@@ -239,6 +239,7 @@ public class JwtTokenProvider {
             Role role = Role.USER;
 
             if (roles != null && !roles.isEmpty()) {
+                // TODO: ADMIN, USER 제외 예외처리 필
                 String roleString = roles.get(0).replace("ROLE_", "");
                 role = Role.valueOf(roleString);
             }

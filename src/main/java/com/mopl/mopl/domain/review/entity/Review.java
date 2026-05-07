@@ -1,5 +1,6 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.domain.review.entity;
 
+import com.mopl.mopl.entity.Content;
 import com.mopl.mopl.global.base.BaseUpdatableEntity;
 import com.mopl.mopl.domain.user.entity.User;
 import jakarta.persistence.Column;
@@ -37,7 +38,6 @@ public class Review extends BaseUpdatableEntity {
     private Content content;
 
     @Builder
-
     public Review(Double rating, String description, User user, Content content) {
         this.rating = rating;
         this.description = description;

@@ -1,5 +1,6 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.domain.playlist.entity;
 
+import com.mopl.mopl.entity.Content;
 import com.mopl.mopl.global.base.BaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

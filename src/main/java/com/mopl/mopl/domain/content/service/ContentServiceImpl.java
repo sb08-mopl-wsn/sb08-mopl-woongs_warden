@@ -72,13 +72,12 @@ public class ContentServiceImpl implements ContentService
      *
      * @param contentId             수정할 콘텐츠 ID
      * @param contentUpdateRequest  콘텐츠 수정 요청 정보
-     * @param thumbnailImage        썸네일 이미지
      * @return 수정된 콘텐츠 정보
      * @throws ContentNotFoundException 콘텐츠가 존재하지 않을 때
      */
     @Transactional
     @Override
-    public ContentDto update(UUID contentId, ContentUpdateRequest contentUpdateRequest, MultipartFile thumbnailImage) {
+    public ContentDto update(UUID contentId, ContentUpdateRequest contentUpdateRequest) {
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new ContentNotFoundException(contentId));
 

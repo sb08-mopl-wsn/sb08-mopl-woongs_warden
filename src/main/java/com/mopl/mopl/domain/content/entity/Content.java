@@ -78,11 +78,27 @@ public class Content extends BaseUpdatableEntity
     }
 
     public void updateReviewStats(BigDecimal avgRating, int reviewCount) {
+        if (avgRating == null) {
+            throw new IllegalArgumentException("avgRating은 null이면 안됩니다.");
+        }
+
+        if (reviewCount < 0) {
+            throw new IllegalArgumentException("reviewCount는 0 이상이어야 합니다.");
+        }
+
+        if (avgRating.compareTo(BigDecimal.ZERO) < 0 || avgRating.compareTo(new BigDecimal("5.0")) > 0) {
+            throw new IllegalArgumentException("angRating은 0.0과 5.0 사이 값이어야 합니다.");
+        }
+
         this.avgRating = avgRating;
         this.reviewCount = reviewCount;
     }
 
     public void updateWatcherCount(int watcherCount) {
+        if (watcherCount < 0) {
+            throw new IllegalArgumentException("watcherCount는 0 이상이어야 합니다.");
+        }
+        
         this.watcherCount = watcherCount;
     }
 }

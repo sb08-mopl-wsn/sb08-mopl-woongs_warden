@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.content.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
@@ -19,5 +20,6 @@ public record ContentCreateRequest
         @Size(max = 50)
         String type,
 
+        @NotEmpty
         List<String> tags
 ) {}

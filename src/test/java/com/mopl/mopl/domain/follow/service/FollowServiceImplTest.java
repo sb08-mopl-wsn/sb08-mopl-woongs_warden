@@ -10,7 +10,10 @@ import static org.mockito.Mockito.verify;
 import com.mopl.mopl.domain.follow.dto.FollowDto;
 import com.mopl.mopl.domain.follow.dto.FollowRequest;
 import com.mopl.mopl.domain.follow.entity.Follow;
+import com.mopl.mopl.domain.follow.exception.FollowException;
 import com.mopl.mopl.domain.follow.exception.FollowNotFoundException;
+import com.mopl.mopl.domain.follow.exception.FolloweeNotFoundException;
+import com.mopl.mopl.domain.follow.exception.FollowerNotFoundException;
 import com.mopl.mopl.domain.follow.exception.SelfFollowException;
 import com.mopl.mopl.domain.follow.mapper.FollowMapper;
 import com.mopl.mopl.domain.follow.repository.FollowRepository;
@@ -18,9 +21,9 @@ import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -157,21 +160,21 @@ class FollowServiceImplTest {
 
     // then
     assertThat(isFollowed).isFalse();
-    verify(followRepository, never()).existsByFollower_IdAndFollowee_Id(any(), any());
+    verify(followRepository, never()).existsByFollowerIdAndFolloweeId(any(), any());
   }
 
   @Test
   @DisplayName("팔로우 여부 확인 - 팔로우 중이면 true, 아니면 false 반환 (Repository 분기)")
   void isFollowedByMe_ReturnsRepositoryResult() {
     // given
-    given(followRepository.existsByFollower_IdAndFollowee_Id(followerId, followeeId)).willReturn(true);
+    given(followRepository.existsByFollowerIdAndFolloweeId(followerId, followeeId)).willReturn(true);
 
     // when
     boolean isFollowed = followService.isFollowedByMe(followerId, followeeId);
 
     // then
     assertThat(isFollowed).isTrue();
-    verify(followRepository).existsByFollower_IdAndFollowee_Id(followerId, followeeId);
+    verify(followRepository).existsByFollowerIdAndFolloweeId(followerId, followeeId);
   }
 
   @Test
@@ -179,18 +182,18 @@ class FollowServiceImplTest {
   void getFollowerCount_DelegatesToRepository() {
     // given
     long expectedCount = 5L;
-    given(followRepository.countByFollowee_Id(followeeId)).willReturn(expectedCount);
+    given(followRepository.countByFolloweeId(followeeId)).willReturn(expectedCount);
 
     // when
     long count = followService.getFollowerCount(followeeId);
 
     // then
     assertThat(count).isEqualTo(expectedCount);
-    verify(followRepository).countByFollowee_Id(followeeId);
+    verify(followRepository).countByFolloweeId(followeeId);
   }
 
   @Test
-  @DisplayName("팔로우 요청 - 요청한 유저(follower)를 찾을 수 없으면 USER_NOT_FOUND 예외 발생")
+  @DisplayName("팔로우 요청 - 요청한 유저(follower)를 찾을 수 없으면 FOLLOWER_NOT_FOUND 예외 발생")
   void follow_FollowerNotFound_ThrowsException() {
     // given
     FollowRequest request = new FollowRequest(followeeId);
@@ -198,14 +201,13 @@ class FollowServiceImplTest {
 
     // when & then
     assertThatThrownBy(() -> followService.follow(followerId, request))
-        .isInstanceOf(FollowException.class)
-        .hasMessageContaining("follower를 찾을 수 없습니다");
+        .isInstanceOf(FollowerNotFoundException.class);
 
     verify(followRepository, never()).save(any());
   }
 
   @Test
-  @DisplayName("팔로우 요청 - 대상 유저(followee)를 찾을 수 없으면 USER_NOT_FOUND 예외 발생")
+  @DisplayName("팔로우 요청 - 대상 유저(followee)를 찾을 수 없으면 FOLLOWEE_NOT_FOUND 예외 발생")
   void follow_FolloweeNotFound_ThrowsException() {
     // given
     FollowRequest request = new FollowRequest(followeeId);
@@ -214,8 +216,7 @@ class FollowServiceImplTest {
 
     // when & then
     assertThatThrownBy(() -> followService.follow(followerId, request))
-        .isInstanceOf(FollowException.class)
-        .hasMessageContaining("followee를 찾을 수 없습니다");
+        .isInstanceOf(FolloweeNotFoundException.class);
 
     verify(followRepository, never()).save(any());
   }

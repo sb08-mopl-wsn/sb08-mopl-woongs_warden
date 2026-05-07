@@ -25,6 +25,7 @@ public class ReviewServiceImpl implements ReviewService {
   private final ReviewMapper reviewMapper;
 
   @Override
+  @Transactional
   public Review createReview(ReviewCreateRequest request, User user) {
     // TODO: 리뷰 생성 로직 작성해야함
     return null;

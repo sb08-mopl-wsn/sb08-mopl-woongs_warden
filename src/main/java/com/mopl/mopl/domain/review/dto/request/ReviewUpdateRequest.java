@@ -1,14 +1,12 @@
 package com.mopl.mopl.domain.review.dto.request;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 
 public record ReviewUpdateRequest(
     String text,
-    @Min(value = 0)
-    @Max(value = 5)
+    @DecimalMin("0.0")
+    @DecimalMax("5.0")
     Double rating
 ) {
 }

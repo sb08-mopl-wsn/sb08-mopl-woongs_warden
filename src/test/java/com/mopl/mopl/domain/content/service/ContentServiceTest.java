@@ -90,7 +90,7 @@ class ContentServiceTest
             // then
             assertThat(result.title()).isEqualTo("test content");
             assertThat(result.description()).isEqualTo("test description");
-            assertThat(result.contentType()).isEqualTo(ContentType.movie);
+            assertThat(result.type()).isEqualTo(ContentType.movie);
 
             then(contentRepository).should().save(any(Content.class));
             then(contentMapper).should().toContentDto(content);

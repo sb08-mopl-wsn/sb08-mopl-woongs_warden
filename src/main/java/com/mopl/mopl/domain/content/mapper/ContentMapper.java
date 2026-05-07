@@ -10,6 +10,7 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface ContentMapper
 {
+    @Mapping(source = "contentType", target = "type")
     @Mapping(source = "thumbnailKey", target = "thumbnailUrl")
     @Mapping(source = "avgRating", target = "averageRating")
     ContentDto toContentDto(Content content);

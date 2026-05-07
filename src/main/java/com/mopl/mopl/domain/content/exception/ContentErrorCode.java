@@ -20,7 +20,7 @@ public enum ContentErrorCode implements ErrorCode {
 
     @Override
     public String getDomain() {
-        return "CONTENT";
+        return "CONT";
     }
 
     @Override

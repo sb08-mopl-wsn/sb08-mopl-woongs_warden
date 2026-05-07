@@ -10,7 +10,7 @@ public record ContentDto
         UUID id,
         String title,
         String description,
-        ContentType contentType,
+        ContentType type,
         String thumbnailUrl,
         List<String> tags,
         double averageRating,

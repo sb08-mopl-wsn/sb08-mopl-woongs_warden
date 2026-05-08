@@ -19,26 +19,16 @@ import java.util.UUID;
 public class UserController {
     private final UserService userService;
 
-    @PostMapping()
+    @PostMapping
     public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserCreateRequest request) {
-        log.info("[User-Controller] 생성 요청 시작: content = {}", request.name());
-
         UserDto userDto = userService.createUser(request);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(userDto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(userDto);
     }
 
     @GetMapping("/{userId}")
     public ResponseEntity<UserDto> getDetailUser(@PathVariable UUID userId) {
-        log.info("[User-Controller] 조회 요청 시작: userId = {}", userId);
-
         UserDto userDto = userService.getUser(userId);
-
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(userDto);
+        return ResponseEntity.status(HttpStatus.OK).body(userDto);
     }
 
     @PatchMapping("/{userId}/role")
@@ -46,13 +36,8 @@ public class UserController {
             @PathVariable UUID userId,
             @Valid @RequestBody UserRoleUpdateRequest request
     ) {
-        log.info("[User-Controller] 수정 요청 시작: content = userId: {}", userId);
-
         UserDto userDto = userService.updateUserRole(userId, request);
-
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(userDto);
+        return ResponseEntity.status(HttpStatus.OK).body(userDto);
     }
 
 
@@ -61,13 +46,8 @@ public class UserController {
             @PathVariable UUID userId,
             @Valid @RequestBody ChangePasswordRequest request
     ) {
-        log.info("[User-Controller] 수정 요청 시작: content = userId: {}", userId);
-
         UserDto userDto = userService.updateUserPassword(userId, request);
-
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(userDto);
+        return ResponseEntity.status(HttpStatus.OK).body(userDto);
     }
 
     @PatchMapping("/{userId}/locked")
@@ -75,12 +55,7 @@ public class UserController {
             @PathVariable UUID userId,
             @Valid @RequestBody UserLockUpdateRequest request
     ) {
-        log.info("[User-Controller] 수정 요청 시작: content = userId: {}", userId);
-
         UserDto userDto = userService.updateUserLocked(userId, request);
-
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(userDto);
+        return ResponseEntity.status(HttpStatus.OK).body(userDto);
     }
 }

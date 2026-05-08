@@ -12,19 +12,18 @@ import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.security.SecureRandom;
 
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
@@ -32,8 +31,13 @@ public class UserServiceImpl implements UserService {
     private final JwtRegistry jwtRegistry;
 
     // admin이 유저를 초기화할 경우 쓸 비밀번호
-    @Value("${initPassword.init.user}")
-    private String initPassword;
+    private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final String LOWER = "abcdefghijklmnopqrstuvwxyz";
+    private static final String DIGIT = "0123456789";
+    private static final String SPECIAL = "!@#$%^&*";
+    private static final String ALL = UPPER + LOWER + DIGIT + SPECIAL;
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     @Transactional
@@ -44,12 +48,10 @@ public class UserServiceImpl implements UserService {
 
             // email이 유니크라 중복이면 자동으로 취소되면서 에러로 이동
             userRepository.saveAndFlush(user);
-            log.info("[User-Service] 작업 완료");
             return userMapper.toDto(user);
 
         } catch (DataIntegrityViolationException e) {
             if (isEmailDuplicateException(e)) {
-                log.error("[User-Service] 에러 중복 이메일: detail = {}", request.email());
                 throw new UserDuplicateException();
             }
             throw e;
@@ -61,20 +63,17 @@ public class UserServiceImpl implements UserService {
     public UserDto getUser(UUID userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
         UserDto result = userMapper.toDto(user);
-        log.info("[User-Service] 작업 완료: content {}", result.id());
         return result;
     }
 
     @Override
     @Transactional
-    @PreAuthorize("hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('ADMIN')")
     public UserDto updateUserRole(UUID userId, UserRoleUpdateRequest request) {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
         target.updateRole(request.role());
-
-        log.info("[User-Service] 사용자 권한 수정 완료: userId = {}, name = {}", userId, target.getName());
         return userMapper.toDto(target);
     }
 
@@ -90,7 +89,6 @@ public class UserServiceImpl implements UserService {
         target.updatePassword(encodedPassword);
         jwtRegistry.invalidateJwtInformationByUserId(userId);
 
-        log.info("[User-Service] 사용자 비밀번호 수정 완료: userId = {}, name = {}", userId, target.getName());
         return userMapper.toDto(target);
     }
 
@@ -104,11 +102,13 @@ public class UserServiceImpl implements UserService {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        String encodedPassword = passwordEncoder.encode(initPassword);
+        String rawPassword = generateInitPassword();
+        String encodedPassword = passwordEncoder.encode(rawPassword);
+
         target.updatePassword(encodedPassword);
         jwtRegistry.invalidateJwtInformationByUserId(userId);
 
-        log.info("[User-Service] 사용자 비밀번호 수정 완료: userId = {}, name = {}", userId, target.getName());
+        // TODO 나중에 메일로 어떻게 변경이 됬는지 보내는 이벤트가 필요함
         return userMapper.toDto(target);
     }
 
@@ -126,8 +126,6 @@ public class UserServiceImpl implements UserService {
         } else {
             target.unlock();
         }
-
-        log.info("[User-Service] 사용자 잠금 상태 수정 완료: userId = {}", userId);
         return userMapper.toDto(target);
     }
 
@@ -154,5 +152,29 @@ public class UserServiceImpl implements UserService {
                         || message.toLowerCase().contains("duplicate")
                         || message.toLowerCase().contains("duplicated")
         );
+    }
+
+    private String generateInitPassword() {
+        StringBuilder password = new StringBuilder();
+
+        // 필수 조건 보장
+        password.append(UPPER.charAt(secureRandom.nextInt(UPPER.length())));
+        password.append(LOWER.charAt(secureRandom.nextInt(LOWER.length())));
+        password.append(DIGIT.charAt(secureRandom.nextInt(DIGIT.length())));
+        password.append(SPECIAL.charAt(secureRandom.nextInt(SPECIAL.length())));
+
+        // 나머지 4자리 랜덤
+        for (int i = 0; i < 4; i++) {
+            password.append(ALL.charAt(secureRandom.nextInt(ALL.length())));
+        }
+
+        // 섞기
+        return password.chars()
+                .mapToObj(c -> (char) c)
+                .sorted((a, b) -> secureRandom.nextInt(3) - 1)
+                .collect(StringBuilder::new,
+                        StringBuilder::append,
+                        StringBuilder::append)
+                .toString();
     }
 }

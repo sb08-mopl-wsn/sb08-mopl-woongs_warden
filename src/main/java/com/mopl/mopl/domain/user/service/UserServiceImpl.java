@@ -14,12 +14,11 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.security.SecureRandom;
 
+import java.security.SecureRandom;
 import java.util.UUID;
 
 @Service
@@ -48,20 +47,16 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserDto createUser(UserCreateRequest request) {
-        try {
-            String password = passwordEncoder.encode(request.password());
-            User user = new User(request.name(), request.email(), password, null, null);
-
-            // email이 유니크라 중복이면 자동으로 취소되면서 에러로 이동
-            userRepository.saveAndFlush(user);
-            return userMapper.toDto(user);
-
-        } catch (DataIntegrityViolationException e) {
-            if (isEmailDuplicateException(e)) {
-                throw new UserDuplicateException();
-            }
-            throw e;
+        if (userRepository.existsByEmail(request.email())) {
+            throw new UserDuplicateException();
         }
+
+        String password = passwordEncoder.encode(request.password());
+        User user = new User(request.name(), request.email(), password, null, null);
+
+        // todo 나중에 이벤트로 알리기
+        userRepository.save(user);
+        return userMapper.toDto(user);
     }
 
     @Override
@@ -79,6 +74,7 @@ public class UserServiceImpl implements UserService {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
+        // todo 이벤트로 변경 알리기
         target.updateRole(request.role());
         return userMapper.toDto(target);
     }
@@ -94,7 +90,6 @@ public class UserServiceImpl implements UserService {
         String encodedPassword = passwordEncoder.encode(request.password());
         target.updatePassword(encodedPassword);
         jwtRegistry.invalidateJwtInformationByUserId(userId);
-
         return userMapper.toDto(target);
     }
 
@@ -132,32 +127,8 @@ public class UserServiceImpl implements UserService {
         } else {
             target.unlock();
         }
+        // todo 나중에 이벤트 변경 알리기, 정지면 메일로 보내야 할거 같다
         return userMapper.toDto(target);
-    }
-
-    private boolean isEmailDuplicateException(DataIntegrityViolationException e) {
-        Throwable cause = e;
-
-        while (cause != null) {
-            if (cause instanceof org.hibernate.exception.ConstraintViolationException constraintViolationException) {
-                String constraintName = constraintViolationException.getConstraintName();
-
-                return constraintName != null
-                        && constraintName.toLowerCase().contains("email");
-            }
-
-            cause = cause.getCause();
-        }
-
-        String message = e.getMostSpecificCause().getMessage();
-
-        return message != null
-                && message.toLowerCase().contains("email")
-                && (
-                message.toLowerCase().contains("unique")
-                        || message.toLowerCase().contains("duplicate")
-                        || message.toLowerCase().contains("duplicated")
-        );
     }
 
     private String generateInitPassword() {

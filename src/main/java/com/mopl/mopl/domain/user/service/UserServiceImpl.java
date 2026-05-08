@@ -31,11 +31,17 @@ public class UserServiceImpl implements UserService {
     private final JwtRegistry jwtRegistry;
 
     // admin이 유저를 초기화할 경우 쓸 비밀번호
-    private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    private static final String LOWER = "abcdefghijklmnopqrstuvwxyz";
-    private static final String DIGIT = "0123456789";
-    private static final String SPECIAL = "!@#$%^&*";
-    private static final String ALL = UPPER + LOWER + DIGIT + SPECIAL;
+    @Value("${password.policy.upper}")
+    private String upper;
+
+    @Value("${password.policy.lower}")
+    private String lower;
+
+    @Value("${password.policy.digit}")
+    private String digit;
+
+    @Value("${password.policy.special}")
+    private String special;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -156,16 +162,17 @@ public class UserServiceImpl implements UserService {
 
     private String generateInitPassword() {
         StringBuilder password = new StringBuilder();
+        String all = upper + lower + digit + special;
 
         // 필수 조건 보장
-        password.append(UPPER.charAt(secureRandom.nextInt(UPPER.length())));
-        password.append(LOWER.charAt(secureRandom.nextInt(LOWER.length())));
-        password.append(DIGIT.charAt(secureRandom.nextInt(DIGIT.length())));
-        password.append(SPECIAL.charAt(secureRandom.nextInt(SPECIAL.length())));
+        password.append(upper.charAt(secureRandom.nextInt(upper.length())));
+        password.append(lower.charAt(secureRandom.nextInt(lower.length())));
+        password.append(digit.charAt(secureRandom.nextInt(digit.length())));
+        password.append(special.charAt(secureRandom.nextInt(special.length())));
 
         // 나머지 4자리 랜덤
         for (int i = 0; i < 4; i++) {
-            password.append(ALL.charAt(secureRandom.nextInt(ALL.length())));
+            password.append(all.charAt(secureRandom.nextInt(all.length())));
         }
 
         // 섞기

@@ -19,7 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -31,9 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
@@ -70,6 +67,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 생성에 성공한다")
     void createUser_success() {
+        // given
         UserCreateRequest request = new UserCreateRequest(
                 "user@test.com",
                 "사용자",
@@ -88,21 +86,26 @@ class UserServiceImplTest {
                 false
         );
 
+        given(userRepository.existsByEmail(request.email()))
+                .willReturn(false);
+
         given(passwordEncoder.encode(request.password()))
                 .willReturn("encoded-password");
 
-        given(userRepository.saveAndFlush(any(User.class)))
+        given(userRepository.save(any(User.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         given(userMapper.toDto(any(User.class)))
                 .willReturn(expected);
 
+        // when
         UserDto result = userService.createUser(request);
 
+        // then
         assertThat(result).isEqualTo(expected);
 
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).saveAndFlush(userCaptor.capture());
+        verify(userRepository).save(userCaptor.capture());
 
         User savedUser = userCaptor.getValue();
 
@@ -112,6 +115,7 @@ class UserServiceImplTest {
         assertThat(savedUser.getRole()).isEqualTo(Role.USER);
         assertThat(savedUser.isLocked()).isFalse();
 
+        verify(userRepository).existsByEmail(request.email());
         verify(passwordEncoder).encode(request.password());
         verify(userMapper).toDto(savedUser);
     }
@@ -119,24 +123,23 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 생성 시 이메일이 중복되면 UserDuplicateException이 발생한다")
     void createUser_duplicateEmail_throwUserDuplicateException() {
+        // given
         UserCreateRequest request = new UserCreateRequest(
                 "duplicate@test.com",
                 "중복사용자",
                 "Password1!"
         );
 
-        given(passwordEncoder.encode(request.password()))
-                .willReturn("encoded-password");
+        given(userRepository.existsByEmail(request.email()))
+                .willReturn(true);
 
-        given(userRepository.saveAndFlush(any(User.class)))
-                .willThrow(new DataIntegrityViolationException("duplicate email"));
-
+        // when & then
         assertThatThrownBy(() -> userService.createUser(request))
                 .isInstanceOf(UserDuplicateException.class);
 
-        verify(passwordEncoder).encode(request.password());
-        verify(userRepository).saveAndFlush(any(User.class));
-        verifyNoInteractions(userMapper);
+        verify(userRepository).existsByEmail(request.email());
+        verifyNoInteractions(passwordEncoder, userMapper);
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test

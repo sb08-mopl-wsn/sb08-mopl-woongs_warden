@@ -42,7 +42,6 @@ public class User  extends BaseEntity {
     @Column(length = 100, nullable = true)
     private String socialId;
 
-    @Builder(builderMethodName = "userBuilder")
     public User(String name, String email, String password , Social socialType, String socialId) {
         this.name = name;
         this.email = email;

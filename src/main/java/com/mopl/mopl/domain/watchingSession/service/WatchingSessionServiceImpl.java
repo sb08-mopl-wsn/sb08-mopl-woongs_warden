@@ -18,6 +18,7 @@ import com.mopl.mopl.global.event.WatchingSessionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,10 +45,6 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
     @Transactional
     public void join(UUID contentId, UUID userId) {
 
-        if (watchingSessionRepository.existsByContentIdAndUserId(contentId, userId)) {
-            throw new WatchingSessionAlreadyJoinedException(contentId, userId);
-        }
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
         Content content = contentRepository.findById(contentId)
@@ -57,7 +54,13 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                 .content(content)
                 .user(user)
                 .build();
-        watchingSessionRepository.save(session);
+
+        // JOIN 중복 방지가 원자적이지 않아 동시 요청에서 중복 세션 또는 500 에러가 발생할 수 있음.
+        try {
+            watchingSessionRepository.saveAndFlush(session);
+        } catch (DataIntegrityViolationException e) {
+            throw new WatchingSessionAlreadyJoinedException(contentId, userId);
+        }
 
         WatchingSessionDto sessionDto = sessionMapper.toDto(session.getId(), session.getCreatedAt(), content, user);
         publishSessionEvent(contentId, ChangeType.JOIN, sessionDto);

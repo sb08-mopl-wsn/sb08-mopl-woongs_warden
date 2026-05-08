@@ -17,6 +17,7 @@ import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
 import com.mopl.mopl.domain.notification.repository.NotificationRepository;
 import com.mopl.mopl.domain.user.entity.User;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -54,7 +55,7 @@ class NotificationServiceImplTest {
   }
 
   @Test
-  @DisplayName("알림 삭제(읽음) - 정상적으로 삭제 완료")
+  @DisplayName("알림 삭제 - 정상적으로 삭제 완료")
   void deleteNotification_Success() {
 
     // given
@@ -164,5 +165,35 @@ class NotificationServiceImplTest {
     assertThat(response.hasNext()).isFalse();
     assertThat(response.data()).hasSize(2);
     assertThat(response.nextCursor()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("알림 목록 조회 - ASCENDING 정렬 시 repository의 Asc 메서드를 호출한다.")
+  void getNotifications_Ascending_CallsRepositoryAsc() {
+    // given
+    int limit = 10;
+    String sortDirection = "ASCENDING";
+    given(notificationRepository.findNotificationsByCursorAsc(eq(userId), eq(null), eq(null), any(
+        PageRequest.class))).willReturn(new ArrayList<>());
+    given(notificationRepository.countByUserId(userId)).willReturn(0L);
+
+    // when
+    notificationService.getNotifications(userId, null, null, limit, sortDirection, "createdAt");
+
+    // then
+    verify(notificationRepository).findNotificationsByCursorAsc(eq(userId), eq(null), eq(null), any(PageRequest.class));
+    verify(notificationRepository, never()).findNotificationsByCursorDesc(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("알림 목록 조회 - 유효하지 않은 형식의 커서 전달 시 DateTimeParseException 발생")
+  void getNotifications_InvalidCursor_ThrowsExceptions() {
+    // given
+    String invalidCursor = "2026-invalid-date-format";
+
+    // when & then
+    assertThatThrownBy(() ->
+        notificationService.getNotifications(userId, invalidCursor, null, 10, "DESCENDING", "createdAt")
+        ).isInstanceOf(DateTimeParseException.class);
   }
 }

@@ -23,7 +23,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       "WHERE n.user.id = :userId " +
       "AND (CAST(:cursor AS timestamp) IS NULL OR " +
       "n.createdAt < :cursor OR " +
-      "(n.createdAt = :cursor AND n.id < :idAfter))" +
+      "(n.createdAt = :cursor AND (:idAfter IS NULL OR n.id < :idAfter)))" +
       "ORDER BY n.createdAt DESC, n.id DESC")
   List<Notification> findNotificationsByCursorDesc(
     @Param("userId") UUID userId,
@@ -37,7 +37,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       "WHERE n.user.id = :userId " +
       "AND (CAST(:cursor AS timestamp) IS NULL OR " +
       "n.createdAt > :cursor OR " +
-      "(n.createdAt = :cursor AND n.id > :idAfter))" +
+      "(n.createdAt = :cursor AND (:idAfter IS NULL OR n.id > :idAfter)))" +
       "ORDER BY n.createdAt ASC, n.id ASC")
   List<Notification> findNotificationsByCursorAsc(
       @Param("userId") UUID userId,

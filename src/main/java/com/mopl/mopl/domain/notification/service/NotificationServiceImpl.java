@@ -3,10 +3,14 @@ package com.mopl.mopl.domain.notification.service;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
+import com.mopl.mopl.domain.notification.exception.InvalidCursorFormatException;
+import com.mopl.mopl.domain.notification.exception.InvalidLimitValueException;
+import com.mopl.mopl.domain.notification.exception.InvalidSortParameterException;
 import com.mopl.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
 import com.mopl.mopl.domain.notification.repository.NotificationRepository;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +27,7 @@ public class NotificationServiceImpl implements NotificationService {
   private final NotificationMapper notificationMapper;
 
   /**
-   * 특정 알림을 단건 삭제(읽음 처리)하는 메서드
+   * 특정 알림을 단건 삭제하는 메서드
    * @param userId 알림 삭제를 요청한 현재 로그인 사용자의 ID
    * @param notificationId 삭제할 알림의 고유 ID
    */
@@ -52,10 +56,29 @@ public class NotificationServiceImpl implements NotificationService {
       UUID userId, String cursor, UUID idAfter, int limit, String sortDirection, String sortBy
   ) {
 
-    // 커서 시간 파싱
-    Instant cursorTime = (cursor != null && !cursor.isBlank())
-        ? Instant.parse(cursor)
-        : null;
+    // limit 값 검증 방어로직
+    if (limit <= 0) {
+      throw new InvalidLimitValueException();
+    }
+
+    // 정렬 파라미터 검증 (WhiteList 검사)
+    if (!"createdAt".equals(sortBy)) {
+      throw new InvalidSortParameterException("정렬 기준(sortBy)은 'createdAt'만 지원합니다.");
+    }
+
+    if (!"ASCENDING".equalsIgnoreCase(sortDirection) && !"DESCENDING".equalsIgnoreCase(sortDirection)) {
+      throw new InvalidSortParameterException("정렬 방향(sortDirection)은 'ASCENDING' 또는 'DESCENDING'만 지원합니다.");
+    }
+
+    // 커서 시간 파싱, 예외처리 방어로직
+    Instant cursorTime = null;
+    if (cursor != null && !cursor.isBlank()) {
+      try {
+        cursorTime = Instant.parse(cursor);
+      } catch (DateTimeParseException e) {
+        throw new InvalidCursorFormatException();
+      }
+    }
 
     // DB 조회 (Limit보다 1개 더 많이 가져와서 다음 페이지 존재여부 확인)
     PageRequest pageRequest = PageRequest.of(0, limit + 1);

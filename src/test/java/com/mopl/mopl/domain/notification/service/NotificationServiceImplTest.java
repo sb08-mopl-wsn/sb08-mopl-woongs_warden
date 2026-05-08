@@ -12,12 +12,12 @@ import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.notification.entity.NotificationLevel;
+import com.mopl.mopl.domain.notification.exception.InvalidCursorFormatException;
 import com.mopl.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
 import com.mopl.mopl.domain.notification.repository.NotificationRepository;
 import com.mopl.mopl.domain.user.entity.User;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -194,6 +194,6 @@ class NotificationServiceImplTest {
     // when & then
     assertThatThrownBy(() ->
         notificationService.getNotifications(userId, invalidCursor, null, 10, "DESCENDING", "createdAt")
-        ).isInstanceOf(DateTimeParseException.class);
+        ).isInstanceOf(InvalidCursorFormatException.class);
   }
 }

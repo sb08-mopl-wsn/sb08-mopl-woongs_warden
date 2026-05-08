@@ -42,7 +42,10 @@ public class User  extends BaseEntity {
     @Column(length = 100, nullable = true)
     private String socialId;
 
-    @Builder
+    @Builder(
+            builderMethodName = "builder",
+            builderClassName = "UserBuilder"
+    )
     public User(String name, String email, String password , Social socialType, String socialId) {
         this.name = name;
         this.email = email;
@@ -54,7 +57,10 @@ public class User  extends BaseEntity {
         this.socialId = socialId != null ? socialId:null;
     }
 
-    @Builder(builderMethodName = "adminBuilder")
+    @Builder(
+            builderMethodName = "adminBuilder",
+            builderClassName = "AdminBuilder"
+    )
     // 어드민 생성용
     public User(String name, String email, String password) {
         this.name = name;

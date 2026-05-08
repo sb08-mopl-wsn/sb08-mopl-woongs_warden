@@ -40,7 +40,7 @@ cloud:
     credentials:
       access-key: test-access-key
       secret-key: test-secret-key
-    region: ap-northease-2
+    region: ap-northeast-2
     s3:
       bucket: test-bucket
       cdn-url: test-cdn-url

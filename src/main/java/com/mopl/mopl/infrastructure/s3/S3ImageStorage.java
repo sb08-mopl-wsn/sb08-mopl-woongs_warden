@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 
 @Slf4j
@@ -50,7 +51,9 @@ public class S3ImageStorage
                     .contentType(file.getContentType())
                     .build();
 
-            s3Client.putObject(request, RequestBody.fromBytes(file.getBytes()));
+            try (InputStream inputStream = file.getInputStream()) {
+                s3Client.putObject(request, RequestBody.fromInputStream(inputStream, file.getSize()));
+            }
 
             log.debug("[S3ImageStorage] Uploaded file {} to bucket {}]", file.getOriginalFilename(), bucket);
         } catch (IOException | SdkException e) {

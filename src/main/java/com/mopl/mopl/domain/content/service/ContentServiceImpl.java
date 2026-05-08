@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -39,6 +41,7 @@ public class ContentServiceImpl implements ContentService
     @Transactional
     @Override
     public ContentDto create(ContentCreateRequest contentCreateRequest, MultipartFile thumbnailImage) {
+        // DB 롤백에 맞게 S3를 맞춰야 하지만, 업로드는 고아 파일이 남아도 치명적이지 않음.
         String thumbnailKey = (thumbnailImage != null && !thumbnailImage.isEmpty())
                 ? s3ImageStorage.upload(thumbnailImage, "thumbnail")
                 : null;
@@ -142,11 +145,19 @@ public class ContentServiceImpl implements ContentService
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new ContentNotFoundException(contentId));
 
-        if (content.getThumbnailKey() != null) {
-            s3ImageStorage.delete(content.getThumbnailKey());
-        }
-
         contentRepository.delete(content);
+
+        // S3는 무조건 DB 트랜잭션 이후에 실행되어야 함.
+        // 추후 이벤트 기반으로 변경(@TransactionalEventListener)
+        String thumbnailKey = content.getThumbnailKey();
+        if (thumbnailKey != null) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    s3ImageStorage.delete(thumbnailKey);
+                }
+            });
+        }
     }
 
     private String extractCursor(Content content, String sortBy) {

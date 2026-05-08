@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.mopl.mopl.domain.notification.dto.CursorPaginationRequest;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
@@ -99,8 +100,7 @@ class NotificationServiceImplTest {
   void getNotifications_HasNextTrue() {
 
     // given
-    int limit = 2;
-    String sortDirection = "DESCENDING";
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 2, "DESCENDING", "createdAt");
 
     List<Notification> mockNotifications = new ArrayList<>();
     // limit(2) 보다 1개 더 많은 3개 생성
@@ -121,15 +121,32 @@ class NotificationServiceImplTest {
     );
 
     // when
-    CursorResponseNotificationDto response = notificationService.getNotifications(
-        userId, null, null, limit, sortDirection, "createdAt"
-    );
+    CursorResponseNotificationDto response = notificationService.getNotifications(userId, request);
 
     // then
     assertThat(response.hasNext()).isTrue();
-    assertThat(response.data()).hasSize(limit); // 2
+    assertThat(response.data()).hasSize(request.limit()); // 2
     assertThat(response.totalCount()).isEqualTo(10L);
     assertThat(response.nextCursor()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("알림 목록 조회 - 두 번째 페이지(커서 존재)부터는 count 쿼리를 실행하지 않고 -1을 반환한다.")
+  void getNotifications_WithCursor_DoesNotCount() {
+    // given
+    String cursor = Instant.now().toString(); // 커서 값 존재
+    CursorPaginationRequest request = new CursorPaginationRequest(cursor, null, 10, "DESCENDING", "createdAt");
+
+    given(notificationRepository.findNotificationsByCursorDesc(
+        eq(userId), any(Instant.class), eq(null), any(PageRequest.class)
+    )).willReturn(new ArrayList<>());
+
+    // when
+    CursorResponseNotificationDto response = notificationService.getNotifications(userId, request);
+
+    // then
+    assertThat(response.totalCount()).isEqualTo(-1L);
+    verify(notificationRepository, never()).countByUserId(any()); // 카운트 메서드 호출 안했는지 검증
   }
 
   @Test
@@ -137,7 +154,7 @@ class NotificationServiceImplTest {
   void getNotifications_HasNextFalse() {
 
     // given
-    int limit = 5;
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 5, "DESCENDING", "createdAt");
 
     List<Notification> mockNotifications = new ArrayList<>();
     for (int i = 0; i < 2; i++) {
@@ -157,9 +174,7 @@ class NotificationServiceImplTest {
     );
 
     // when
-    CursorResponseNotificationDto response = notificationService.getNotifications(
-        userId, null, null, limit, "DESCENDING", "createdAt"
-    );
+    CursorResponseNotificationDto response = notificationService.getNotifications(userId, request);
 
     // then
     assertThat(response.hasNext()).isFalse();
@@ -171,14 +186,14 @@ class NotificationServiceImplTest {
   @DisplayName("알림 목록 조회 - ASCENDING 정렬 시 repository의 Asc 메서드를 호출한다.")
   void getNotifications_Ascending_CallsRepositoryAsc() {
     // given
-    int limit = 10;
-    String sortDirection = "ASCENDING";
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "ASCENDING", "createdAt");
+
     given(notificationRepository.findNotificationsByCursorAsc(eq(userId), eq(null), eq(null), any(
         PageRequest.class))).willReturn(new ArrayList<>());
     given(notificationRepository.countByUserId(userId)).willReturn(0L);
 
     // when
-    notificationService.getNotifications(userId, null, null, limit, sortDirection, "createdAt");
+    notificationService.getNotifications(userId, request);
 
     // then
     verify(notificationRepository).findNotificationsByCursorAsc(eq(userId), eq(null), eq(null), any(PageRequest.class));
@@ -190,10 +205,10 @@ class NotificationServiceImplTest {
   void getNotifications_InvalidCursor_ThrowsExceptions() {
     // given
     String invalidCursor = "2026-invalid-date-format";
+    CursorPaginationRequest request = new CursorPaginationRequest(invalidCursor, null, 10, "DESCENDING", "createdAt");
 
     // when & then
     assertThatThrownBy(() ->
-        notificationService.getNotifications(userId, invalidCursor, null, 10, "DESCENDING", "createdAt")
-        ).isInstanceOf(InvalidCursorFormatException.class);
+        notificationService.getNotifications(userId, request)).isInstanceOf(InvalidCursorFormatException.class);
   }
 }

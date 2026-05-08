@@ -1,5 +1,6 @@
 package com.mopl.mopl.domain.notification.service;
 
+import com.mopl.mopl.domain.notification.dto.CursorPaginationRequest;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import java.util.UUID;
 
@@ -9,12 +10,5 @@ public interface NotificationService {
   void deleteNotification(UUID userId, UUID notificationId);
 
   // 알림 목록 조회
-  CursorResponseNotificationDto getNotifications(
-      UUID userId,
-      String cursor,
-      UUID idAfter,
-      int limit,
-      String sortDirection,
-      String sortBy
-  );
+  CursorResponseNotificationDto getNotifications(UUID userId, CursorPaginationRequest request);
 }

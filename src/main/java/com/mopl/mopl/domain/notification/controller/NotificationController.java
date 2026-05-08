@@ -1,7 +1,9 @@
 package com.mopl.mopl.domain.notification.controller;
 
+import com.mopl.mopl.domain.notification.dto.CursorPaginationRequest;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import com.mopl.mopl.domain.notification.service.NotificationService;
+import jakarta.validation.Valid;
 import java.util.Arrays;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,17 +40,13 @@ public class NotificationController {
   @GetMapping
   public ResponseEntity<CursorResponseNotificationDto> getNotifications(
       @RequestHeader(value = "X-Temp-User-Id", required = true) UUID userId, // 임시 헤더
-      @RequestParam(value = "cursor", required = false) String cursor,
-      @RequestParam(value = "idAfter", required = false) UUID idAfter,
-      @RequestParam(value = "limit", defaultValue = "20") int limit,
-      @RequestParam(value = "sortDirection", defaultValue = "DESCENDING") String sortDirection,
-      @RequestParam(value = "sortBy", defaultValue = "createdAt") String sortBy
+      @Valid @ModelAttribute CursorPaginationRequest request
   ) {
 
     validateTempAuthAllowed();
 
     CursorResponseNotificationDto response = notificationService.getNotifications(
-        userId, cursor, idAfter, limit, sortDirection, sortBy);
+        userId, request);
 
     return ResponseEntity.ok(response);
   }

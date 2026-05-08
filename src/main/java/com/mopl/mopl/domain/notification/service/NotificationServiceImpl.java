@@ -1,5 +1,6 @@
 package com.mopl.mopl.domain.notification.service;
 
+import com.mopl.mopl.domain.notification.dto.CursorPaginationRequest;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
@@ -44,59 +45,48 @@ public class NotificationServiceImpl implements NotificationService {
   /**
    * 사용자의 알림 목록을 커서 기반 페이지네이션 방식으로 조회 (무한 스크롤)
    * @param userId 알림 목록을 조회할 현재 로그인 사용자의 ID
-   * @param cursor 페이지네이션 기준점 (이전 페이지 마지막 알림의 생성 시간)
-   * @param idAfter 커서(시간)가 완전히 동일한 데이터가 있을 때 순서 보장을 위한 보조 커서
-   * @param limit 한 번에 조회할 알림의 최대 개수
-   * @param sortDirection 정렬 방향 (기본값: DESCENDING)
-   * @param sortBy 정렬 기준 (createdAt 고정)
+   * @param request 페이지네이션 요청 파라미터 (cursor, limit, 정렬 정보 등)
    * @return 알림 목록, 다음 커서 정보, 총 개수 등이 포함된 커서 응답 DTO 객체
    */
   @Override
-  public CursorResponseNotificationDto getNotifications(
-      UUID userId, String cursor, UUID idAfter, int limit, String sortDirection, String sortBy
-  ) {
-
-    // limit 값 검증 방어로직
-    if (limit <= 0) {
-      throw new InvalidLimitValueException();
-    }
+  public CursorResponseNotificationDto getNotifications(UUID userId, CursorPaginationRequest request) {
 
     // 정렬 파라미터 검증 (WhiteList 검사)
-    if (!"createdAt".equals(sortBy)) {
+    if (!"createdAt".equals(request.sortBy())) {
       throw new InvalidSortParameterException("정렬 기준(sortBy)은 'createdAt'만 지원합니다.");
     }
 
-    if (!"ASCENDING".equalsIgnoreCase(sortDirection) && !"DESCENDING".equalsIgnoreCase(sortDirection)) {
+    if (!"ASCENDING".equalsIgnoreCase(request.sortDirection()) && !"DESCENDING".equalsIgnoreCase(request.sortDirection())) {
       throw new InvalidSortParameterException("정렬 방향(sortDirection)은 'ASCENDING' 또는 'DESCENDING'만 지원합니다.");
     }
 
     // 커서 시간 파싱, 예외처리 방어로직
     Instant cursorTime = null;
-    if (cursor != null && !cursor.isBlank()) {
+    if (request.cursor() != null && !request.cursor().isBlank()) {
       try {
-        cursorTime = Instant.parse(cursor);
+        cursorTime = Instant.parse(request.cursor());
       } catch (DateTimeParseException e) {
         throw new InvalidCursorFormatException();
       }
     }
 
     // DB 조회 (Limit보다 1개 더 많이 가져와서 다음 페이지 존재여부 확인)
-    PageRequest pageRequest = PageRequest.of(0, limit + 1);
+    PageRequest pageRequest = PageRequest.of(0, request.limit() + 1);
     List<Notification> notifications;
 
-    if ("ASCENDING".equalsIgnoreCase(sortDirection)) {
-      notifications = notificationRepository.findNotificationsByCursorAsc(userId, cursorTime, idAfter, pageRequest);
+    if ("ASCENDING".equalsIgnoreCase(request.sortDirection())) {
+      notifications = notificationRepository.findNotificationsByCursorAsc(userId, cursorTime, request.idAfter(), pageRequest);
     } else {
-      notifications = notificationRepository.findNotificationsByCursorDesc(userId, cursorTime, idAfter, pageRequest);
+      notifications = notificationRepository.findNotificationsByCursorDesc(userId, cursorTime, request.idAfter(), pageRequest);
     }
 
     // 다음 페이지 존재 확인
-    boolean hasNext = notifications.size() > limit;
+    boolean hasNext = notifications.size() > request.limit();
     if (hasNext) {
-      notifications.remove(limit);
+      notifications.remove(request.limit().intValue());
     }
 
-    // 다음 페이지 조회를 위해서 커서 정보 춫출
+    // 다음 페이지 조회를 위해서 커서 정보 추출
     String nextCursor = null;
     UUID nextIdAfter = null;
     if (!notifications.isEmpty()) {
@@ -105,8 +95,11 @@ public class NotificationServiceImpl implements NotificationService {
       nextIdAfter = lastNotification.getId();
     }
 
-    // 사용자 총 알림 개수
-    long totalCount = notificationRepository.countByUserId(userId);
+    // 사용자 총 알림 개수 (첫 페이지에서만 count 쿼리 실행)
+    long totalCount = -1L;
+    if (request.cursor() == null || request.cursor().isBlank()){
+      totalCount = notificationRepository.countByUserId(userId);
+    }
 
     // Dto 변환
     List<NotificationDto> data = notifications.stream()
@@ -115,7 +108,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     // dto 리턴
     return new CursorResponseNotificationDto(
-        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection
+        data, nextCursor, nextIdAfter, hasNext, totalCount, request.sortBy(), request.sortDirection()
     );
   }
 }

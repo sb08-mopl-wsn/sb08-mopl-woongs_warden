@@ -1,6 +1,5 @@
 package com.mopl.mopl.domain.watchingSession.controller;
 
-import com.mopl.mopl.domain.watchingSession.dto.WatchingSessionChange;
 import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,7 @@ public class WatchingSessionController {
 
     @MessageMapping("/contents/{contentId}/watch/join")
     public void handleJoin(@DestinationVariable UUID contentId,
-                               @AuthenticationPrincipal MoplUserDetails userDetails) {
+                           @AuthenticationPrincipal MoplUserDetails userDetails) {
 
         UUID userId = userDetails.getUserDto().id();
         watchingSessionService.join(contentId, userId);

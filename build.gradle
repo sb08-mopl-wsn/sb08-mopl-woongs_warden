@@ -53,6 +53,11 @@ dependencies {
 	// docs
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.16'
 
+	// cloud
+	implementation platform('software.amazon.awssdk:bom:2.41.34')
+	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:apache-client'
+
 	// test
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'

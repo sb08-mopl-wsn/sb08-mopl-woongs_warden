@@ -28,6 +28,17 @@ logging:
     root: info
     org.springframework.web.socket: DEBUG
 
+# S3
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY}
+      secret-key: ${AWS_SECRET_KEY}
+    region: ${AWS_REGION:ap-northeast-2}
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+      cdn-url: ${AWS_S3_CDN_URL}
+
 management:
   endpoints:
     web:

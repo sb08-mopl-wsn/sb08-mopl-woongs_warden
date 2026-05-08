@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -29,10 +30,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
@@ -59,6 +60,11 @@ class UserServiceImplTest {
                 passwordEncoder,
                 jwtRegistry
         );
+
+        ReflectionTestUtils.setField(userService, "upper", "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        ReflectionTestUtils.setField(userService, "lower", "abcdefghijklmnopqrstuvwxyz");
+        ReflectionTestUtils.setField(userService, "digit", "0123456789");
+        ReflectionTestUtils.setField(userService, "special", "!@#$%^&*");
     }
 
     @Test
@@ -225,7 +231,6 @@ class UserServiceImplTest {
         User user = createUser();
 
         ChangePasswordRequest request = new ChangePasswordRequest("NewPassword1!");
-
         UserDto expected = createUserDto(userId, user);
 
         given(userRepository.findById(userId))
@@ -269,7 +274,6 @@ class UserServiceImplTest {
     void initUserPassword_success() {
         UUID userId = UUID.randomUUID();
         User user = createUser();
-
         UserDto expected = createUserDto(userId, user);
 
         given(userRepository.findById(userId))

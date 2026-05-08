@@ -11,3 +11,13 @@ spring:
 logging:
   level:
     root: warn
+
+cloud:
+  aws:
+    credentials:
+      access-key: test-access-key
+      secret-key: test-secret-key
+    region: ap-northease-2
+    s3:
+      bucket: test-bucket
+      cdn-url: test-cdn-url

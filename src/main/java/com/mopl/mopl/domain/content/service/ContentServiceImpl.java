@@ -12,6 +12,7 @@ import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @Service
@@ -154,7 +156,11 @@ public class ContentServiceImpl implements ContentService
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    s3ImageStorage.delete(thumbnailKey);
+                    try {
+                        s3ImageStorage.delete(thumbnailKey);
+                    } catch (Exception e) {
+                        log.warn("S3 이미지 삭제 실패: key={}", thumbnailKey, e);
+                    }
                 }
             });
         }

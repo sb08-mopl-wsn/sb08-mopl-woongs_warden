@@ -21,7 +21,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -52,8 +51,6 @@ class UserServiceImplTest {
 
     private UserServiceImpl userService;
 
-    private static final String INIT_PASSWORD = "Init1234!";
-
     @BeforeEach
     void setUp() {
         userService = new UserServiceImpl(
@@ -62,14 +59,11 @@ class UserServiceImplTest {
                 passwordEncoder,
                 jwtRegistry
         );
-
-        ReflectionTestUtils.setField(userService, "initPassword", INIT_PASSWORD);
     }
 
     @Test
     @DisplayName("회원 생성에 성공한다")
     void createUser_success() {
-        // given
         UserCreateRequest request = new UserCreateRequest(
                 "user@test.com",
                 "사용자",
@@ -97,10 +91,8 @@ class UserServiceImplTest {
         given(userMapper.toDto(any(User.class)))
                 .willReturn(expected);
 
-        // when
         UserDto result = userService.createUser(request);
 
-        // then
         assertThat(result).isEqualTo(expected);
 
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
@@ -121,7 +113,6 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 생성 시 이메일이 중복되면 UserDuplicateException이 발생한다")
     void createUser_duplicateEmail_throwUserDuplicateException() {
-        // given
         UserCreateRequest request = new UserCreateRequest(
                 "duplicate@test.com",
                 "중복사용자",
@@ -134,7 +125,6 @@ class UserServiceImplTest {
         given(userRepository.saveAndFlush(any(User.class)))
                 .willThrow(new DataIntegrityViolationException("duplicate email"));
 
-        // when & then
         assertThatThrownBy(() -> userService.createUser(request))
                 .isInstanceOf(UserDuplicateException.class);
 
@@ -146,7 +136,6 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 단건 조회에 성공한다")
     void getUser_success() {
-        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
         UserDto expected = createUserDto(userId, user);
@@ -157,10 +146,8 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
-        // when
         UserDto result = userService.getUser(userId);
 
-        // then
         assertThat(result).isEqualTo(expected);
 
         verify(userRepository).findById(userId);
@@ -170,13 +157,11 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 단건 조회 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void getUser_notFound_throwUserNotFoundException() {
-        // given
         UUID userId = UUID.randomUUID();
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> userService.getUser(userId))
                 .isInstanceOf(UserNotFoundException.class);
 
@@ -187,7 +172,6 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 권한 수정에 성공한다")
     void updateUserRole_success() {
-        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
 
@@ -209,10 +193,8 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
-        // when
         UserDto result = userService.updateUserRole(userId, request);
 
-        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.getRole()).isEqualTo(Role.ADMIN);
 
@@ -223,14 +205,12 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 권한 수정 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void updateUserRole_notFound_throwUserNotFoundException() {
-        // given
         UUID userId = UUID.randomUUID();
         UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> userService.updateUserRole(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 
@@ -241,7 +221,6 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 비밀번호 수정에 성공한다")
     void updateUserPassword_success() {
-        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
 
@@ -258,40 +237,36 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
-        // when
         UserDto result = userService.updateUserPassword(userId, request);
 
-        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("new-encoded-password");
 
         verify(userRepository).findById(userId);
         verify(passwordEncoder).encode(request.password());
+        verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
         verify(userMapper).toDto(user);
     }
 
     @Test
     @DisplayName("회원 비밀번호 수정 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void updateUserPassword_notFound_throwUserNotFoundException() {
-        // given
         UUID userId = UUID.randomUUID();
         ChangePasswordRequest request = new ChangePasswordRequest("NewPassword1!");
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> userService.updateUserPassword(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 
         verify(userRepository).findById(userId);
-        verifyNoInteractions(passwordEncoder, userMapper);
+        verifyNoInteractions(passwordEncoder, jwtRegistry, userMapper);
     }
 
     @Test
     @DisplayName("관리자에 의한 비밀번호 초기화에 성공한다")
     void initUserPassword_success() {
-        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
 
@@ -300,45 +275,51 @@ class UserServiceImplTest {
         given(userRepository.findById(userId))
                 .willReturn(Optional.of(user));
 
-        given(passwordEncoder.encode(INIT_PASSWORD))
+        given(passwordEncoder.encode(any(String.class)))
                 .willReturn("init-encoded-password");
 
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
-        // when
         UserDto result = userService.initUserPassword(userId);
 
-        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("init-encoded-password");
 
+        ArgumentCaptor<String> passwordCaptor = ArgumentCaptor.forClass(String.class);
+        verify(passwordEncoder).encode(passwordCaptor.capture());
+
+        String rawPassword = passwordCaptor.getValue();
+
+        assertThat(rawPassword).hasSize(8);
+        assertThat(rawPassword).matches(".*[A-Z].*");
+        assertThat(rawPassword).matches(".*[a-z].*");
+        assertThat(rawPassword).matches(".*[0-9].*");
+        assertThat(rawPassword).matches(".*[!@#$%^&*].*");
+
         verify(userRepository).findById(userId);
-        verify(passwordEncoder).encode(INIT_PASSWORD);
+        verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
         verify(userMapper).toDto(user);
     }
 
     @Test
     @DisplayName("비밀번호 초기화 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void initUserPassword_notFound_throwUserNotFoundException() {
-        // given
         UUID userId = UUID.randomUUID();
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> userService.initUserPassword(userId))
                 .isInstanceOf(UserNotFoundException.class);
 
         verify(userRepository).findById(userId);
-        verifyNoInteractions(passwordEncoder, userMapper);
+        verifyNoInteractions(passwordEncoder, jwtRegistry, userMapper);
     }
 
     @Test
     @DisplayName("회원을 잠금 처리하면 계정이 잠기고 JWT 정보가 무효화된다")
     void updateUserLocked_lock_success() {
-        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
 
@@ -360,10 +341,8 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
-        // when
         UserDto result = userService.updateUserLocked(userId, request);
 
-        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.isLocked()).isTrue();
 
@@ -375,7 +354,6 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 잠금을 해제하면 계정이 잠금 해제되고 JWT 정보는 무효화하지 않는다")
     void updateUserLocked_unlock_success() {
-        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
         user.lock();
@@ -398,10 +376,8 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
-        // when
         UserDto result = userService.updateUserLocked(userId, request);
 
-        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.isLocked()).isFalse();
 
@@ -413,14 +389,12 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 잠금 상태 수정 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void updateUserLocked_notFound_throwUserNotFoundException() {
-        // given
         UUID userId = UUID.randomUUID();
         UserLockUpdateRequest request = new UserLockUpdateRequest(true);
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> userService.updateUserLocked(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 

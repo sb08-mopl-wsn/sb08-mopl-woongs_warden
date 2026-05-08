@@ -42,19 +42,25 @@ public class User  extends BaseEntity {
     @Column(length = 100, nullable = true)
     private String socialId;
 
-    @Builder
-    public User(String name, String email, String password, String profileImageKey, Social socialType, String socialId) {
+    @Builder(
+            builderMethodName = "builder",
+            builderClassName = "UserBuilder"
+    )
+    public User(String name, String email, String password , Social socialType, String socialId) {
         this.name = name;
         this.email = email;
         this.password = password;
         this.role = Role.USER;
         this.isLocked = false;
-        this.profileImageKey = profileImageKey;
+        this.profileImageKey = null;
         this.socialType = socialType != null ? socialType : null;
-        this.socialId = socialId;
+        this.socialId = socialId != null ? socialId:null;
     }
 
-    @Builder
+    @Builder(
+            builderMethodName = "adminBuilder",
+            builderClassName = "AdminBuilder"
+    )
     // 어드민 생성용
     public User(String name, String email, String password) {
         this.name = name;

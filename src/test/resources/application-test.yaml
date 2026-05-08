@@ -11,3 +11,26 @@ spring:
 logging:
   level:
     root: warn
+
+jwt:
+  access-token:
+    secret: test-access-secret-test-access-secret-test-access-secret
+    exp: 900000
+  refresh-token:
+    secret: test-refresh-secret-test-refresh-secret-test-refresh-secret
+    exp: 3600000
+    cookie:
+      secure: false
+      same-site: Lax
+
+initAdmin:
+  create:
+    admin: admin@admin.com
+    pw: Admin1234!
+
+password:
+  policy:
+    upper: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+    lower: abcdefghijklmnopqrstuvwxyz
+    digit: 0123456789
+    special: "!@#$%^&*"

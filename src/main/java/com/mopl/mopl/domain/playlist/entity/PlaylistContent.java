@@ -1,4 +1,4 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.domain.playlist.entity;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.global.base.BaseEntity;

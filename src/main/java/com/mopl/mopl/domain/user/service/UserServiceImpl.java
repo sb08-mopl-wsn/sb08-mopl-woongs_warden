@@ -48,8 +48,11 @@ public class UserServiceImpl implements UserService {
             return userMapper.toDto(user);
 
         } catch (DataIntegrityViolationException e) {
-            log.error("[User-Service] 에러 중복 이메일: detail = {}", request.email());
-            throw new UserDuplicateException();
+            if (isEmailDuplicateException(e)) {
+                log.error("[User-Service] 에러 중복 이메일: detail = {}", request.email());
+                throw new UserDuplicateException();
+            }
+            throw e;
         }
     }
 
@@ -85,6 +88,7 @@ public class UserServiceImpl implements UserService {
 
         String encodedPassword = passwordEncoder.encode(request.password());
         target.updatePassword(encodedPassword);
+        jwtRegistry.invalidateJwtInformationByUserId(userId);
 
         log.info("[User-Service] 사용자 비밀번호 수정 완료: userId = {}, name = {}", userId, target.getName());
         return userMapper.toDto(target);
@@ -102,6 +106,7 @@ public class UserServiceImpl implements UserService {
 
         String encodedPassword = passwordEncoder.encode(initPassword);
         target.updatePassword(encodedPassword);
+        jwtRegistry.invalidateJwtInformationByUserId(userId);
 
         log.info("[User-Service] 사용자 비밀번호 수정 완료: userId = {}, name = {}", userId, target.getName());
         return userMapper.toDto(target);
@@ -124,5 +129,30 @@ public class UserServiceImpl implements UserService {
 
         log.info("[User-Service] 사용자 잠금 상태 수정 완료: userId = {}", userId);
         return userMapper.toDto(target);
+    }
+
+    private boolean isEmailDuplicateException(DataIntegrityViolationException e) {
+        Throwable cause = e;
+
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException constraintViolationException) {
+                String constraintName = constraintViolationException.getConstraintName();
+
+                return constraintName != null
+                        && constraintName.toLowerCase().contains("email");
+            }
+
+            cause = cause.getCause();
+        }
+
+        String message = e.getMostSpecificCause().getMessage();
+
+        return message != null
+                && message.toLowerCase().contains("email")
+                && (
+                message.toLowerCase().contains("unique")
+                        || message.toLowerCase().contains("duplicate")
+                        || message.toLowerCase().contains("duplicated")
+        );
     }
 }

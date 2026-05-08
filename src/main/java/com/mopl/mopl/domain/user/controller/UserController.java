@@ -21,7 +21,7 @@ public class UserController {
 
     @PostMapping()
     public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserCreateRequest request) {
-        log.info("[User-Controller] 생성 요청 시작: content = {}", request.email());
+        log.info("[User-Controller] 생성 요청 시작: content = {}", request.name());
 
         UserDto userDto = userService.createUser(request);
 
@@ -51,7 +51,7 @@ public class UserController {
         UserDto userDto = userService.updateUserRole(userId, request);
 
         return ResponseEntity
-                .status(HttpStatus.ACCEPTED)
+                .status(HttpStatus.OK)
                 .body(userDto);
     }
 
@@ -66,7 +66,7 @@ public class UserController {
         UserDto userDto = userService.updateUserPassword(userId, request);
 
         return ResponseEntity
-                .status(HttpStatus.ACCEPTED)
+                .status(HttpStatus.OK)
                 .body(userDto);
     }
 
@@ -80,7 +80,7 @@ public class UserController {
         UserDto userDto = userService.updateUserLocked(userId, request);
 
         return ResponseEntity
-                .status(HttpStatus.ACCEPTED)
+                .status(HttpStatus.OK)
                 .body(userDto);
     }
 }

@@ -5,6 +5,7 @@ import com.mopl.mopl.global.auth.handler.*;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -12,6 +13,7 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
@@ -26,7 +28,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 @Configuration
 @EnableWebSecurity
-//@EnableMethodSecurity  // 기능을 못하게 주석
+@EnableMethodSecurity  // 인증 무시할려면 여기 주석하시면 됩니다.
 public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -47,45 +49,47 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+                        .ignoringRequestMatchers(
+                                "/api/auth/sign-in"
+//                                "/api/auth/sign-out",
+//                                "/api/auth/refresh"
+                        )
                 )
                 .authorizeHttpRequests(auth -> auth
                                 // 문서 관련
-//                        .requestMatchers("/", "/index.html").permitAll()
-//                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
-//
-//                        // 로그인/아웃 관련
-//                        .requestMatchers("/api/auth/csrf-token").permitAll()
-//                        .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
-//                        .requestMatchers("/api/auth/login", "/api/auth/logout").permitAll()
-//                        .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 엑세스 토큰 재발급
-//
-//                        // 채널 관련
-//                        .requestMatchers("/api/channels/public").hasRole("CHANNEL_MANAGER")
-//                        .requestMatchers(HttpMethod.PATCH, "/api/channels/{channelId}").hasRole("CHANNEL_MANAGER")
-//                        .requestMatchers(HttpMethod.DELETE, "/api/channels").hasRole("CHANNEL_MANAGER")
-//
-//                        // 유저 관련
-//                        .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
-//
-//                        // 사용자 권한 변경은 ADMIN 권한 필요
-//                        .requestMatchers(HttpMethod.PUT, "/api/auth/role").hasRole("ADMIN")
-//                        .requestMatchers("/api/**").authenticated()
-//                        .anyRequest().authenticated()
+                                .requestMatchers("/", "/index.html").permitAll()
+                                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
 
-                                .anyRequest().permitAll()
+                                // 로그인/아웃 관련
+                                .requestMatchers("/api/auth/csrf-token").permitAll()
+                                .requestMatchers("/api/auth/sign-in", "/api/auth/sign-out").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 엑세스 토큰 재발급
+
+                                // 유저 관련
+                                .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
+
+                                // 사용자 권한 변경은 ADMIN 권한 필요
+                                .requestMatchers(HttpMethod.PATCH, "/api/users/*/role").hasRole("ADMIN")
+                                .requestMatchers(HttpMethod.PATCH, "/api/users/*/locked").hasRole("ADMIN")
+                                .requestMatchers("/api/**").authenticated()
+                                .anyRequest().authenticated()
+
+                        // 인증 무시할려면 여기 주석 해제하고
+                        // 위에 체인메서드 전부 주석하시면 됩니다.
+                        // .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .formLogin(login -> login
-                        .loginProcessingUrl("/api/auth/login")
+                        .loginProcessingUrl("/api/auth/sign-in")
                         .successHandler(jwtLoginSuccessHandler)
                         .failureHandler(loginFailureHandler)
                         .permitAll()
                 )
                 .httpBasic(basic -> basic.disable())
                 .logout(logout -> logout
-                        .logoutUrl("/api/auth/logout")
+                        .logoutUrl("/api/auth/sign-out")
                         .addLogoutHandler(jwtLogoutHandler)
                         .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler())
                         .permitAll())
@@ -121,6 +125,7 @@ public class SecurityConfig {
                 .requestMatchers("/static/**", "/css/**", "/js/**", "/images/**", "/*.js", "/*.css");
     }
 
+    // todo 여기 지금 경고 나온다고 함
     @Bean
     public DaoAuthenticationProvider authenticationProvider(UserDetailsService userDetailsService) {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();

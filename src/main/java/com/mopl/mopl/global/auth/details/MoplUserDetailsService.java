@@ -1,6 +1,6 @@
 package com.mopl.mopl.global.auth.details;
 
-import com.mopl.mopl.domain.user.dto.UserDto;
+import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,12 +20,10 @@ public class MoplUserDetailsService implements UserDetailsService {
     private final UserMapper userMapper;
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByName(username)
-                .map(user -> {
-                    UserDto userDto = userMapper.toDto(user);
-                    return new MoplUserDetails(userDto, user.getPassword());
-                })
+    public UserDetails loadUserByUsername(String username) {
+        User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+
+        return new MoplUserDetails(userMapper.toDto(user), user.getPassword());
     }
 }

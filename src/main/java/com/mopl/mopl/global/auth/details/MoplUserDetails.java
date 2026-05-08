@@ -31,6 +31,10 @@ public class MoplUserDetails implements UserDetails {
 
     @Override
     public String getUsername() {
+        return userDto.email();
+    }
+
+    public String getNmae() {
         return userDto.name();
     }
 
@@ -58,10 +62,10 @@ public class MoplUserDetails implements UserDetails {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof MoplUserDetails that)) return false;
-        return Objects.equals(userDto.name(), that.userDto.name());}
+        return Objects.equals(userDto.email(), that.userDto.email());}
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(userDto.name());
+        return Objects.hashCode(userDto.email());
     }
 }

@@ -10,15 +10,20 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @Service
@@ -26,6 +31,7 @@ public class ContentServiceImpl implements ContentService
 {
     private final ContentRepository contentRepository;
     private final ContentMapper contentMapper;
+    private final S3ImageStorage s3ImageStorage;
 
     /**
      * 콘텐츠를 생성한다.
@@ -37,9 +43,9 @@ public class ContentServiceImpl implements ContentService
     @Transactional
     @Override
     public ContentDto create(ContentCreateRequest contentCreateRequest, MultipartFile thumbnailImage) {
-        // 나중에 s3에 연결
+        // DB 롤백에 맞게 S3를 맞춰야 하지만, 업로드는 고아 파일이 남아도 치명적이지 않음.
         String thumbnailKey = (thumbnailImage != null && !thumbnailImage.isEmpty())
-                ? thumbnailImage.getOriginalFilename()
+                ? s3ImageStorage.upload(thumbnailImage, "thumbnail")
                 : null;
 
         Content content = Content.builder()
@@ -142,6 +148,22 @@ public class ContentServiceImpl implements ContentService
                 .orElseThrow(() -> new ContentNotFoundException(contentId));
 
         contentRepository.delete(content);
+
+        // S3는 무조건 DB 트랜잭션 이후에 실행되어야 함.
+        // 추후 이벤트 기반으로 변경(@TransactionalEventListener)
+        String thumbnailKey = content.getThumbnailKey();
+        if (thumbnailKey != null) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        s3ImageStorage.delete(thumbnailKey);
+                    } catch (Exception e) {
+                        log.warn("S3 이미지 삭제 실패: key={}", thumbnailKey, e);
+                    }
+                }
+            });
+        }
     }
 
     private String extractCursor(Content content, String sortBy) {

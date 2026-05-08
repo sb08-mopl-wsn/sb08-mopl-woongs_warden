@@ -27,3 +27,10 @@ initAdmin:
   create:
     admin: admin@admin.com
     pw: Admin1234!
+
+password:
+  policy:
+    upper: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+    lower: abcdefghijklmnopqrstuvwxyz
+    digit: 0123456789
+    special: "!@#$%^&*"

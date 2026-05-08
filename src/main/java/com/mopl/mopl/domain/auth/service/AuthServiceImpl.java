@@ -1,19 +1,22 @@
 package com.mopl.mopl.domain.auth.service;
 
+import com.mopl.mopl.domain.jwt.dto.JwtDTO;
+import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
-import com.mopl.mopl.domain.user.dto.request.UserRoleUpdateRequest;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.auth.JwtTokenProvider;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -22,6 +25,8 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final UserRepository userRepository;
     private final JwtRegistry jwtRegistry;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final MoplUserDetailsService userDetailsService;
 
     @Override
     @Transactional(readOnly = true)
@@ -34,31 +39,45 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
-        UserDto userDto = userMapper.toDto(user);
-        return userDto;
+        return userMapper.toDto(user);
     }
 
     @Override
     @Transactional
-    public UserDto updateRole(UUID userId,UserRoleUpdateRequest userRoleUpdateRequest) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
+    public JwtDTO refresh(String refreshToken, HttpServletResponse response) {
+        if (refreshToken == null || !jwtTokenProvider.validateRefreshToken(refreshToken)) {
+            throw new IllegalArgumentException("유효하지 않은 refresh token입니다.");
+        }
 
-        user.updateRole(userRoleUpdateRequest.role());
-        User updatedUser = userRepository.save(user);
-        invalidateUserTokens(updatedUser.getId());
+        if (!jwtRegistry.hasActiveJwtInformationByRefreshToken(refreshToken)) {
+            jwtTokenProvider.expireRefreshCookie(response);
+            throw new IllegalArgumentException("활성화된 refresh token이 아닙니다.");
+        }
 
-        return userMapper.toDto(updatedUser);
-    }
+        String userEmail = jwtTokenProvider.getUserEmailFromToken(refreshToken);
 
-    private void invalidateUserTokens(UUID userId) {
+        MoplUserDetails userDetails =
+                (MoplUserDetails) userDetailsService.loadUserByUsername(userEmail);
+
         try {
-            // InMemoryJwtRegistry(및 DB)에 저장된 해당 유저의 토큰 정보를 모두 삭제/폐기 처리합니다.
-            jwtRegistry.invalidateJwtInformationByUserId(userId);
-            log.info("[AuthService] 유저(ID: {})의 모든 활성 JWT 토큰이 무효화되었습니다.", userId);
+            String newAccessToken = jwtTokenProvider.generateAccessToken(userDetails);
+            String newRefreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
+            UserDto userDto = userDetails.getUserDto();
+
+            JwtInformation newJwtInfo = new JwtInformation(
+                    userDto,
+                    newAccessToken,
+                    newRefreshToken
+            );
+
+            jwtRegistry.rotateJwtInformation(refreshToken, newJwtInfo);
+            jwtTokenProvider.addRefreshCookie(response, newRefreshToken);
+
+            return new JwtDTO(userDto, newAccessToken);
+
         } catch (Exception e) {
-            log.error("[AuthService] JWT 무효화 중 오류 발생: " + e.getMessage());
-            e.printStackTrace();
+            log.error("토큰 재발급 중 오류 발생", e);
+            throw new RuntimeException("토큰 재발급 중 오류가 발생했습니다.", e);
         }
     }
 }

@@ -1,19 +1,24 @@
 package com.mopl.mopl.domain.auth;
 
 import com.mopl.mopl.domain.auth.service.AuthServiceImpl;
+import com.mopl.mopl.domain.jwt.dto.JwtDTO;
+import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
-import com.mopl.mopl.domain.user.dto.request.UserRoleUpdateRequest;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,7 +26,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +42,15 @@ class AuthServiceImplTest {
     @Mock
     private JwtRegistry jwtRegistry;
 
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private MoplUserDetailsService userDetailsService;
+
+    @Mock
+    private HttpServletResponse response;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
@@ -46,7 +61,6 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("현재 사용자 조회 성공")
         void getCurrentUserInfo_success() {
-            // given
             UUID userId = UUID.randomUUID();
 
             UserDto userDto = new UserDto(
@@ -60,18 +74,13 @@ class AuthServiceImplTest {
             );
 
             MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
-
             User user = mock(User.class);
 
-            when(userRepository.findByEmail("test@test.com"))
-                    .thenReturn(Optional.of(user));
-            when(userMapper.toDto(user))
-                    .thenReturn(userDto);
+            when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
+            when(userMapper.toDto(user)).thenReturn(userDto);
 
-            // when
             UserDto result = authService.getCurrentUserInfo(userDetails);
 
-            // then
             assertThat(result).isEqualTo(userDto);
             verify(userRepository).findByEmail("test@test.com");
             verify(userMapper).toDto(user);
@@ -80,10 +89,8 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("UserDetails가 null이면 null 반환")
         void getCurrentUserInfo_nullUserDetails() {
-            // when
             UserDto result = authService.getCurrentUserInfo(null);
 
-            // then
             assertThat(result).isNull();
             verifyNoInteractions(userRepository, userMapper);
         }
@@ -91,7 +98,6 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("사용자를 찾을 수 없으면 예외")
         void getCurrentUserInfo_userNotFound() {
-            // given
             UUID userId = UUID.randomUUID();
 
             UserDto userDto = new UserDto(
@@ -106,118 +112,126 @@ class AuthServiceImplTest {
 
             MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
 
-            when(userRepository.findByEmail("missing@test.com"))
-                    .thenReturn(Optional.empty());
+            when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> authService.getCurrentUserInfo(userDetails))
                     .isInstanceOf(UserNotFoundException.class);
         }
     }
 
     @Nested
-    @DisplayName("권한 변경")
-    class UpdateRole {
+    @DisplayName("토큰 재발급")
+    class Refresh {
 
         @Test
-        @DisplayName("권한 변경 성공")
-        void updateRole_success() {
-            // given
+        @DisplayName("refresh 성공")
+        void refresh_success() throws Exception {
+            String oldRefreshToken = "old.refresh.token";
+            String newAccessToken = "new.access.token";
+            String newRefreshToken = "new.refresh.token";
+
             UUID userId = UUID.randomUUID();
-
-            User user = mock(User.class);
-            User savedUser = mock(User.class);
-
-            UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
-
-            UserDto resultDto = new UserDto(
+            UserDto userDto = new UserDto(
                     userId,
                     null,
-                    "admin@test.com",
-                    "admin",
+                    "admin@admin.com",
+                    "관리자",
                     null,
                     Role.ADMIN,
                     false
             );
 
-            when(userRepository.findById(userId))
-                    .thenReturn(Optional.of(user));
-            when(userRepository.save(user))
-                    .thenReturn(savedUser);
-            when(savedUser.getId())
-                    .thenReturn(userId);
-            when(userMapper.toDto(savedUser))
-                    .thenReturn(resultDto);
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
 
-            // when
-            UserDto result = authService.updateRole(userId, request);
+            when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
+            when(userDetailsService.loadUserByUsername("admin@admin.com")).thenReturn(userDetails);
+            when(jwtTokenProvider.generateAccessToken(userDetails)).thenReturn(newAccessToken);
+            when(jwtTokenProvider.generateRefreshToken(userDetails)).thenReturn(newRefreshToken);
 
-            // then
-            verify(user).updateRole(Role.ADMIN);
-            verify(userRepository).save(user);
-            verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
-            assertThat(result).isEqualTo(resultDto);
+            JwtDTO result = authService.refresh(oldRefreshToken, response);
+
+            assertThat(result.userDto()).isEqualTo(userDto);
+            assertThat(result.accessToken()).isEqualTo(newAccessToken);
+
+            ArgumentCaptor<JwtInformation> captor = ArgumentCaptor.forClass(JwtInformation.class);
+            verify(jwtRegistry).rotateJwtInformation(eq(oldRefreshToken), captor.capture());
+            assertThat(captor.getValue().getUser()).isEqualTo(userDto);
+            assertThat(captor.getValue().getAccessToken()).isEqualTo(newAccessToken);
+            assertThat(captor.getValue().getRefreshToken()).isEqualTo(newRefreshToken);
+
+            verify(jwtTokenProvider).addRefreshCookie(response, newRefreshToken);
         }
 
         @Test
-        @DisplayName("유저가 없으면 예외")
-        void updateRole_userNotFound() {
-            // given
-            UUID userId = UUID.randomUUID();
-            UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
+        @DisplayName("refreshToken이 null이면 예외")
+        void refresh_fail_nullToken() {
+            assertThatThrownBy(() -> authService.refresh(null, response))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("유효하지 않은 refresh token입니다.");
 
-            when(userRepository.findById(userId))
-                    .thenReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> authService.updateRole(userId, request))
-                    .isInstanceOf(UserNotFoundException.class);
-
-            verify(userRepository, never()).save(any());
-            verifyNoInteractions(jwtRegistry);
+            verify(jwtTokenProvider, never()).validateRefreshToken(any());
         }
 
         @Test
-        @DisplayName("JWT 무효화 실패해도 권한 변경 결과 반환")
-        void updateRole_jwtInvalidateFail() {
-            // given
-            UUID userId = UUID.randomUUID();
+        @DisplayName("refreshToken 검증 실패 시 예외")
+        void refresh_fail_invalidToken() {
+            String refreshToken = "invalid.refresh.token";
 
-            User user = mock(User.class);
-            User savedUser = mock(User.class);
+            when(jwtTokenProvider.validateRefreshToken(refreshToken)).thenReturn(false);
 
-            UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
+            assertThatThrownBy(() -> authService.refresh(refreshToken, response))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("유효하지 않은 refresh token입니다.");
 
-            UserDto resultDto = new UserDto(
-                    userId,
+            verify(jwtRegistry, never()).hasActiveJwtInformationByRefreshToken(any());
+        }
+
+        @Test
+        @DisplayName("활성화된 refreshToken이 아니면 쿠키 만료 후 예외")
+        void refresh_fail_inactiveToken() {
+            String refreshToken = "inactive.refresh.token";
+
+            when(jwtTokenProvider.validateRefreshToken(refreshToken)).thenReturn(true);
+            when(jwtRegistry.hasActiveJwtInformationByRefreshToken(refreshToken)).thenReturn(false);
+
+            assertThatThrownBy(() -> authService.refresh(refreshToken, response))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("활성화된 refresh token이 아닙니다.");
+
+            verify(jwtTokenProvider).expireRefreshCookie(response);
+        }
+
+        @Test
+        @DisplayName("토큰 재발급 중 예외 발생 시 RuntimeException")
+        void refresh_fail_tokenGenerationException() throws Exception {
+            String refreshToken = "old.refresh.token";
+
+            UserDto userDto = new UserDto(
+                    UUID.randomUUID(),
                     null,
-                    "admin@test.com",
-                    "admin",
+                    "admin@admin.com",
+                    "관리자",
                     null,
                     Role.ADMIN,
                     false
             );
 
-            when(userRepository.findById(userId))
-                    .thenReturn(Optional.of(user));
-            when(userRepository.save(user))
-                    .thenReturn(savedUser);
-            when(savedUser.getId())
-                    .thenReturn(userId);
-            when(userMapper.toDto(savedUser))
-                    .thenReturn(resultDto);
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
 
-            doThrow(new RuntimeException("jwt invalidate fail"))
-                    .when(jwtRegistry)
-                    .invalidateJwtInformationByUserId(userId);
+            when(jwtTokenProvider.validateRefreshToken(refreshToken)).thenReturn(true);
+            when(jwtRegistry.hasActiveJwtInformationByRefreshToken(refreshToken)).thenReturn(true);
+            when(jwtTokenProvider.getUserEmailFromToken(refreshToken)).thenReturn("admin@admin.com");
+            when(userDetailsService.loadUserByUsername("admin@admin.com")).thenReturn(userDetails);
+            when(jwtTokenProvider.generateAccessToken(userDetails))
+                    .thenThrow(new RuntimeException("access token fail"));
 
-            // when
-            UserDto result = authService.updateRole(userId, request);
+            assertThatThrownBy(() -> authService.refresh(refreshToken, response))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessage("토큰 재발급 중 오류가 발생했습니다.");
 
-            // then
-            verify(user).updateRole(Role.ADMIN);
-            verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
-            assertThat(result).isEqualTo(resultDto);
+            verify(jwtRegistry, never()).rotateJwtInformation(any(), any());
         }
     }
 }

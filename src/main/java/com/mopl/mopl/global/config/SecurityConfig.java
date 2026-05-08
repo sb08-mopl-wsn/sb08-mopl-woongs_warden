@@ -49,11 +49,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
-                        .ignoringRequestMatchers(
-                                "/api/auth/sign-in"
-//                                "/api/auth/sign-out",
-//                                "/api/auth/refresh"
-                        )
+                        .ignoringRequestMatchers("/api/auth/sign-in")
                 )
                 .authorizeHttpRequests(auth -> auth
                                 // 문서 관련
@@ -67,10 +63,15 @@ public class SecurityConfig {
 
                                 // 유저 관련
                                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
-
-                                // 사용자 권한 변경은 ADMIN 권한 필요
+                                .requestMatchers(HttpMethod.GET, "/api/users/{userId}").permitAll()
+                                .requestMatchers(HttpMethod.PATCH, "/api/users/{userId}/password").permitAll()
                                 .requestMatchers(HttpMethod.PATCH, "/api/users/*/role").hasRole("ADMIN")
                                 .requestMatchers(HttpMethod.PATCH, "/api/users/*/locked").hasRole("ADMIN")
+
+                                // 인증 관련
+                                .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
+
                                 .requestMatchers("/api/**").authenticated()
                                 .anyRequest().authenticated()
 

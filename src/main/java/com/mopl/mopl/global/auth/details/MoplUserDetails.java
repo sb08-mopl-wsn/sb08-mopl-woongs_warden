@@ -34,7 +34,7 @@ public class MoplUserDetails implements UserDetails {
         return userDto.email();
     }
 
-    public String getNmae() {
+    public String getName() {
         return userDto.name();
     }
 

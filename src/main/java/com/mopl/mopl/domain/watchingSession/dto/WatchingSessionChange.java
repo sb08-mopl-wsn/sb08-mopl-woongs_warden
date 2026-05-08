@@ -4,7 +4,7 @@ import com.mopl.mopl.domain.watchingSession.entity.ChangeType;
 
 public record WatchingSessionChange(
         ChangeType type,
-        WatchingSessionDto watchingSessionDto,
+        WatchingSessionDto watchingSession,
         long watcherCount
 ) {
 }

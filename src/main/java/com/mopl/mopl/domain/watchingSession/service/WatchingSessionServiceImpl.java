@@ -4,12 +4,14 @@ import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.domain.user.entity.User;
+import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.domain.watchingSession.dto.WatchingSessionChange;
 import com.mopl.mopl.domain.watchingSession.dto.WatchingSessionDto;
 import com.mopl.mopl.domain.watchingSession.entity.ChangeType;
 import com.mopl.mopl.domain.watchingSession.entity.WatchingSession;
 import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionAlreadyJoinedException;
+import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionNotFoundException;
 import com.mopl.mopl.domain.watchingSession.mapper.WatchingSessionMapper;
 import com.mopl.mopl.domain.watchingSession.repository.WatchingSessionRepository;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
@@ -27,26 +29,27 @@ import java.util.UUID;
 @Service
 public class WatchingSessionServiceImpl implements WatchingSessionService {
 
+    // Repository
     private final WatchingSessionRepository watchingSessionRepository;
     private final UserRepository userRepository;
     private final ContentRepository contentRepository;
 
+    // Mapper
     private final WatchingSessionMapper sessionMapper;
 
+    // Event
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
     public void join(UUID contentId, UUID userId) {
 
-        // 이미 시청 중인 세션이 있는가?
         if (watchingSessionRepository.existsByContentIdAndUserId(contentId, userId)) {
             throw new WatchingSessionAlreadyJoinedException(contentId, userId);
         }
 
-        // TODO: 유저 커스텀 예외 생성 후 추가
         User user = userRepository.findById(userId)
-                .orElseThrow();
+                .orElseThrow(() -> new UserNotFoundException(userId));
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new ContentNotFoundException(contentId));
 
@@ -56,39 +59,52 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                 .build();
         watchingSessionRepository.save(session);
 
-        long watcherCount = watchingSessionRepository.countByContentId(contentId);
-
         WatchingSessionDto sessionDto = sessionMapper.toDto(session.getId(), session.getCreatedAt(), content, user);
-
-        WatchingSessionChange change = new WatchingSessionChange(
-                ChangeType.JOIN,
-                sessionDto,
-                watcherCount
-        );
-        eventPublisher.publishEvent(new WatchingSessionEvent(change, contentId));
+        publishSessionEvent(contentId, ChangeType.JOIN, sessionDto);
     }
 
     @Override
     @Transactional
     public void leave(UUID contentId, UUID userId) {
 
-        // TODO: 유저 커스텀 예외 생성 후 추가
+        WatchingSession session = watchingSessionRepository.findByContentIdAndUserId(contentId, userId)
+                .orElseThrow(() -> new WatchingSessionNotFoundException("현재 시청 중인 세션이 없습니다."));
+
+        validateUserAndContent(contentId, userId);
+
+        // 퇴장 처리를 위해 이전 세션을 저장해놓음.
+        WatchingSessionDto sessionDto = sessionMapper.toDto(
+                session.getId(),
+                session.getCreatedAt(),
+                session.getContent(),
+                session.getUser()
+        );
+
+        watchingSessionRepository.delete(session);
+        // 쓰기 지연 방지 및 동기화
+        watchingSessionRepository.flush();
+
+        publishSessionEvent(contentId, ChangeType.LEAVE, sessionDto);
+    }
+
+    private void publishSessionEvent(UUID contentId, ChangeType type, WatchingSessionDto sessionDto) {
+        long watcherCount = watchingSessionRepository.countByContentId(contentId);
+
+        WatchingSessionChange change = new WatchingSessionChange(
+                type,
+                sessionDto,
+                watcherCount
+        );
+        eventPublisher.publishEvent(new WatchingSessionEvent(change, contentId));
+    }
+
+    private void validateUserAndContent(UUID contentId, UUID userId) {
         if (!userRepository.existsById(userId)) {
-            throw new RuntimeException();
+            throw new UserNotFoundException(userId);
         }
 
         if (!contentRepository.existsById(contentId)) {
             throw new ContentNotFoundException(contentId);
         }
-
-        watchingSessionRepository.deleteByContentIdAndUserId(contentId, userId);
-
-        long watcherCount = watchingSessionRepository.countByContentId(contentId);
-        WatchingSessionChange change = new WatchingSessionChange(
-                ChangeType.LEAVE,
-                null,
-                watcherCount
-        );
-        eventPublisher.publishEvent(new WatchingSessionEvent(change, contentId));
     }
 }

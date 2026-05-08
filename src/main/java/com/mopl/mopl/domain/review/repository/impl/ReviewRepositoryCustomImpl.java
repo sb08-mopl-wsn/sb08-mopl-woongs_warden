@@ -61,7 +61,10 @@ public class ReviewRepositoryCustomImpl implements ReviewRepositoryCustom {
   }
 
   private BooleanExpression cursorPageCondition(String sortBy, String cursor, UUID idAfter, boolean isAsc) {
-    if (cursor == null || idAfter == null) {
+    if ((cursor == null) != (idAfter == null)) {
+      throw new ReviewCursorException();
+    }
+    if (cursor == null) {
       return null; // 첫 페이지 조회
     }
 

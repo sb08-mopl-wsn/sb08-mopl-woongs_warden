@@ -19,6 +19,7 @@ import com.mopl.mopl.domain.user.entity.User;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,15 +39,14 @@ public class ReviewServiceImpl implements ReviewService {
     Content content = contentRepository.findById(request.contentId())
         .orElseThrow(() -> new ContentNotFoundException(request.contentId()));
 
-    reviewRepository.findByUserAndContent(user, content).ifPresent(review -> {
-      throw new ReviewException(ReviewErrorCode.DUPLICATE_REVIEW);
-    });
-
     Review review = reviewMapper.toEntity(request, user, content);
 
-    Review savedReview = reviewRepository.save(review);
-
-    return reviewMapper.toDto(savedReview);
+    try {
+      Review savedReview = reviewRepository.save(review);
+      return reviewMapper.toDto(savedReview);
+    } catch (DataIntegrityViolationException e) {
+      throw new ReviewException(ReviewErrorCode.DUPLICATE_REVIEW);
+    }
   }
 
   @Override
@@ -67,7 +67,7 @@ public class ReviewServiceImpl implements ReviewService {
     String nextCursor = null;
     UUID nextIdAfter = null;
 
-    if (reviewSlice.hasContent()) {
+    if (reviewSlice.hasNext() && reviewSlice.hasContent()) {
       Review lastReview = reviewSlice.getContent().get(reviewSlice.getContent().size() - 1);
       nextCursor = extractCursor(lastReview, request.sortBy());
       nextIdAfter = lastReview.getId();

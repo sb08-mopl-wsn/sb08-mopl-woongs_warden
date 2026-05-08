@@ -10,6 +10,7 @@ import org.springdoc.core.annotations.ParameterObject;
 public record ReviewSearchRequest(
     @NotNull(message = "콘텐츠 ID는 필수입니다.")
     UUID contentId,
+    @NotNull(message = "limit는 필수입니다.")
     @Min(1)
     @Max(100)
     Integer limit,

@@ -1,0 +1,6 @@
+package com.mopl.mopl.domain.user.dto.request;
+
+public record UserLockUpdateRequest(
+        boolean locked
+) {
+}

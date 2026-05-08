@@ -10,6 +10,7 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class ContentServiceImpl implements ContentService
 {
     private final ContentRepository contentRepository;
     private final ContentMapper contentMapper;
+    private final S3ImageStorage s3ImageStorage;
 
     /**
      * 콘텐츠를 생성한다.
@@ -37,9 +39,8 @@ public class ContentServiceImpl implements ContentService
     @Transactional
     @Override
     public ContentDto create(ContentCreateRequest contentCreateRequest, MultipartFile thumbnailImage) {
-        // 나중에 s3에 연결
         String thumbnailKey = (thumbnailImage != null && !thumbnailImage.isEmpty())
-                ? thumbnailImage.getOriginalFilename()
+                ? s3ImageStorage.upload(thumbnailImage, "thumbnail")
                 : null;
 
         Content content = Content.builder()
@@ -140,6 +141,10 @@ public class ContentServiceImpl implements ContentService
     public void delete(UUID contentId) {
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new ContentNotFoundException(contentId));
+
+        if (content.getThumbnailKey() != null) {
+            s3ImageStorage.delete(content.getThumbnailKey());
+        }
 
         contentRepository.delete(content);
     }

@@ -43,7 +43,8 @@ public class SecurityConfig {
             JwtLogoutHandler jwtLogoutHandler,
             LoginFailureHandler loginFailureHandler,
             DaoAuthenticationProvider authenticationProvider,
-            CustomAccessDeniedHandler customAccessDeniedHandler
+            CustomAccessDeniedHandler customAccessDeniedHandler,
+            CustomAuthenticationEntryPoint customAuthenticationEntryPoint
     ) throws Exception {
         http
                 .csrf(csrf -> csrf
@@ -57,9 +58,7 @@ public class SecurityConfig {
                                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
 
                                 // 로그인/아웃 관련
-                                .requestMatchers("/api/auth/csrf-token").permitAll()
                                 .requestMatchers("/api/auth/sign-in", "/api/auth/sign-out").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 엑세스 토큰 재발급
 
                                 // 유저 관련
                                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
@@ -95,9 +94,7 @@ public class SecurityConfig {
                         .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler())
                         .permitAll())
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
-                        })
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
                         .accessDeniedHandler(customAccessDeniedHandler)
                 )
                 .authenticationProvider(authenticationProvider)

@@ -27,7 +27,7 @@ import java.util.UUID;
 @Slf4j
 @Component
 public class JwtTokenProvider {
-    public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH-TOKEN";
+    public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
     private final int accessTokenExpirationMs;
     private final int refreshTokenExpirationMs;
 
@@ -172,35 +172,11 @@ public class JwtTokenProvider {
         }
     }
 
-    // TODO 여기 예러처리 나중에 수정해보기
-    public String getUsernameFromToken(String token) {
+    public String getUserEmailFromToken(String token) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
             String subject = signedJWT.getJWTClaimsSet().getSubject();
             return subject;
-
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid JWT token", e);
-        }
-    }
-
-    // 토큰에서 이메일 찾기
-    public String getUserEmailFromToken(String token) {
-        try {
-            SignedJWT signedJWT = SignedJWT.parse(token);
-            String userEmail = signedJWT.getJWTClaimsSet().getStringClaim("userEmail");
-
-            if (userEmail == null || userEmail.isBlank()) {
-                userEmail = signedJWT.getJWTClaimsSet().getSubject();
-            }
-
-            // 어디선가 자꾸 오염이 되서 email 앞에 null이라는 글자가 붙게 됩니다.
-            // 일단 null이 email 앞에 붙게 되니 앞에 null 4글자만 지우게 만들었습니다.
-            if (userEmail != null && userEmail.startsWith("null")) {
-                userEmail = userEmail.substring(4);
-            }
-
-            return userEmail;
 
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid JWT token", e);

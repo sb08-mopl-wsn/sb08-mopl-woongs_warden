@@ -33,6 +33,10 @@ public class AuthController {
             String refreshToken,
             HttpServletResponse response
     ) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
         try {
             JwtDTO jwtDTO = authService.refresh(refreshToken, response);
             return ResponseEntity.ok(jwtDTO);

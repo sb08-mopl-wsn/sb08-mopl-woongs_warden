@@ -1,5 +1,7 @@
 package com.mopl.mopl.domain.auth.service;
 
+import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
+import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
@@ -46,22 +48,26 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public JwtDTO refresh(String refreshToken, HttpServletResponse response) {
         if (refreshToken == null || !jwtTokenProvider.validateRefreshToken(refreshToken)) {
-            throw new IllegalArgumentException("유효하지 않은 refresh token입니다.");
+            throw new AuthInvalidTokenException();
         }
 
         if (!jwtRegistry.hasActiveJwtInformationByRefreshToken(refreshToken)) {
             jwtTokenProvider.expireRefreshCookie(response);
-            throw new IllegalArgumentException("활성화된 refresh token이 아닙니다.");
+            throw new AuthExpiredTokenException();
         }
 
         String userEmail = jwtTokenProvider.getUserEmailFromToken(refreshToken);
+        JwtInformation oldJwtInfo = jwtRegistry.getJwtInformationByRefreshToken(refreshToken);
+
 
         MoplUserDetails userDetails =
                 (MoplUserDetails) userDetailsService.loadUserByUsername(userEmail);
 
+        String newRefreshToken = null;
+
         try {
             String newAccessToken = jwtTokenProvider.generateAccessToken(userDetails);
-            String newRefreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
+            newRefreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
             UserDto userDto = userDetails.getUserDto();
 
             JwtInformation newJwtInfo = new JwtInformation(
@@ -76,6 +82,12 @@ public class AuthServiceImpl implements AuthService {
             return new JwtDTO(userDto, newAccessToken);
 
         } catch (Exception e) {
+            jwtRegistry.rollbackRotateJwtInformation(
+                    refreshToken,
+                    oldJwtInfo,
+                    newRefreshToken
+            );
+
             log.error("토큰 재발급 중 오류 발생", e);
             throw new RuntimeException("토큰 재발급 중 오류가 발생했습니다.", e);
         }

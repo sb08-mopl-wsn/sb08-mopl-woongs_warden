@@ -2,6 +2,7 @@ package com.mopl.mopl.global.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -10,9 +11,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -33,6 +35,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
     // 토큰 폐기 여부 확인용 저장소
     private final JwtRegistry jwtRegistry;
+
+    private final AuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
     protected void doFilterInternal(
@@ -55,13 +59,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Access 토큰 유효성 검사(토큰 타입 검증, 만료 시간 검증, 서명 무결성 검증)
                 if (tokenProvider.validateAccessToken(token)) {
                     if (!jwtRegistry.hasActiveJwtInformationByAccessToken(token)) {
-                        sendUnauthorized(response, "Token revoked");
+                        authenticationEntryPoint.commence(
+                                request,
+                                response,
+                                new BadCredentialsException("만료된 토큰입니다.")
+                        );
                         return;
                     }
 
-                    // todo 여기 username말고 userEamil로 어떻게 해보기
-                    String username = tokenProvider.getUsernameFromToken(token);
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    MoplUserDetails userDetails = tokenProvider.parseAccessToken(token);
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
@@ -74,14 +80,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 } else {
                     // 토큰 유효성 검사 실패 시 처리(401)
-                    sendUnauthorized(response, "Invalid JWT token");
+                    authenticationEntryPoint.commence(
+                            request,
+                            response,
+                            new BadCredentialsException("유효하지 않은 토큰입니다.")
+                    );
                     return;
                 }
             }
         } catch (Exception e) {
             // 인증 과정에서 예외 발생 시 인증 컨텍스트를 초기화하고 401 응답을 반환한다.
             SecurityContextHolder.clearContext();
-            sendUnauthorized(response, "JWT authentication failed");
+            authenticationEntryPoint.commence(
+                    request,
+                    response,
+                    new BadCredentialsException("인증 처리 중 오류가 발생했습니다.")
+            );
             return;
         }
 
@@ -104,21 +118,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .orElse(null);
         }
         return null;
-    }
-
-    private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
-        // 응답 헤더 설정
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-
-        // JSON 응답 전송
-        String responseBody = objectMapper.createObjectNode()
-                .put("success", false)
-                .put("message", message)
-                .toString();
-
-        // 응답 바디 전송
-        response.getWriter().write(responseBody);
     }
 }

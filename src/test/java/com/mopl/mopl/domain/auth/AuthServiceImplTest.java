@@ -1,5 +1,7 @@
 package com.mopl.mopl.domain.auth;
 
+import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
+import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
 import com.mopl.mopl.domain.auth.service.AuthServiceImpl;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
@@ -127,6 +129,7 @@ class AuthServiceImplTest {
         @DisplayName("refresh 성공")
         void refresh_success() throws Exception {
             String oldRefreshToken = "old.refresh.token";
+            String oldAccessToken = "old.access.token";
             String newAccessToken = "new.access.token";
             String newRefreshToken = "new.refresh.token";
 
@@ -141,10 +144,17 @@ class AuthServiceImplTest {
                     false
             );
 
+            JwtInformation oldJwtInfo = new JwtInformation(
+                    userDto,
+                    oldAccessToken,
+                    oldRefreshToken
+            );
+
             MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
 
             when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
             when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
             when(userDetailsService.loadUserByUsername("admin@admin.com")).thenReturn(userDetails);
             when(jwtTokenProvider.generateAccessToken(userDetails)).thenReturn(newAccessToken);
@@ -156,40 +166,42 @@ class AuthServiceImplTest {
             assertThat(result.accessToken()).isEqualTo(newAccessToken);
 
             ArgumentCaptor<JwtInformation> captor = ArgumentCaptor.forClass(JwtInformation.class);
+
             verify(jwtRegistry).rotateJwtInformation(eq(oldRefreshToken), captor.capture());
             assertThat(captor.getValue().getUser()).isEqualTo(userDto);
             assertThat(captor.getValue().getAccessToken()).isEqualTo(newAccessToken);
             assertThat(captor.getValue().getRefreshToken()).isEqualTo(newRefreshToken);
 
             verify(jwtTokenProvider).addRefreshCookie(response, newRefreshToken);
+            verify(jwtRegistry, never()).rollbackRotateJwtInformation(any(), any(), any());
         }
 
         @Test
-        @DisplayName("refreshToken이 null이면 예외")
+        @DisplayName("refreshToken이 null이면 AuthInvalidTokenException")
         void refresh_fail_nullToken() {
             assertThatThrownBy(() -> authService.refresh(null, response))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("유효하지 않은 refresh token입니다.");
+                    .isInstanceOf(AuthInvalidTokenException.class);
 
             verify(jwtTokenProvider, never()).validateRefreshToken(any());
+            verifyNoInteractions(jwtRegistry);
         }
 
         @Test
-        @DisplayName("refreshToken 검증 실패 시 예외")
+        @DisplayName("refreshToken 검증 실패 시 AuthInvalidTokenException")
         void refresh_fail_invalidToken() {
             String refreshToken = "invalid.refresh.token";
 
             when(jwtTokenProvider.validateRefreshToken(refreshToken)).thenReturn(false);
 
             assertThatThrownBy(() -> authService.refresh(refreshToken, response))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("유효하지 않은 refresh token입니다.");
+                    .isInstanceOf(AuthInvalidTokenException.class);
 
             verify(jwtRegistry, never()).hasActiveJwtInformationByRefreshToken(any());
+            verify(jwtRegistry, never()).getJwtInformationByRefreshToken(any());
         }
 
         @Test
-        @DisplayName("활성화된 refreshToken이 아니면 쿠키 만료 후 예외")
+        @DisplayName("활성화된 refreshToken이 아니면 쿠키 만료 후 AuthExpiredTokenException")
         void refresh_fail_inactiveToken() {
             String refreshToken = "inactive.refresh.token";
 
@@ -197,16 +209,17 @@ class AuthServiceImplTest {
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(refreshToken)).thenReturn(false);
 
             assertThatThrownBy(() -> authService.refresh(refreshToken, response))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("활성화된 refresh token이 아닙니다.");
+                    .isInstanceOf(AuthExpiredTokenException.class);
 
             verify(jwtTokenProvider).expireRefreshCookie(response);
+            verify(jwtRegistry, never()).getJwtInformationByRefreshToken(any());
         }
 
         @Test
-        @DisplayName("토큰 재발급 중 예외 발생 시 RuntimeException")
+        @DisplayName("토큰 생성 중 예외 발생 시 rollback 후 RuntimeException")
         void refresh_fail_tokenGenerationException() throws Exception {
-            String refreshToken = "old.refresh.token";
+            String oldRefreshToken = "old.refresh.token";
+            String oldAccessToken = "old.access.token";
 
             UserDto userDto = new UserDto(
                     UUID.randomUUID(),
@@ -218,20 +231,82 @@ class AuthServiceImplTest {
                     false
             );
 
+            JwtInformation oldJwtInfo = new JwtInformation(
+                    userDto,
+                    oldAccessToken,
+                    oldRefreshToken
+            );
+
             MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
 
-            when(jwtTokenProvider.validateRefreshToken(refreshToken)).thenReturn(true);
-            when(jwtRegistry.hasActiveJwtInformationByRefreshToken(refreshToken)).thenReturn(true);
-            when(jwtTokenProvider.getUserEmailFromToken(refreshToken)).thenReturn("admin@admin.com");
+            when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
+            when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
             when(userDetailsService.loadUserByUsername("admin@admin.com")).thenReturn(userDetails);
             when(jwtTokenProvider.generateAccessToken(userDetails))
                     .thenThrow(new RuntimeException("access token fail"));
 
-            assertThatThrownBy(() -> authService.refresh(refreshToken, response))
+            assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessage("토큰 재발급 중 오류가 발생했습니다.");
 
             verify(jwtRegistry, never()).rotateJwtInformation(any(), any());
+            verify(jwtRegistry).rollbackRotateJwtInformation(
+                    oldRefreshToken,
+                    oldJwtInfo,
+                    null
+            );
+        }
+
+        @Test
+        @DisplayName("쿠키 추가 실패 시 rollback 후 RuntimeException")
+        void refresh_fail_addRefreshCookieException() throws Exception {
+            String oldRefreshToken = "old.refresh.token";
+            String oldAccessToken = "old.access.token";
+            String newAccessToken = "new.access.token";
+            String newRefreshToken = "new.refresh.token";
+
+            UserDto userDto = new UserDto(
+                    UUID.randomUUID(),
+                    null,
+                    "admin@admin.com",
+                    "관리자",
+                    null,
+                    Role.ADMIN,
+                    false
+            );
+
+            JwtInformation oldJwtInfo = new JwtInformation(
+                    userDto,
+                    oldAccessToken,
+                    oldRefreshToken
+            );
+
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
+
+            when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
+            when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
+            when(userDetailsService.loadUserByUsername("admin@admin.com")).thenReturn(userDetails);
+            when(jwtTokenProvider.generateAccessToken(userDetails)).thenReturn(newAccessToken);
+            when(jwtTokenProvider.generateRefreshToken(userDetails)).thenReturn(newRefreshToken);
+
+            doThrow(new RuntimeException("cookie fail"))
+                    .when(jwtTokenProvider)
+                    .addRefreshCookie(response, newRefreshToken);
+
+            assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessage("토큰 재발급 중 오류가 발생했습니다.");
+
+            verify(jwtRegistry).rotateJwtInformation(any(), any());
+            verify(jwtRegistry).rollbackRotateJwtInformation(
+                    oldRefreshToken,
+                    oldJwtInfo,
+                    newRefreshToken
+            );
         }
     }
 }

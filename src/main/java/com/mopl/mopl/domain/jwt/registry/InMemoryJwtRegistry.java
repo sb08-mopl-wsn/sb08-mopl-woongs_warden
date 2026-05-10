@@ -58,12 +58,6 @@ public class InMemoryJwtRegistry implements JwtRegistry {
     }
 
     @Override
-    public boolean hasActiveJwtInformationByUserId(UUID userId) {
-        Queue<JwtInformation> userQueue = origin.get(userId);
-        return userQueue != null && !userQueue.isEmpty();
-    }
-
-    @Override
     public boolean hasActiveJwtInformationByAccessToken(String accessToken) {
         if (accessToken == null) return false;
         return tokenIndex.containsKey(accessToken);
@@ -118,29 +112,60 @@ public class InMemoryJwtRegistry implements JwtRegistry {
     }
 
     @Override
-    @Scheduled(fixedDelay = 1000 * 60 * 5)
-    public void clearExpiredJwtInformation() {
-        Date now = new Date();
+    public JwtInformation getJwtInformationByRefreshToken(String refreshToken) {
+        if (refreshToken == null) {
+            return null;
+        }
 
-        origin.values().forEach(queue -> {
-            queue.removeIf(info -> {
-                boolean shouldRemove;
+        return origin.values().stream()
+                .flatMap(Queue::stream)
+                .filter(info -> refreshToken.equals(info.getRefreshToken()))
+                .findFirst()
+                .orElse(null);
+    }
 
-                try {
-                    boolean isAccessExpired = jwtTokenProvider.getExpiration(info.getAccessToken()).before(now);
-                    boolean isRefreshExpired = jwtTokenProvider.getExpiration(info.getRefreshToken()).before(now);
+    @Override
+    @Transactional
+    public void rollbackRotateJwtInformation(
+            String oldRefreshToken,
+            JwtInformation oldJwtInformation,
+            String newRefreshToken
+    ) {
+        if (oldJwtInformation == null) {
+            return;
+        }
 
-                    shouldRemove = isAccessExpired && isRefreshExpired;
-                } catch (Exception e) {
-                    shouldRemove = true;
-                }
+        UUID userId = oldJwtInformation.getUser().id();
 
-                if (shouldRemove) {
+        origin.putIfAbsent(userId, new ConcurrentLinkedQueue<>());
+        Queue<JwtInformation> userQueue = origin.get(userId);
+
+        if (newRefreshToken != null) {
+            userQueue.removeIf(info -> {
+                boolean matched = newRefreshToken.equals(info.getRefreshToken());
+
+                if (matched) {
                     tokenIndex.remove(info.getAccessToken());
                 }
 
-                return shouldRemove;
+                return matched;
             });
-        });
+        }
+
+        boolean oldTokenAlreadyExists = userQueue.stream()
+                .anyMatch(info -> oldRefreshToken.equals(info.getRefreshToken()));
+
+        if (!oldTokenAlreadyExists) {
+            while (userQueue.size() >= maxActiveJwtCount) {
+                JwtInformation removed = userQueue.poll();
+
+                if (removed != null) {
+                    tokenIndex.remove(removed.getAccessToken());
+                }
+            }
+
+            userQueue.offer(oldJwtInformation);
+            tokenIndex.put(oldJwtInformation.getAccessToken(), oldJwtInformation);
+        }
     }
 }

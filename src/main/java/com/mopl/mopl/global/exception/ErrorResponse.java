@@ -1,6 +1,7 @@
 package com.mopl.mopl.global.exception;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.mopl.mopl.domain.auth.exception.AuthErrorCode;
 import org.springframework.http.HttpStatus;
 
 import java.time.Instant;

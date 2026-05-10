@@ -71,7 +71,7 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
     public void leave(UUID contentId, UUID userId) {
 
         WatchingSession session = watchingSessionRepository.findByContentIdAndUserId(contentId, userId)
-                .orElseThrow(() -> new WatchingSessionNotFoundException("현재 시청 중인 세션이 없습니다."));
+                .orElseThrow(() -> new WatchingSessionNotFoundException(contentId, userId));
 
         validateUserAndContent(contentId, userId);
 

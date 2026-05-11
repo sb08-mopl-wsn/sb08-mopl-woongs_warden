@@ -46,7 +46,7 @@ public class SportsdbApiClient
 
     private String currentSeason() {
         LocalDate now = LocalDate.now();
-        int startYear = now.getMonthValue() > 8 ? now.getYear() : now.getYear() - 1;
+        int startYear = now.getMonthValue() >= 8 ? now.getYear() : now.getYear() - 1;
         return startYear + "-" + (startYear + 1);
     }
 }

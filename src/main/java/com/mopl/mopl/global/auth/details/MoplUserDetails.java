@@ -45,7 +45,7 @@ public class MoplUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return !userDto.locked();
     }
 
     @Override

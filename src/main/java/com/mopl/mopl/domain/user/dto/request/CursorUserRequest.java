@@ -3,6 +3,8 @@ package com.mopl.mopl.domain.user.dto.request;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.SortBy;
 import com.mopl.mopl.domain.user.entity.SortDirection;
+import com.mopl.mopl.domain.user.exception.CursorUserException;
+import com.mopl.mopl.global.exception.GlobalExceptionHandler;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -27,7 +29,7 @@ public record CursorUserRequest(
         boolean cursorSet = cursor != null && !cursor.isBlank();
         boolean idAfterSet = idAfter != null;
         if (cursorSet != idAfterSet) {
-            throw new IllegalArgumentException("cursor와 idAfter는 함께 전달되어야 합니다.");
+            throw new CursorUserException();
         }
     }
 }

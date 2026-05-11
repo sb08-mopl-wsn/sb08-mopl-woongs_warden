@@ -1,7 +1,7 @@
 package com.mopl.mopl.domain.user.service;
 
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
-import com.mopl.mopl.domain.user.dto.CursorUserListResponse;
+import com.mopl.mopl.domain.user.dto.CursorResponseUserDto;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.dto.request.*;
 import com.mopl.mopl.domain.user.entity.Role;
@@ -65,7 +65,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     @PreAuthorize("hasRole('ADMIN')")
-    public CursorUserListResponse getAllUsers(CursorUserRequest request) {
+    public CursorResponseUserDto getAllUsers(CursorUserRequest request) {
         Instant cursorTime = null;
         if (request.cursor() != null && !request.cursor().isBlank()) {
             cursorTime = Instant.parse(request.cursor());
@@ -100,13 +100,15 @@ public class UserServiceImpl implements UserService {
             nextIdAfter = lastUser.getId();
         }
 
-        long userCount = userRepository.count();
+        long userCount = cursorTime == null
+                ? userRepository.countUsersByEmailAndRole(emailLike, roleEqual)
+                : -1L;
 
         List<UserDto> data = users.stream()
                 .map(userMapper::toDto)
                 .toList();
 
-        return new CursorUserListResponse(data, nextCursor, nextIdAfter, hasNext, userCount, request.sortBy(), request.sortDirection());
+        return new CursorResponseUserDto(data, nextCursor, nextIdAfter, hasNext, userCount, request.sortBy(), request.sortDirection());
     }
 
     @Override

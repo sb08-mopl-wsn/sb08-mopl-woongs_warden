@@ -5,7 +5,6 @@ import com.mopl.mopl.domain.user.dto.CursorResponseUserDto;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.dto.request.*;
 import com.mopl.mopl.domain.user.entity.Role;
-import com.mopl.mopl.domain.user.entity.SortDirection;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserDuplicateException;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
@@ -72,20 +71,18 @@ public class UserServiceImpl implements UserService {
         }
 
         PageRequest pageRequest = PageRequest.of(0, request.limit() + 1);
-        List<User> users;
 
         String emailLike = request.emailLike();
         Role roleEqual = request.roleEqual();
 
-        if (SortDirection.ASCENDING.equals(request.sortDirection())) {
-            users = userRepository.findUsersByCursorAsc(
-                    emailLike, roleEqual, cursorTime, request.idAfter(), pageRequest
-            );
-        } else {
-            users = userRepository.findUsersByCursorDesc(
-                    emailLike, roleEqual, cursorTime, request.idAfter(), pageRequest
-            );
-        }
+        List<User> users = userRepository.findUsersByCursor(
+                emailLike,
+                roleEqual,
+                cursorTime,
+                request.idAfter(),
+                request.sortDirection(),
+                pageRequest
+        );
 
         boolean hasNext = users.size() > request.limit();
         if (hasNext) {

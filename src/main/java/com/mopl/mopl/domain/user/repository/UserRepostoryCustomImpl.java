@@ -2,6 +2,7 @@ package com.mopl.mopl.domain.user.repository;
 
 import com.mopl.mopl.domain.user.entity.QUser;
 import com.mopl.mopl.domain.user.entity.Role;
+import com.mopl.mopl.domain.user.entity.SortDirection;
 import com.mopl.mopl.domain.user.entity.User;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -13,14 +14,44 @@ import java.util.List;
 import java.util.UUID;
 
 @RequiredArgsConstructor
-public class UserRepositoryImpl implements UserRepositoryCustom {
+public class UserRepostoryCustomImpl implements UserRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
 
     private final QUser user = QUser.user;
 
     @Override
-    public List<User> findUsersByCursorDesc(
+    public List<User> findUsersByCursor(
+            String emailLike,
+            Role roleEqual,
+            Instant cursor,
+            UUID idAfter,
+            SortDirection sortDirection,
+            Pageable pageable
+    ) {
+        SortDirection direction = sortDirection == null
+                ? SortDirection.DESCENDING
+                : sortDirection;
+
+        return switch (direction) {
+            case ASCENDING -> findUsersByCursorAsc(
+                    emailLike,
+                    roleEqual,
+                    cursor,
+                    idAfter,
+                    pageable
+            );
+            case DESCENDING -> findUsersByCursorDesc(
+                    emailLike,
+                    roleEqual,
+                    cursor,
+                    idAfter,
+                    pageable
+            );
+        };
+    }
+
+    private List<User> findUsersByCursorDesc(
             String emailLike,
             Role roleEqual,
             Instant cursor,
@@ -42,8 +73,7 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
                 .fetch();
     }
 
-    @Override
-    public List<User> findUsersByCursorAsc(
+    private List<User> findUsersByCursorAsc(
             String emailLike,
             Role roleEqual,
             Instant cursor,

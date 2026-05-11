@@ -44,3 +44,15 @@ cloud:
     s3:
       bucket: test-bucket
       cdn-url: test-cdn-url
+
+external:
+  tmdb:
+    api:
+      token: external-tmdb-api-token
+      base-url: tmdb-base-url
+  sportsdb:
+    api:
+      base-url: sports-base-url
+  timeout:
+    connect-timeout: 5000
+    read-timeout: 5000

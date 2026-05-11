@@ -1,0 +1,41 @@
+package com.mopl.mopl.global.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
+
+@Configuration
+@EnableAsync
+public class AsyncConfig implements AsyncConfigurer {
+
+    public static final String WATCHING_SESSION_EXECUTOR = "watchingSessionExecutor";
+
+    // TODO: 추후 추가할 예정
+//    @Override
+//    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+//    }
+
+    @Bean(name = WATCHING_SESSION_EXECUTOR)
+    public Executor watchingSessionExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("ws-watch-");
+
+        // 큐가 꽉 찼을 경우 호출한 스레드가 직접 처리하게 하여 누락 방지
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+
+        // 종료 시 대기 중인 작업 완료 설정
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(20);
+
+        executor.initialize();
+        return executor;
+    }
+}

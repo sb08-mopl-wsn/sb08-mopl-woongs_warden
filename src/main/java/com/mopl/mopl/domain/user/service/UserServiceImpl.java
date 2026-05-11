@@ -13,6 +13,7 @@ import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,7 +69,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-//    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public UserDto updateUserRole(UUID userId, UserRoleUpdateRequest request) {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
@@ -80,7 +81,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-//    @PreAuthorize("principal.userDto.id == #userId")
+    @PreAuthorize("principal.userDto.id == #userId")
     // TODO 이거 만료시간 3분 해야됨
     public UserDto updateUserPassword(UUID userId, ChangePasswordRequest request) {
         User target = userRepository.findById(userId)
@@ -97,7 +98,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     @Transactional
-//    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public UserDto initUserPassword(UUID userId) {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
@@ -114,7 +115,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-//    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public UserDto updateUserLocked(UUID userId, UserLockUpdateRequest request) {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));

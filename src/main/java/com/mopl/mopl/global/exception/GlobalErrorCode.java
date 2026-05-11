@@ -10,8 +10,8 @@ public enum GlobalErrorCode implements ErrorCode {
 
     INVALID_INPUT(9001, "INVALID_INPUT", HttpStatus.BAD_REQUEST, "입력값 검증에 실패했습니다."),
     FILE_UPLOAD_FAILED(9002, "FILE_UPLOAD_FAILED", HttpStatus.BAD_REQUEST, "파일 업로드에 실패했습니다."),
-    INTERNAL_SERVER_ERROR(9999, "SERVER_ERROR", HttpStatus.INTERNAL_SERVER_ERROR,
-            "서버 내부 오류가 발생했습니다.");
+    SSE_CONNECTION_FAILED(9003, "SSE_CONNECTION_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "SSE 연결 초기화 중 에러가 발생했습니다."),
+    INTERNAL_SERVER_ERROR(9999, "SERVER_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
     private final int numeric;
     private final String errorKey;

@@ -26,7 +26,7 @@ public class NotificationController {
   // 알림 목록 조회
   @GetMapping
   public ResponseEntity<CursorResponseNotificationDto> getNotifications(
-      @AuthenticationPrincipal MoplUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
       @Valid @ModelAttribute CursorPaginationRequest request
   ) {
 
@@ -40,7 +40,7 @@ public class NotificationController {
   // 알림 단건 삭제
   @DeleteMapping("/{notificationId}")
   public ResponseEntity<Void> deleteNotification(
-      @AuthenticationPrincipal MoplUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
       @PathVariable("notificationId") UUID notificationId
   ) {
 

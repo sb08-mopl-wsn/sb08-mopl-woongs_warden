@@ -20,7 +20,7 @@ public class SseController {
   // 클라이언트-서버 간 실시간 통신 파이프라인 최초 연결 요청 API
   @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public SseEmitter subscribe(
-      @AuthenticationPrincipal MoplUserDetails userDetails
+      @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails
   ) {
     return sseService.subscribe(userDetails.getUserDto().id());
   }

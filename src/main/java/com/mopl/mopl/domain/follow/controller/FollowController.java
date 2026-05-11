@@ -27,7 +27,7 @@ public class FollowController {
 
   @PostMapping
   public ResponseEntity<FollowDto> follow(
-    @AuthenticationPrincipal MoplUserDetails userDetails,
+    @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
     @Valid @RequestBody FollowRequest request
   ) {
     UUID followerId = userDetails.getUserDto().id();
@@ -37,7 +37,7 @@ public class FollowController {
 
   @DeleteMapping("/{followId}")
   public ResponseEntity<Void> unfollow(
-      @AuthenticationPrincipal MoplUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
       @PathVariable("followId") UUID followId
   ) {
     UUID followerId = userDetails.getUserDto().id();
@@ -47,7 +47,7 @@ public class FollowController {
 
   @GetMapping("/followed-by-me")
   public ResponseEntity<Boolean> isFollowedByMe(
-      @AuthenticationPrincipal MoplUserDetails userDetails,
+      @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
       @RequestParam("followeeId") UUID followeeId
   ) {
     UUID followerId = userDetails.getUserDto().id();

@@ -22,7 +22,7 @@ public class WatchingSessionEventListener {
     private static final String DESTINATION_PREFIX = "/sub/contents/";
     private static final String DESTINATION_SUFFIX = "/watch";
 
-    @Async
+    @Async("watchingSessionExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleWatchingSessionEvent(WatchingSessionEvent event) {
         String destination = createDestination(event.contentId());

@@ -10,7 +10,6 @@ import com.mopl.mopl.domain.watchingSession.dto.WatchingSessionChange;
 import com.mopl.mopl.domain.watchingSession.dto.WatchingSessionDto;
 import com.mopl.mopl.domain.watchingSession.entity.ChangeType;
 import com.mopl.mopl.domain.watchingSession.entity.WatchingSession;
-import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionAlreadyJoinedException;
 import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionNotFoundException;
 import com.mopl.mopl.domain.watchingSession.mapper.WatchingSessionMapper;
 import com.mopl.mopl.domain.watchingSession.repository.WatchingSessionRepository;
@@ -18,7 +17,6 @@ import com.mopl.mopl.global.event.WatchingSessionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,17 +48,15 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new ContentNotFoundException(contentId));
 
-        WatchingSession session = WatchingSession.builder()
-                .content(content)
-                .user(user)
-                .build();
-
-        // JOIN 중복 방지가 원자적이지 않아 동시 요청에서 중복 세션 또는 500 에러가 발생할 수 있음.
-        try {
-            watchingSessionRepository.saveAndFlush(session);
-        } catch (DataIntegrityViolationException e) {
-            throw new WatchingSessionAlreadyJoinedException(contentId, userId);
-        }
+        WatchingSession session = watchingSessionRepository
+                .findByContentIdAndUserId(contentId, userId)
+                .orElseGet(() -> {
+                    WatchingSession newSession = WatchingSession.builder()
+                            .content(content)
+                            .user(user)
+                            .build();
+                    return watchingSessionRepository.saveAndFlush(newSession);
+                });
 
         WatchingSessionDto sessionDto = sessionMapper.toDto(session.getId(), session.getCreatedAt(), content, user);
         publishSessionEvent(contentId, ChangeType.JOIN, sessionDto);
@@ -72,8 +68,6 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
         WatchingSession session = watchingSessionRepository.findByContentIdAndUserId(contentId, userId)
                 .orElseThrow(() -> new WatchingSessionNotFoundException(contentId, userId));
-
-        validateUserAndContent(contentId, userId);
 
         // 퇴장 처리를 위해 이전 세션을 저장해놓음.
         WatchingSessionDto sessionDto = sessionMapper.toDto(
@@ -99,15 +93,5 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                 watcherCount
         );
         eventPublisher.publishEvent(new WatchingSessionEvent(change, contentId));
-    }
-
-    private void validateUserAndContent(UUID contentId, UUID userId) {
-        if (!userRepository.existsById(userId)) {
-            throw new UserNotFoundException(userId);
-        }
-
-        if (!contentRepository.existsById(contentId)) {
-            throw new ContentNotFoundException(contentId);
-        }
     }
 }

@@ -1,12 +1,16 @@
 package com.mopl.mopl.domain.user.service;
 
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
+import com.mopl.mopl.domain.user.dto.CursorResponseUserDto;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.dto.request.ChangePasswordRequest;
+import com.mopl.mopl.domain.user.dto.request.CursorUserRequest;
 import com.mopl.mopl.domain.user.dto.request.UserCreateRequest;
 import com.mopl.mopl.domain.user.dto.request.UserLockUpdateRequest;
 import com.mopl.mopl.domain.user.dto.request.UserRoleUpdateRequest;
 import com.mopl.mopl.domain.user.entity.Role;
+import com.mopl.mopl.domain.user.entity.SortBy;
+import com.mopl.mopl.domain.user.entity.SortDirection;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserDuplicateException;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
@@ -19,18 +23,25 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
@@ -62,6 +73,224 @@ class UserServiceImplTest {
         ReflectionTestUtils.setField(userService, "lower", "abcdefghijklmnopqrstuvwxyz");
         ReflectionTestUtils.setField(userService, "digit", "0123456789");
         ReflectionTestUtils.setField(userService, "special", "!@#$%^&*");
+    }
+
+    @Test
+    @DisplayName("첫 페이지 사용자 목록 조회 시 DESC 조회를 수행하고 countUsersByEmailAndRole을 호출한다")
+    void getAllUsers_firstPage_desc_success() {
+        // given
+        CursorUserRequest request = new CursorUserRequest(
+                null,
+                null,
+                null,
+                null,
+                20,
+                SortDirection.DESCENDING,
+                SortBy.createdAt
+        );
+
+        User user = createUser();
+        UserDto userDto = createUserDto(UUID.randomUUID(), user);
+
+        given(userRepository.findUsersByCursorDesc(
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        )).willReturn(List.of(user));
+
+        given(userRepository.countUsersByEmailAndRole(null, null))
+                .willReturn(1L);
+
+        given(userMapper.toDto(user))
+                .willReturn(userDto);
+
+        // when
+        CursorResponseUserDto result = userService.getAllUsers(request);
+
+        // then
+        assertThat(result.data()).containsExactly(userDto);
+        assertThat(result.nextCursor()).isNull();
+        assertThat(result.nextIdAfter()).isNull();
+        assertThat(result.hasNext()).isFalse();
+        assertThat(result.totalCount()).isEqualTo(1L);
+        assertThat(result.sortBy()).isEqualTo(SortBy.createdAt);
+        assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING);
+
+        verify(userRepository).findUsersByCursorDesc(
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        );
+        verify(userRepository).countUsersByEmailAndRole(null, null);
+        verify(userMapper).toDto(user);
+    }
+
+    @Test
+    @DisplayName("첫 페이지 사용자 목록 조회 시 ASC 조회를 수행하고 countUsersByEmailAndRole을 호출한다")
+    void getAllUsers_firstPage_asc_success() {
+        // given
+        CursorUserRequest request = new CursorUserRequest(
+                "user",
+                Role.USER,
+                null,
+                null,
+                20,
+                SortDirection.ASCENDING,
+                SortBy.email
+        );
+
+        User user = createUser();
+        UserDto userDto = createUserDto(UUID.randomUUID(), user);
+
+        given(userRepository.findUsersByCursorAsc(
+                eq("user"),
+                eq(Role.USER),
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        )).willReturn(List.of(user));
+
+        given(userRepository.countUsersByEmailAndRole("user", Role.USER))
+                .willReturn(1L);
+
+        given(userMapper.toDto(user))
+                .willReturn(userDto);
+
+        // when
+        CursorResponseUserDto result = userService.getAllUsers(request);
+
+        // then
+        assertThat(result.data()).containsExactly(userDto);
+        assertThat(result.hasNext()).isFalse();
+        assertThat(result.totalCount()).isEqualTo(1L);
+        assertThat(result.sortBy()).isEqualTo(SortBy.email);
+        assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
+
+        verify(userRepository).findUsersByCursorAsc(
+                eq("user"),
+                eq(Role.USER),
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        );
+        verify(userRepository).countUsersByEmailAndRole("user", Role.USER);
+        verify(userMapper).toDto(user);
+    }
+
+    @Test
+    @DisplayName("다음 페이지 사용자 목록 조회 시 countUsersByEmailAndRole을 호출하지 않고 totalCount는 -1L을 반환한다")
+    void getAllUsers_nextPage_skipCount_success() {
+        // given
+        UUID idAfter = UUID.randomUUID();
+        String cursor = "2026-05-11T04:36:08Z";
+        Instant cursorTime = Instant.parse(cursor);
+
+        CursorUserRequest request = new CursorUserRequest(
+                null,
+                null,
+                cursor,
+                idAfter,
+                20,
+                SortDirection.DESCENDING,
+                SortBy.createdAt
+        );
+
+        User user = createUser();
+        UserDto userDto = createUserDto(UUID.randomUUID(), user);
+
+        given(userRepository.findUsersByCursorDesc(
+                isNull(),
+                isNull(),
+                eq(cursorTime),
+                eq(idAfter),
+                any(Pageable.class)
+        )).willReturn(List.of(user));
+
+        given(userMapper.toDto(user))
+                .willReturn(userDto);
+
+        // when
+        CursorResponseUserDto result = userService.getAllUsers(request);
+
+        // then
+        assertThat(result.data()).containsExactly(userDto);
+        assertThat(result.hasNext()).isFalse();
+        assertThat(result.totalCount()).isEqualTo(-1L);
+
+        verify(userRepository).findUsersByCursorDesc(
+                isNull(),
+                isNull(),
+                eq(cursorTime),
+                eq(idAfter),
+                any(Pageable.class)
+        );
+        verify(userRepository, never()).countUsersByEmailAndRole(any(), any());
+        verify(userMapper).toDto(user);
+    }
+
+    @Test
+    @DisplayName("조회 결과가 limit보다 많으면 hasNext가 true이고 마지막 요소를 제거한다")
+    void getAllUsers_hasNext_success() {
+        // given
+        CursorUserRequest request = new CursorUserRequest(
+                null,
+                null,
+                null,
+                null,
+                1,
+                SortDirection.DESCENDING,
+                SortBy.createdAt
+        );
+
+        User firstUser = createUser();
+        UUID firstUserId = UUID.randomUUID();
+        Instant firstCreatedAt = Instant.parse("2026-05-11T04:36:08Z");
+        ReflectionTestUtils.setField(firstUser, "id", firstUserId);
+        ReflectionTestUtils.setField(firstUser, "createdAt", firstCreatedAt);
+
+        User extraUser = createUser();
+        ReflectionTestUtils.setField(extraUser, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(extraUser, "createdAt", Instant.parse("2026-05-10T04:36:08Z"));
+
+        UserDto firstUserDto = createUserDto(firstUserId, firstUser);
+
+        given(userRepository.findUsersByCursorDesc(
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        )).willReturn(new ArrayList<>(List.of(firstUser, extraUser)));
+
+        given(userRepository.countUsersByEmailAndRole(null, null))
+                .willReturn(2L);
+
+        given(userMapper.toDto(firstUser))
+                .willReturn(firstUserDto);
+
+        // when
+        CursorResponseUserDto result = userService.getAllUsers(request);
+
+        // then
+        assertThat(result.data()).containsExactly(firstUserDto);
+        assertThat(result.hasNext()).isTrue();
+        assertThat(result.nextCursor()).isEqualTo(firstCreatedAt.toString());
+        assertThat(result.nextIdAfter()).isEqualTo(firstUserId);
+        assertThat(result.totalCount()).isEqualTo(2L);
+
+        verify(userRepository).findUsersByCursorDesc(
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                any(Pageable.class)
+        );
+        verify(userRepository).countUsersByEmailAndRole(null, null);
+        verify(userMapper).toDto(firstUser);
     }
 
     @Test
@@ -145,6 +374,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 단건 조회에 성공한다")
     void getUser_success() {
+        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
         UserDto expected = createUserDto(userId, user);
@@ -155,8 +385,10 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
+        // when
         UserDto result = userService.getUser(userId);
 
+        // then
         assertThat(result).isEqualTo(expected);
 
         verify(userRepository).findById(userId);
@@ -166,11 +398,13 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 단건 조회 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void getUser_notFound_throwUserNotFoundException() {
+        // given
         UUID userId = UUID.randomUUID();
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
+        // when & then
         assertThatThrownBy(() -> userService.getUser(userId))
                 .isInstanceOf(UserNotFoundException.class);
 
@@ -181,6 +415,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 권한 수정에 성공한다")
     void updateUserRole_success() {
+        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
 
@@ -202,8 +437,10 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
+        // when
         UserDto result = userService.updateUserRole(userId, request);
 
+        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.getRole()).isEqualTo(Role.ADMIN);
 
@@ -214,12 +451,14 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 권한 수정 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void updateUserRole_notFound_throwUserNotFoundException() {
+        // given
         UUID userId = UUID.randomUUID();
         UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
+        // when & then
         assertThatThrownBy(() -> userService.updateUserRole(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 
@@ -230,6 +469,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 비밀번호 수정에 성공한다")
     void updateUserPassword_success() {
+        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
 
@@ -245,8 +485,10 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
+        // when
         UserDto result = userService.updateUserPassword(userId, request);
 
+        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("new-encoded-password");
 
@@ -259,12 +501,14 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 비밀번호 수정 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void updateUserPassword_notFound_throwUserNotFoundException() {
+        // given
         UUID userId = UUID.randomUUID();
         ChangePasswordRequest request = new ChangePasswordRequest("NewPassword1!");
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
+        // when & then
         assertThatThrownBy(() -> userService.updateUserPassword(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 
@@ -275,6 +519,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("관리자에 의한 비밀번호 초기화에 성공한다")
     void initUserPassword_success() {
+        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
         UserDto expected = createUserDto(userId, user);
@@ -288,8 +533,10 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
+        // when
         UserDto result = userService.initUserPassword(userId);
 
+        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("init-encoded-password");
 
@@ -312,11 +559,13 @@ class UserServiceImplTest {
     @Test
     @DisplayName("비밀번호 초기화 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void initUserPassword_notFound_throwUserNotFoundException() {
+        // given
         UUID userId = UUID.randomUUID();
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
+        // when & then
         assertThatThrownBy(() -> userService.initUserPassword(userId))
                 .isInstanceOf(UserNotFoundException.class);
 
@@ -327,6 +576,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원을 잠금 처리하면 계정이 잠기고 JWT 정보가 무효화된다")
     void updateUserLocked_lock_success() {
+        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
 
@@ -348,8 +598,10 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
+        // when
         UserDto result = userService.updateUserLocked(userId, request);
 
+        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.isLocked()).isTrue();
 
@@ -361,6 +613,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 잠금을 해제하면 계정이 잠금 해제되고 JWT 정보는 무효화하지 않는다")
     void updateUserLocked_unlock_success() {
+        // given
         UUID userId = UUID.randomUUID();
         User user = createUser();
         user.lock();
@@ -383,8 +636,10 @@ class UserServiceImplTest {
         given(userMapper.toDto(user))
                 .willReturn(expected);
 
+        // when
         UserDto result = userService.updateUserLocked(userId, request);
 
+        // then
         assertThat(result).isEqualTo(expected);
         assertThat(user.isLocked()).isFalse();
 
@@ -396,12 +651,14 @@ class UserServiceImplTest {
     @Test
     @DisplayName("회원 잠금 상태 수정 시 사용자가 없으면 UserNotFoundException이 발생한다")
     void updateUserLocked_notFound_throwUserNotFoundException() {
+        // given
         UUID userId = UUID.randomUUID();
         UserLockUpdateRequest request = new UserLockUpdateRequest(true);
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.empty());
 
+        // when & then
         assertThatThrownBy(() -> userService.updateUserLocked(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 

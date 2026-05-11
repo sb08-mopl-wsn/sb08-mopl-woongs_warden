@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RequiredArgsConstructor
-public class UserRepostoryCustomImpl implements UserRepositoryCustom {
+public class UserRepositoryCustomImpl implements UserRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
 

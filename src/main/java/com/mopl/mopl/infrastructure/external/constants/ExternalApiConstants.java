@@ -4,7 +4,6 @@ public class ExternalApiConstants
 {
     /* sports */
     // batch에서 사용
-    public static final String SEASON = "2025-2026";
     public static final String EVENTS_SEASON_PATH = "/eventsseason.php?id={id}&s={season}";
 
     public static final int PREMIER_LEAGUE_ID = 4328;

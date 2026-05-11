@@ -6,15 +6,18 @@ import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.TmdbMovie;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.TmdbTv;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 @Component
 public class TmdbContentMapper
 {
@@ -75,12 +78,20 @@ public class TmdbContentMapper
 
     private Instant parseDate(String date) {
         if (date == null || date.isBlank()) return null;
-        return LocalDate.parse(date)
-                .atStartOfDay()
-                .toInstant(ZoneOffset.UTC);
+
+        try {
+            return LocalDate.parse(date)
+                    .atStartOfDay()
+                    .toInstant(ZoneOffset.UTC);
+        } catch (DateTimeParseException e) {
+            log.warn("날짜 파싱 실패: date={}", date, e);
+            return null;
+        }
     }
 
     private List<String> resolveGenres(List<Integer> genreIds, Map<Integer, String> genreMap) {
+        if (genreIds == null || genreIds.isEmpty() || genreMap == null) return List.of();
+
         return genreIds.stream()
                 .map(genreMap::get)
                 .filter(Objects::nonNull)

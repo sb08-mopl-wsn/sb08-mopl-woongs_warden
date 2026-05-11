@@ -1,6 +1,7 @@
 package com.mopl.mopl.infrastructure.external.tmdb;
 
 import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
+import com.mopl.mopl.infrastructure.external.exception.TmdbEmptyResponseException;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbGenreListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbMovieListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbTvListResponse;
@@ -27,10 +28,16 @@ public class TmdbApiClient
      * @return 영화 목록 및 페이지 정보
      */
     public TmdbMovieListResponse discoverMovies(int page) {
-        return restClient.get()
+        TmdbMovieListResponse response = restClient.get()
                 .uri(ExternalApiConstants.DISCOVER_MOVIE, page)
                 .retrieve()
                 .body(TmdbMovieListResponse.class);
+
+        if (response == null) {
+            throw new TmdbEmptyResponseException();
+        }
+
+        return response;
     }
 
     /**
@@ -40,10 +47,16 @@ public class TmdbApiClient
      * @return TV 프로그램 목록 및 페이지 정보
      */
     public TmdbTvListResponse discoverTv(int page) {
-        return restClient.get()
+        TmdbTvListResponse response = restClient.get()
                 .uri(ExternalApiConstants.DISCOVER_TV, page)
                 .retrieve()
                 .body(TmdbTvListResponse.class);
+
+        if (response == null) {
+            throw new TmdbEmptyResponseException();
+        }
+
+        return response;
     }
 
     /**
@@ -62,7 +75,8 @@ public class TmdbApiClient
             return response.genres().stream()
                     .collect(Collectors.toMap(
                             TmdbGenreListResponse.Genre::id,
-                            TmdbGenreListResponse.Genre::name
+                            TmdbGenreListResponse.Genre::name,
+                            (existing, replace) -> existing
                     ));
         }
         return Map.of();

@@ -1,14 +1,10 @@
 package com.mopl.mopl.infrastructure.external.config;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestClient;
 
 @Configuration
@@ -36,10 +32,6 @@ public class ExternalApiConfig
                 .baseUrl(tmdbBaseUrl)
                 .defaultHeader("Authorization", "Bearer " + tmdbToken)
                 .requestFactory(clientHttpRequestFactory())
-                .messageConverters(converters -> {
-                    converters.clear();
-                    converters.add(new MappingJackson2HttpMessageConverter(externalApiObjectMapper()));
-                })
                 .build();
     }
 
@@ -49,12 +41,6 @@ public class ExternalApiConfig
                 .baseUrl(sportsdbBaseUrl)
                 .requestFactory(clientHttpRequestFactory())
                 .build();
-    }
-
-    private ObjectMapper externalApiObjectMapper() {
-        return new ObjectMapper()
-                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
     private ClientHttpRequestFactory clientHttpRequestFactory() {

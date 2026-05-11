@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.List;
+import java.time.format.DateTimeParseException;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 @RequiredArgsConstructor
 @Component
@@ -25,15 +27,22 @@ public class SportsdbContentMapper
                 .contentType(ContentType.sport)
                 .thumbnailKey(sportDbEvent.strThumb())
                 .releaseDate(parseDate(sportDbEvent.dateEvent()))
-                .tags(List.of(sportDbEvent.strSport(), sportDbEvent.strLeague()))
+                .tags(Stream.of(sportDbEvent.strSport(), sportDbEvent.strLeague())
+                        .filter(Objects::nonNull)
+                        .toList())
                 .externalId(sportDbEvent.idEvent())
                 .build();
     }
 
     private Instant parseDate(String date) {
         if (date == null || date.isBlank()) return null;
-        return LocalDate.parse(date)
-                .atStartOfDay()
-                .toInstant(ZoneOffset.UTC);
+
+        try {
+            return LocalDate.parse(date)
+                    .atStartOfDay()
+                    .toInstant(ZoneOffset.UTC);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 }

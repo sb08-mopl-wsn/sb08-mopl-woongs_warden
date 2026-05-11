@@ -64,7 +64,7 @@ public class Content extends BaseUpdatableEntity
         this.thumbnailKey = thumbnailKey;
         this.tags = tags != null ? tags : new ArrayList<>();
         this.releaseDate = releaseDate;
-        this.externalId = externalId;
+        this.externalId = (externalId == null || externalId.isBlank()) ? null : externalId;
     }
 
     public void update(String title, String description, List<String> tags) {

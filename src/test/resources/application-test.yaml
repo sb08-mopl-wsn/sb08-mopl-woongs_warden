@@ -49,10 +49,10 @@ external:
   tmdb:
     api:
       token: external-tmdb-api-token
-      base-url: tmdb-base-url
+      base-url: http://localhost:8089
   sportsdb:
     api:
-      base-url: sports-base-url
+      base-url: http://localhost:8089
   timeout:
     connect-timeout: 5000
     read-timeout: 5000

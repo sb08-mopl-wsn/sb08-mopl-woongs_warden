@@ -1,8 +1,8 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.domain.watchingSession.entity;
 
 import com.mopl.mopl.domain.content.entity.Content;
-import com.mopl.mopl.global.base.BaseEntity;
 import com.mopl.mopl.domain.user.entity.User;
+import com.mopl.mopl.global.base.BaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;

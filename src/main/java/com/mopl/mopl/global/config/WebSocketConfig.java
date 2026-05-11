@@ -21,15 +21,15 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
-    private final JwtAuthenticationChannelInterceptor jwtAuthenticationChannelInterceptor;
-
-    private AuthorizationChannelInterceptor authorizationChannelInterceptor() {
-        return new AuthorizationChannelInterceptor(
-                MessageMatcherDelegatingAuthorizationManager.builder()
-                        .anyMessage().hasRole(Role.USER.name())
-                        .build()
-        );
-    }
+//    private final JwtAuthenticationChannelInterceptor jwtAuthenticationChannelInterceptor;
+//
+//    private AuthorizationChannelInterceptor authorizationChannelInterceptor() {
+//        return new AuthorizationChannelInterceptor(
+//                MessageMatcherDelegatingAuthorizationManager.builder()
+//                        .anyMessage().hasRole(Role.USER.name())
+//                        .build()
+//        );
+//    }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -53,19 +53,19 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
                 .withSockJS()
-                .setHeartbeatTime(25000)
+                .setHeartbeatTime(3000)
                 .setDisconnectDelay(5000);
 
         log.info("[WebSocket 설정] STOMP 엔드포인트 등록 완료");
         log.debug("[STOMP 엔드포인트] 경로: /ws, SockJS 폴백: 활성화, CORS: 모든 오리진 허용");
     }
 
-    @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(
-                jwtAuthenticationChannelInterceptor, // 1순위 - 인증
-                new SecurityContextChannelInterceptor(), // 2순위
-                authorizationChannelInterceptor() // 3순위 - 인가
-        );
-    }
+//    @Override
+//    public void configureClientInboundChannel(ChannelRegistration registration) {
+//        registration.interceptors(
+//                jwtAuthenticationChannelInterceptor, // 1순위 - 인증
+//                new SecurityContextChannelInterceptor(), // 2순위
+//                authorizationChannelInterceptor() // 3순위 - 인가
+//        );
+//    }
 }

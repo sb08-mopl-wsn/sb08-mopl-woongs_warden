@@ -1,7 +1,12 @@
 package com.mopl.mopl.domain.review.service.impl;
 
+import com.mopl.mopl.domain.content.entity.Content;
+import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
+import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.domain.review.dto.request.ReviewCreateRequest;
+import com.mopl.mopl.domain.review.dto.request.ReviewSearchRequest;
 import com.mopl.mopl.domain.review.dto.request.ReviewUpdateRequest;
+import com.mopl.mopl.domain.review.dto.response.CursorResponseReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewDto;
 import com.mopl.mopl.domain.review.entity.Review;
 import com.mopl.mopl.domain.review.exception.ReviewErrorCode;
@@ -11,8 +16,11 @@ import com.mopl.mopl.domain.review.mapper.ReviewMapper;
 import com.mopl.mopl.domain.review.repository.ReviewRepository;
 import com.mopl.mopl.domain.review.service.ReviewService;
 import com.mopl.mopl.domain.user.entity.User;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,14 +30,23 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewServiceImpl implements ReviewService {
 
   private final ReviewRepository reviewRepository;
-  // private final ContentRepository contentRepository; // 최신화 되면 주석 제거
+  private final ContentRepository contentRepository;
   private final ReviewMapper reviewMapper;
 
   @Override
   @Transactional
   public ReviewDto createReview(ReviewCreateRequest request, User user) {
-    // TODO: 리뷰 생성 로직 작성해야함
-    return null;
+    Content content = contentRepository.findById(request.contentId())
+        .orElseThrow(() -> new ContentNotFoundException(request.contentId()));
+
+    Review review = reviewMapper.toEntity(request, user, content);
+
+    try {
+      Review savedReview = reviewRepository.saveAndFlush(review);
+      return reviewMapper.toDto(savedReview);
+    } catch (DataIntegrityViolationException e) {
+      throw new ReviewException(ReviewErrorCode.DUPLICATE_REVIEW);
+    }
   }
 
   @Override
@@ -37,6 +54,36 @@ public class ReviewServiceImpl implements ReviewService {
     Review review = reviewRepository.findById(reviewId)
         .orElseThrow(() -> new ReviewNotFoundException(reviewId));
     return reviewMapper.toDto(review);
+  }
+
+  @Override
+  public CursorResponseReviewDto findReviews(ReviewSearchRequest request) {
+    Slice<Review> reviewSlice = reviewRepository.findReviews(request);
+
+    List<ReviewDto> reviewDtos = reviewSlice.getContent().stream()
+        .map(reviewMapper::toDto)
+        .toList();
+
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+
+    if (reviewSlice.hasNext() && reviewSlice.hasContent()) {
+      Review lastReview = reviewSlice.getContent().get(reviewSlice.getContent().size() - 1);
+      nextCursor = extractCursor(lastReview, request.sortBy());
+      nextIdAfter = lastReview.getId();
+    }
+
+    long totalCount = reviewRepository.countReviews(request.contentId());
+
+    return new CursorResponseReviewDto(
+        reviewDtos,
+        nextCursor,
+        nextIdAfter,
+        reviewSlice.hasNext(),
+        totalCount,
+        request.sortBy(),
+        request.sortDirection()
+    );
   }
 
   @Override
@@ -70,5 +117,13 @@ public class ReviewServiceImpl implements ReviewService {
       throw new ReviewException(ReviewErrorCode.FORBIDDEN);
     }
     return review;
+  }
+
+  private String extractCursor(Review review, String sortBy) {
+    if ("rating".equalsIgnoreCase(sortBy)) {
+      return String.valueOf(review.getRating());
+    }
+    // 기본값 createdAt
+    return review.getCreatedAt().toString();
   }
 }

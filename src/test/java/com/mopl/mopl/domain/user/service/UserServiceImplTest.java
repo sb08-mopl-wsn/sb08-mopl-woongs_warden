@@ -72,7 +72,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("첫 페이지 사용자 목록 조회 시 DESC 조회를 수행하고 countUsersByEmailAndRole을 호출한다")
+    @DisplayName("첫 페이지 사용자 목록 조회 시 DESC 정렬 방향으로 조회하고 countUsersByEmailAndRole을 호출한다")
     void getAllUsers_firstPage_desc_success() {
         // given
         CursorUserRequest request = new CursorUserRequest(
@@ -88,11 +88,12 @@ class UserServiceImplTest {
         User user = createUser();
         UserDto userDto = createUserDto(UUID.randomUUID(), user);
 
-        given(userRepository.findUsersByCursorDesc(
+        given(userRepository.findUsersByCursor(
                 isNull(),
                 isNull(),
                 isNull(),
                 isNull(),
+                eq(SortDirection.DESCENDING),
                 any(Pageable.class)
         )).willReturn(List.of(user));
 
@@ -116,11 +117,12 @@ class UserServiceImplTest {
         assertThat(result.sortBy()).isEqualTo(SortBy.createdAt);
         assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING);
 
-        verify(userRepository).findUsersByCursorDesc(
+        verify(userRepository).findUsersByCursor(
                 isNull(),
                 isNull(),
                 isNull(),
                 isNull(),
+                eq(SortDirection.DESCENDING),
                 any(Pageable.class)
         );
         verify(userRepository).countUsersByEmailAndRole(
@@ -131,7 +133,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("첫 페이지 사용자 목록 조회 시 ASC 조회를 수행하고 countUsersByEmailAndRole을 호출한다")
+    @DisplayName("첫 페이지 사용자 목록 조회 시 ASC 정렬 방향으로 조회하고 countUsersByEmailAndRole을 호출한다")
     void getAllUsers_firstPage_asc_success() {
         // given
         CursorUserRequest request = new CursorUserRequest(
@@ -147,11 +149,12 @@ class UserServiceImplTest {
         User user = createUser();
         UserDto userDto = createUserDto(UUID.randomUUID(), user);
 
-        given(userRepository.findUsersByCursorAsc(
+        given(userRepository.findUsersByCursor(
                 eq("user"),
                 eq(Role.USER),
                 isNull(),
                 isNull(),
+                eq(SortDirection.ASCENDING),
                 any(Pageable.class)
         )).willReturn(List.of(user));
 
@@ -175,11 +178,12 @@ class UserServiceImplTest {
         assertThat(result.sortBy()).isEqualTo(SortBy.email);
         assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
 
-        verify(userRepository).findUsersByCursorAsc(
+        verify(userRepository).findUsersByCursor(
                 eq("user"),
                 eq(Role.USER),
                 isNull(),
                 isNull(),
+                eq(SortDirection.ASCENDING),
                 any(Pageable.class)
         );
         verify(userRepository).countUsersByEmailAndRole(
@@ -210,11 +214,12 @@ class UserServiceImplTest {
         User user = createUser();
         UserDto userDto = createUserDto(UUID.randomUUID(), user);
 
-        given(userRepository.findUsersByCursorDesc(
+        given(userRepository.findUsersByCursor(
                 isNull(),
                 isNull(),
                 eq(cursorTime),
                 eq(idAfter),
+                eq(SortDirection.DESCENDING),
                 any(Pageable.class)
         )).willReturn(List.of(user));
 
@@ -231,11 +236,12 @@ class UserServiceImplTest {
         assertThat(result.hasNext()).isFalse();
         assertThat(result.totalCount()).isEqualTo(-1L);
 
-        verify(userRepository).findUsersByCursorDesc(
+        verify(userRepository).findUsersByCursor(
                 isNull(),
                 isNull(),
                 eq(cursorTime),
                 eq(idAfter),
+                eq(SortDirection.DESCENDING),
                 any(Pageable.class)
         );
         verify(userRepository, never()).countUsersByEmailAndRole(any(), any());
@@ -268,11 +274,12 @@ class UserServiceImplTest {
 
         UserDto firstUserDto = createUserDto(firstUserId, firstUser);
 
-        given(userRepository.findUsersByCursorDesc(
+        given(userRepository.findUsersByCursor(
                 isNull(),
                 isNull(),
                 isNull(),
                 isNull(),
+                eq(SortDirection.DESCENDING),
                 any(Pageable.class)
         )).willReturn(new ArrayList<>(List.of(firstUser, extraUser)));
 
@@ -296,11 +303,12 @@ class UserServiceImplTest {
         assertThat(result.sortBy()).isEqualTo(SortBy.createdAt);
         assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING);
 
-        verify(userRepository).findUsersByCursorDesc(
+        verify(userRepository).findUsersByCursor(
                 isNull(),
                 isNull(),
                 isNull(),
                 isNull(),
+                eq(SortDirection.DESCENDING),
                 any(Pageable.class)
         );
         verify(userRepository).countUsersByEmailAndRole(

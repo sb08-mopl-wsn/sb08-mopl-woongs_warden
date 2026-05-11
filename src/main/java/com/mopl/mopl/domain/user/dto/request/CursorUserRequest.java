@@ -1,8 +1,8 @@
 package com.mopl.mopl.domain.user.dto.request;
 
+import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.SortBy;
 import com.mopl.mopl.domain.user.entity.SortDirection;
-import com.mopl.mopl.domain.user.entity.Role;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -12,7 +12,6 @@ import java.util.UUID;
 public record CursorUserRequest(
         String emailLike,
         Role roleEqual,
-        Boolean isLocked,
         String cursor,
         UUID idAfter,
         @NotNull(message = "limit는 필수값입니다.")
@@ -24,4 +23,11 @@ public record CursorUserRequest(
         @NotNull(message = "sortBy는 필수값입니다.")
         SortBy sortBy
 ) {
+    public CursorUserRequest {
+        boolean cursorSet = cursor != null && !cursor.isBlank();
+        boolean idAfterSet = idAfter != null;
+        if (cursorSet != idAfterSet) {
+            throw new IllegalArgumentException("cursor와 idAfter는 함께 전달되어야 합니다.");
+        }
+    }
 }

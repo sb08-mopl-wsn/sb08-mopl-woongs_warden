@@ -1,9 +1,6 @@
 package com.mopl.mopl.domain.user.service;
 
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
-import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
-import com.mopl.mopl.domain.notification.dto.NotificationDto;
-import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.user.dto.CursorUserListResponse;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.dto.request.*;
@@ -97,7 +94,7 @@ public class UserServiceImpl implements UserService {
 
         String nextCursor = null;
         UUID nextIdAfter = null;
-        if (!users.isEmpty()) {
+        if (hasNext && !users.isEmpty()) {
             User lastUser = users.get(users.size() - 1);
             nextCursor = lastUser.getCreatedAt().toString();
             nextIdAfter = lastUser.getId();
@@ -109,7 +106,7 @@ public class UserServiceImpl implements UserService {
                 .map(userMapper::toDto)
                 .toList();
 
-        return new CursorUserListResponse(data, nextCursor, nextIdAfter, hasNext,userCount,request.sortBy(),request.sortDirection());
+        return new CursorUserListResponse(data, nextCursor, nextIdAfter, hasNext, userCount, request.sortBy(), request.sortDirection());
     }
 
     @Override

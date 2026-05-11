@@ -39,7 +39,7 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 
         if (exception instanceof BadCredentialsException) {
             errorMessage = "ID/PW가 올바르지 않습니다.";
-            errorCode = "BAD_CREDENTIALS";
+            errorCode = "AUTHENTICATION_FAILED";
             status = HttpServletResponse.SC_UNAUTHORIZED;
 
         } else if (exception instanceof LockedException) {
@@ -49,11 +49,11 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 
         } else if (exception instanceof DisabledException) {
             errorMessage = "비활성 계정입니다.";
-            errorCode = "ACCOUNT_DISABLED";
+            errorCode = "AUTHENTICATION_FAILED";
             status = HttpServletResponse.SC_FORBIDDEN;
 
         } else {
-            errorMessage = "로그인 실패입니다.";
+            errorMessage = "로그인 실패 입니다.";
             errorCode = "AUTHENTICATION_FAILED";
             status = HttpServletResponse.SC_UNAUTHORIZED;
         }

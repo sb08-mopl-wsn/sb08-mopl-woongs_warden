@@ -35,13 +35,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
@@ -100,8 +96,10 @@ class UserServiceImplTest {
                 any(Pageable.class)
         )).willReturn(List.of(user));
 
-        given(userRepository.countUsersByEmailAndRole(null, null))
-                .willReturn(1L);
+        given(userRepository.countUsersByEmailAndRole(
+                nullable(String.class),
+                nullable(Role.class)
+        )).willReturn(1L);
 
         given(userMapper.toDto(user))
                 .willReturn(userDto);
@@ -125,7 +123,10 @@ class UserServiceImplTest {
                 isNull(),
                 any(Pageable.class)
         );
-        verify(userRepository).countUsersByEmailAndRole(null, null);
+        verify(userRepository).countUsersByEmailAndRole(
+                nullable(String.class),
+                nullable(Role.class)
+        );
         verify(userMapper).toDto(user);
     }
 
@@ -154,8 +155,10 @@ class UserServiceImplTest {
                 any(Pageable.class)
         )).willReturn(List.of(user));
 
-        given(userRepository.countUsersByEmailAndRole("user", Role.USER))
-                .willReturn(1L);
+        given(userRepository.countUsersByEmailAndRole(
+                eq("user"),
+                eq(Role.USER)
+        )).willReturn(1L);
 
         given(userMapper.toDto(user))
                 .willReturn(userDto);
@@ -165,6 +168,8 @@ class UserServiceImplTest {
 
         // then
         assertThat(result.data()).containsExactly(userDto);
+        assertThat(result.nextCursor()).isNull();
+        assertThat(result.nextIdAfter()).isNull();
         assertThat(result.hasNext()).isFalse();
         assertThat(result.totalCount()).isEqualTo(1L);
         assertThat(result.sortBy()).isEqualTo(SortBy.email);
@@ -177,7 +182,10 @@ class UserServiceImplTest {
                 isNull(),
                 any(Pageable.class)
         );
-        verify(userRepository).countUsersByEmailAndRole("user", Role.USER);
+        verify(userRepository).countUsersByEmailAndRole(
+                eq("user"),
+                eq(Role.USER)
+        );
         verify(userMapper).toDto(user);
     }
 
@@ -218,6 +226,8 @@ class UserServiceImplTest {
 
         // then
         assertThat(result.data()).containsExactly(userDto);
+        assertThat(result.nextCursor()).isNull();
+        assertThat(result.nextIdAfter()).isNull();
         assertThat(result.hasNext()).isFalse();
         assertThat(result.totalCount()).isEqualTo(-1L);
 
@@ -266,8 +276,10 @@ class UserServiceImplTest {
                 any(Pageable.class)
         )).willReturn(new ArrayList<>(List.of(firstUser, extraUser)));
 
-        given(userRepository.countUsersByEmailAndRole(null, null))
-                .willReturn(2L);
+        given(userRepository.countUsersByEmailAndRole(
+                nullable(String.class),
+                nullable(Role.class)
+        )).willReturn(2L);
 
         given(userMapper.toDto(firstUser))
                 .willReturn(firstUserDto);
@@ -281,6 +293,8 @@ class UserServiceImplTest {
         assertThat(result.nextCursor()).isEqualTo(firstCreatedAt.toString());
         assertThat(result.nextIdAfter()).isEqualTo(firstUserId);
         assertThat(result.totalCount()).isEqualTo(2L);
+        assertThat(result.sortBy()).isEqualTo(SortBy.createdAt);
+        assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING);
 
         verify(userRepository).findUsersByCursorDesc(
                 isNull(),
@@ -289,7 +303,10 @@ class UserServiceImplTest {
                 isNull(),
                 any(Pageable.class)
         );
-        verify(userRepository).countUsersByEmailAndRole(null, null);
+        verify(userRepository).countUsersByEmailAndRole(
+                nullable(String.class),
+                nullable(Role.class)
+        );
         verify(userMapper).toDto(firstUser);
     }
 

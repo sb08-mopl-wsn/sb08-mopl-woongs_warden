@@ -18,13 +18,13 @@ public class InitAdmin implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    // admin을 기본적으로 가질 유저의 이메일
-    private static String targetAdminEmail;
-
+    // admin 초기 메일
     @Value("${initAdmin.create.admin}")
-    public void setTargetAdminEmail(String value) {
-        targetAdminEmail = value;
-    }
+    private String targetAdminEmail;
+
+    // admin 초기 비밀번호
+    @Value("${initAdmin.create.pw}")
+    private String passwordInitAdmin;
 
     @Override
     @Transactional
@@ -43,8 +43,8 @@ public class InitAdmin implements CommandLineRunner {
                     // 없으면 만들기
                     () -> {
                         log.warn("어드민으로 지정할 대상 유저([{}])가 DB에 존재하지 않아 어드민 계정을 만듭니다.", targetAdminEmail);
-                        String encodedPassword = passwordEncoder.encode("Admin1234!");
-                        User admin = new User("admin", "admin@admin.com", encodedPassword);
+                        String encodedPassword = passwordEncoder.encode(passwordInitAdmin);
+                        User admin = new User("admin", targetAdminEmail, encodedPassword);
                         userRepository.save(admin);
                     }
             );

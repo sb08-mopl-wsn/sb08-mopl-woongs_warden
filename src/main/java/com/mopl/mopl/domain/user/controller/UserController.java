@@ -1,5 +1,6 @@
 package com.mopl.mopl.domain.user.controller;
 
+import com.mopl.mopl.domain.user.dto.CursorUserListResponse;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.dto.request.*;
 import com.mopl.mopl.domain.user.service.UserService;
@@ -20,9 +21,19 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserCreateRequest request) {
+    public ResponseEntity<UserDto> createUser(
+            @Valid @RequestBody UserCreateRequest request
+    ) {
         UserDto userDto = userService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(userDto);
+    }
+
+    @GetMapping()
+    public ResponseEntity<CursorUserListResponse> getAllUsers(
+            @Valid @ModelAttribute CursorUserRequest request
+    ) {
+        CursorUserListResponse response = userService.getAllUsers(request);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
     @GetMapping("/{userId}")

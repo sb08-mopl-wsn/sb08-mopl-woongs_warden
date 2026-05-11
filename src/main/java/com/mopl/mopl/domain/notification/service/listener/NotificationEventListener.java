@@ -34,7 +34,7 @@ public class NotificationEventListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleFollowEvent(FollowEvent event) {
 
-    log.debug("팔로우 이벤트 수신 - follower: {}, followee: {}", event.followerName(), event.followeeId());
+    log.debug("팔로우 이벤트 수신 - followerId: {}, followeeId: {}", event.followerId(), event.followeeId());
 
     // 알림 수신자(Followee) 엔티티 조회
     User receiver = userRepository.findById(event.followeeId()).orElse(null);

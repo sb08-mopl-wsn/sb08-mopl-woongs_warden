@@ -49,6 +49,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setThreadNamePrefix("noti-async-");
 
         // 큐 500개도 꽉 차면, 알림을 발생시킨 스레드가 직접 처리하게 함
+        // TODO: 추후 Kafka 기반 알림 비동기 큐가 도입되고 Retry 로직 구축 후에는 메인 스레드 지연을 막기 위해 AbortPolicy로 변경할 것
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
 
         executor.setWaitForTasksToCompleteOnShutdown(true);

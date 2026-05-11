@@ -42,7 +42,7 @@ public class ReviewServiceImpl implements ReviewService {
     Review review = reviewMapper.toEntity(request, user, content);
 
     try {
-      Review savedReview = reviewRepository.save(review);
+      Review savedReview = reviewRepository.saveAndFlush(review);
       return reviewMapper.toDto(savedReview);
     } catch (DataIntegrityViolationException e) {
       throw new ReviewException(ReviewErrorCode.DUPLICATE_REVIEW);

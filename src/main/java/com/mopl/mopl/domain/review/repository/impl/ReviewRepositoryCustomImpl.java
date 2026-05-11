@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
 
 @RequiredArgsConstructor
 @Repository
@@ -68,17 +69,22 @@ public class ReviewRepositoryCustomImpl implements ReviewRepositoryCustom {
       return null; // 첫 페이지 조회
     }
 
+    String effectiveSortBy = StringUtils.hasText(sortBy) ? sortBy : "createdAt";
+
     try {
-      if ("rating".equalsIgnoreCase(sortBy)) {
-        double ratingCursor = Double.parseDouble(cursor);
-        BooleanExpression primaryCondition = isAsc ? review.rating.gt(ratingCursor) : review.rating.lt(ratingCursor);
-        BooleanExpression tieCondition = review.rating.eq(ratingCursor).and(isAsc ? review.id.gt(idAfter) : review.id.lt(idAfter));
-        return primaryCondition.or(tieCondition);
-      } else { // 기본값: createdAt
-        Instant createdAtCursor = Instant.parse(cursor);
-        BooleanExpression primaryCondition = isAsc ? review.createdAt.gt(createdAtCursor) : review.createdAt.lt(createdAtCursor);
-        BooleanExpression tieCondition = review.createdAt.eq(createdAtCursor).and(isAsc ? review.id.gt(idAfter) : review.id.lt(idAfter));
-        return primaryCondition.or(tieCondition);
+      switch (effectiveSortBy.toLowerCase()) {
+        case "rating":
+          double ratingCursor = Double.parseDouble(cursor);
+          BooleanExpression primaryRating = isAsc ? review.rating.gt(ratingCursor) : review.rating.lt(ratingCursor);
+          BooleanExpression tieRating = review.rating.eq(ratingCursor).and(isAsc ? review.id.gt(idAfter) : review.id.lt(idAfter));
+          return primaryRating.or(tieRating);
+
+        case "createdat":
+        default: // 기본값 처리
+          Instant createdAtCursor = Instant.parse(cursor);
+          BooleanExpression primaryCreatedAt = isAsc ? review.createdAt.gt(createdAtCursor) : review.createdAt.lt(createdAtCursor);
+          BooleanExpression tieCreatedAt = review.createdAt.eq(createdAtCursor).and(isAsc ? review.id.gt(idAfter) : review.id.lt(idAfter));
+          return primaryCreatedAt.or(tieCreatedAt);
       }
     } catch (NumberFormatException | DateTimeParseException e) {
       throw new ReviewCursorException();

@@ -16,6 +16,8 @@ import com.mopl.mopl.domain.review.mapper.ReviewMapper;
 import com.mopl.mopl.domain.review.repository.ReviewRepository;
 import com.mopl.mopl.domain.review.service.ReviewService;
 import com.mopl.mopl.domain.user.entity.User;
+import com.mopl.mopl.domain.user.exception.UserNotFoundException;
+import com.mopl.mopl.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,11 +33,15 @@ public class ReviewServiceImpl implements ReviewService {
 
   private final ReviewRepository reviewRepository;
   private final ContentRepository contentRepository;
+  private final UserRepository userRepository;
   private final ReviewMapper reviewMapper;
 
   @Override
   @Transactional
-  public ReviewDto createReview(ReviewCreateRequest request, User user) {
+  public ReviewDto createReview(ReviewCreateRequest request, UUID userId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(UserNotFoundException::new);
+
     Content content = contentRepository.findById(request.contentId())
         .orElseThrow(() -> new ContentNotFoundException(request.contentId()));
 
@@ -88,19 +94,22 @@ public class ReviewServiceImpl implements ReviewService {
 
   @Override
   @Transactional
-  public ReviewDto updateReview(UUID reviewId, ReviewUpdateRequest request, User user) {
+  public ReviewDto updateReview(UUID reviewId, ReviewUpdateRequest request, UUID userId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(UserNotFoundException::new);
+
     Review reviewToUpdate = getReviewAndCheckPermission(reviewId, user);
-
     reviewToUpdate.update(request.text(), request.rating());
-
     return reviewMapper.toDto(reviewToUpdate);
   }
 
   @Override
   @Transactional
-  public void deleteReview(UUID reviewId, User user) {
-    Review reviewToDelete = getReviewAndCheckPermission(reviewId, user);
+  public void deleteReview(UUID reviewId, UUID userId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(UserNotFoundException::new);
 
+    Review reviewToDelete = getReviewAndCheckPermission(reviewId, user);
     reviewRepository.delete(reviewToDelete);
   }
 

@@ -7,6 +7,7 @@ import com.mopl.mopl.domain.review.dto.response.CursorResponseReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewDto;
 import com.mopl.mopl.domain.review.service.ReviewService;
 import com.mopl.mopl.domain.user.entity.User;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,9 +34,10 @@ public class ReviewController {
   @PostMapping
   public ResponseEntity<ReviewDto> createReview(
       @Valid @RequestBody ReviewCreateRequest request,
-      @AuthenticationPrincipal User user // Spring Security가 현재 로그인한 사용자 정보를 주입해 줍니다.
+      @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
-    ReviewDto responseDto = reviewService.createReview(request, user);
+    UUID userId = userDetails.getUserDto().id();
+    ReviewDto responseDto = reviewService.createReview(request, userId);
     return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
   }
 
@@ -43,9 +45,10 @@ public class ReviewController {
   public ResponseEntity<ReviewDto> updateReview(
       @PathVariable UUID reviewId,
       @Valid @RequestBody ReviewUpdateRequest request,
-      @AuthenticationPrincipal User user
+      @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
-    ReviewDto responseDto = reviewService.updateReview(reviewId, request, user);
+    UUID userId = userDetails.getUserDto().id();
+    ReviewDto responseDto = reviewService.updateReview(reviewId, request, userId);
     return ResponseEntity.ok(responseDto);
   }
 
@@ -66,9 +69,10 @@ public class ReviewController {
   @DeleteMapping("/{reviewId}")
   public ResponseEntity<Void> deleteReview(
       @PathVariable UUID reviewId,
-      @AuthenticationPrincipal User user
+      @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
-    reviewService.deleteReview(reviewId, user);
+    UUID userId = userDetails.getUserDto().id();
+    reviewService.deleteReview(reviewId, userId);
     return ResponseEntity.noContent().build();
   }
 }

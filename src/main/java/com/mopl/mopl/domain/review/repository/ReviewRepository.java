@@ -1,13 +1,16 @@
 package com.mopl.mopl.domain.review.repository;
 
+import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.review.entity.Review;
+import com.mopl.mopl.domain.user.entity.User;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.UUID;
 
 
-public interface ReviewRepository extends JpaRepository<Review, UUID> {
+public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewRepositoryCustom {
 
   // 수정,삭제,조회
-  Optional<Review> findByUserIdAndContentId(UUID userId, UUID contentId);
+  Optional<Review> findByUserAndContent(User user, Content content);
+
 }

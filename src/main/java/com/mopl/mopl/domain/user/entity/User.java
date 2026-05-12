@@ -54,7 +54,7 @@ public class User  extends BaseEntity {
      * 비번을 바꾼다하면<br>
      * 이전 비밀번호로 남겨서 나중에<br>
      * 사용했던 비번입니다로 응용가능*/
-    @Column(length = 255, nullable = false)
+    @Column(length = 255, nullable = true)
     private String temporaryPassword;
 
     @Column(nullable = false)
@@ -98,12 +98,6 @@ public class User  extends BaseEntity {
     }
 
     public User updatePassword(String encryptedPassword) {
-        // 초기화로 비번변경이 아닌 그냥 변경일 경우 이전 비번 남겨놓기
-        // 근데 지금은 프론트에서 그냥 변경이 없음
-        if(this.init_password) {
-            this.temporaryPassword = this.password;
-        }
-
         this.password = encryptedPassword;
         this.init_password = false;
         return this;

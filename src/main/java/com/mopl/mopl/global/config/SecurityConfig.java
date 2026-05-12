@@ -2,7 +2,6 @@ package com.mopl.mopl.global.config;
 
 import com.mopl.mopl.global.auth.JwtAuthenticationFilter;
 import com.mopl.mopl.global.auth.handler.*;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -70,6 +69,9 @@ public class SecurityConfig {
 
                                 // 인증 관련
                                 .requestMatchers("/api/auth/**").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll() 
+                                .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
 
                                 .requestMatchers("/api/**").authenticated()
                                 .anyRequest().authenticated()

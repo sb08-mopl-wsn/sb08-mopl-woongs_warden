@@ -132,8 +132,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void initUserPassword(String email) {
-        User target = userRepository.findByEmail(email)
-                .orElseThrow(UserNotFoundException::new);
+        User target = userRepository.findByEmail(email).orElse(null);
+
+        if (target == null) {
+            throw new UserNotFoundException();
+        }
 
         String originPassword = target.getPassword();
         String rawPassword = generateInitPassword();
@@ -143,9 +146,9 @@ public class AuthServiceImpl implements AuthService {
         Instant expiredAt = Instant.now().plus(Duration.ofMinutes(3));
 
         // 임시 비번 적용 및 원본 비번 저장
-        target.updateTemporaryPassword(encodedPassword,originPassword, expiredAt);
+        target.updateTemporaryPassword(encodedPassword, originPassword, expiredAt);
 
-        // 메일 전송
+        // 메일 전송 //TODO 나중에 이벤트로 처리해야됨
         sendInitPassword(target.getEmail(), rawPassword, expiredAt);
     }
 
@@ -168,14 +171,15 @@ public class AuthServiceImpl implements AuthService {
             password.append(all.charAt(secureRandom.nextInt(all.length())));
         }
 
-        // 섞기
-        return password.chars()
+        java.util.List<Character> chars = password.chars()
                 .mapToObj(c -> (char) c)
-                .sorted((a, b) -> secureRandom.nextInt(3) - 1)
-                .collect(StringBuilder::new,
-                        StringBuilder::append,
-                        StringBuilder::append)
-                .toString();
+                .collect(java.util.stream.Collectors.toList());
+
+        java.util.Collections.shuffle(chars, secureRandom);
+        StringBuilder shuffled = new StringBuilder(chars.size());
+        chars.forEach(shuffled::append);
+
+        return shuffled.toString();
     }
 
     /**

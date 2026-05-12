@@ -27,8 +27,10 @@ public class MoplUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
-        if (user.isInit_password()&&
-                user.getTemporaryPasswordExpiredAt().isBefore(Instant.now())) {
+        Instant expiredAt = user.getTemporaryPasswordExpiredAt();
+
+        if (user.isInit_password() && expiredAt != null
+                && !expiredAt.isAfter(Instant.now())) {
             // 임시 비밀번호로 되어있던것 다시 원래 비밀번호로 롤백
             String originalPassword = user.getTemporaryPassword();
             user.updatePassword(originalPassword);

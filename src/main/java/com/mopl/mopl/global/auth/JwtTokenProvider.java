@@ -11,7 +11,8 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import jakarta.servlet.http.Cookie;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,9 +20,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -29,8 +27,7 @@ import java.util.UUID;
 @Slf4j
 @Component
 public class JwtTokenProvider {
-
-    public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH-TOKEN";
+    public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
     private final int accessTokenExpirationMs;
     private final int refreshTokenExpirationMs;
 
@@ -38,18 +35,22 @@ public class JwtTokenProvider {
     private final JWSVerifier accessTokenVerifier;
     private final JWSSigner refreshTokenSigner;
     private final JWSVerifier refreshTokenVerifier;
-    private final UserRepository userRepository;  //todo 이거 관해서 수정해야할거 같은데
+
+    private final boolean refreshCookieSecure;
+    private final String refreshCookieSameSite;
 
     public JwtTokenProvider(
-            // application.yaml 파일에 정의된 프로퍼티 값을 주입받는다.
             @Value("${jwt.access-token.secret}") String accessTokenSecret,
             @Value("${jwt.access-token.exp}") int accessTokenExpirationMs,
             @Value("${jwt.refresh-token.secret}") String refreshTokenSecret,
             @Value("${jwt.refresh-token.exp}") int refreshTokenExpirationMs,
-            UserRepository userRepository
+            @Value("${jwt.refresh-token.cookie.secure:false}") boolean refreshCookieSecure,
+            @Value("${jwt.refresh-token.cookie.same-site:Lax}") String refreshCookieSameSite
     ) throws JOSEException {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
+        this.refreshCookieSecure = refreshCookieSecure;
+        this.refreshCookieSameSite = refreshCookieSameSite;
 
         byte[] accessSecretBytes = accessTokenSecret.getBytes(StandardCharsets.UTF_8);
         this.accessTokenSigner = new MACSigner(accessSecretBytes);
@@ -58,8 +59,6 @@ public class JwtTokenProvider {
         byte[] refreshSecretBytes = refreshTokenSecret.getBytes(StandardCharsets.UTF_8);
         this.refreshTokenSigner = new MACSigner(refreshSecretBytes);
         this.refreshTokenVerifier = new MACVerifier(refreshSecretBytes);
-
-        this.userRepository = userRepository;
     }
 
     public String generateAccessToken(MoplUserDetails userDetails) throws JOSEException {
@@ -88,6 +87,8 @@ public class JwtTokenProvider {
                 .jwtID(tokenId)
                 // 사용자 ID(userId)
                 .claim("userId", userDetails.getUserDto().id())
+                .claim("userEmail", userDetails.getUserDto().email())
+                .claim("name", userDetails.getUserDto().name())
                 // 토큰 타입(type)
                 .claim("type", tokenType)
                 // 사용자 권한(roles)
@@ -109,32 +110,34 @@ public class JwtTokenProvider {
         return completedJWT;
     }
 
-    public Cookie generateRefreshTokenCookie(String refreshToken) {
-        Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false);
-        cookie.setPath("/");
-        cookie.setMaxAge(refreshTokenExpirationMs / 1000);
-        return cookie;
+    public ResponseCookie generateRefreshTokenCookie(String refreshToken) {
+        return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .path("/")
+                .maxAge(refreshTokenExpirationMs / 1000)
+                .sameSite(refreshCookieSameSite)
+                .build();
     }
 
-    public Cookie generateRefreshTokenExpirationCookie() {
-        Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, "");
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false);
-        cookie.setPath("/");
-        cookie.setMaxAge(0);
-        return cookie;
+    public ResponseCookie generateRefreshTokenExpirationCookie() {
+        return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .path("/")
+                .maxAge(0)
+                .sameSite(refreshCookieSameSite)
+                .build();
     }
 
     public void addRefreshCookie(HttpServletResponse response, String refreshToken) {
-        Cookie cookie = generateRefreshTokenCookie(refreshToken);
-        response.addCookie(cookie);
+        ResponseCookie cookie = generateRefreshTokenCookie(refreshToken);
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     public void expireRefreshCookie(HttpServletResponse response) {
-        Cookie cookie = generateRefreshTokenExpirationCookie();
-        response.addCookie(cookie);
+        ResponseCookie cookie = generateRefreshTokenExpirationCookie();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     public boolean validateAccessToken(String token) {
@@ -169,7 +172,7 @@ public class JwtTokenProvider {
         }
     }
 
-    public String getUsernameFromToken(String token) {
+    public String getUserEmailFromToken(String token) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
             String subject = signedJWT.getJWTClaimsSet().getSubject();
@@ -202,22 +205,16 @@ public class JwtTokenProvider {
         }
     }
 
-    public Jwt toEntity(String token) {
+    public UUID getUserIdFromToken(String token) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
-            String username = signedJWT.getJWTClaimsSet().getSubject();
+            Object userId = signedJWT.getJWTClaimsSet().getClaim("userId");
 
-            String tokenType = (String) signedJWT.getJWTClaimsSet().getClaim("type");
-            Instant issuedAt = signedJWT.getJWTClaimsSet().getIssueTime().toInstant();
-            Instant expiresAt = signedJWT.getJWTClaimsSet().getExpirationTime().toInstant();
+            if (userId == null) {
+                throw new IllegalArgumentException("userId claim not found");
+            }
 
-            // todo 여기도 수정 필요
-            User user = userRepository.findByName(username)
-                    .orElseThrow(()->new IllegalArgumentException("User not found"));
-
-            //todo 여기 token이 리프레쉬였는지 확인 필요
-            Jwt entity = new Jwt(user, issuedAt,token );
-            return entity;
+            return UUID.fromString(userId.toString());
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid JWT token", e);
         }
@@ -231,6 +228,8 @@ public class JwtTokenProvider {
             JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
 
             String username = claimsSet.getSubject();
+            String userEmail = claimsSet.getStringClaim("userEmail");
+            String name = claimsSet.getStringClaim("name");
             String userIdString = claimsSet.getStringClaim("userId");
             UUID userId = userIdString != null ? UUID.fromString(userIdString) : null;
 
@@ -247,8 +246,8 @@ public class JwtTokenProvider {
             UserDto userDto = new UserDto(
                     userId,
                     null,
-                    null, // email
-                    username,
+                    userEmail, // email
+                    name,
                     null, // profile
                     role,
                     false

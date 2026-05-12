@@ -35,23 +35,26 @@ public class InMemoryJwtRegistry implements JwtRegistry {
         Queue<JwtInformation> userQueue = origin.get(userId);
 
         while (userQueue.size() >= maxActiveJwtCount) {
-            userQueue.poll();
+            JwtInformation removed = userQueue.poll();
+            if (removed != null) {
+                tokenIndex.remove(removed.getAccessToken());
+            }
         }
 
         // 3. 새 로그인 정보 메모리(큐)에 추가
         userQueue.offer(jwtInformation);
+        tokenIndex.put(jwtInformation.getAccessToken(), jwtInformation);
     }
 
     @Override
     @Transactional
+    // 유저 큐삭제
     public void invalidateJwtInformationByUserId(UUID userId) {
-        origin.remove(userId);// 메모리에서 유저의 큐 자체를 삭제
-    }
+        Queue<JwtInformation> removedQueue = origin.remove(userId);
 
-    @Override
-    public boolean hasActiveJwtInformationByUserId(UUID userId) {
-        Queue<JwtInformation> userQueue = origin.get(userId);
-        return userQueue != null && !userQueue.isEmpty();
+        if (removedQueue != null) {
+            removedQueue.forEach(info -> tokenIndex.remove(info.getAccessToken()));
+        }
     }
 
     @Override
@@ -74,41 +77,95 @@ public class InMemoryJwtRegistry implements JwtRegistry {
     @Transactional
     public void rotateJwtInformation(String refreshToken, JwtInformation newJwtInformation) {
         UUID userId = newJwtInformation.getUser().id();
+
+        origin.putIfAbsent(userId, new ConcurrentLinkedQueue<>());
         Queue<JwtInformation> userQueue = origin.get(userId);
 
-        if (userQueue != null) {
-            // 1. 기존 Refresh Token을 가진 정보 삭제
-            userQueue.removeIf(info -> refreshToken.equals(info.getRefreshToken()));
+        JwtInformation[] removedHolder = new JwtInformation[1];
 
-            // 2. 갱신된 새로운 토큰 정보 추가
-            userQueue.offer(newJwtInformation);
+        userQueue.removeIf(info -> {
+            boolean matched = refreshToken.equals(info.getRefreshToken());
 
-            // 3. DB 로테이션 수행
-            String oldJti = jwtTokenProvider.getTokenId(refreshToken);
-            String newJti = jwtTokenProvider.getTokenId(newJwtInformation.getRefreshToken());
+            if (matched) {
+                removedHolder[0] = info;
+            }
+
+            return matched;
+        });
+
+        JwtInformation removed = removedHolder[0];
+
+        if (removed != null) {
+            tokenIndex.remove(removed.getAccessToken());
         }
+
+        while (userQueue.size() >= maxActiveJwtCount) {
+            JwtInformation polled = userQueue.poll();
+
+            if (polled != null) {
+                tokenIndex.remove(polled.getAccessToken());
+            }
+        }
+
+        userQueue.offer(newJwtInformation);
+        tokenIndex.put(newJwtInformation.getAccessToken(), newJwtInformation);
     }
 
     @Override
-    @Scheduled(fixedDelay = 1000 * 60 * 5)
-    public void clearExpiredJwtInformation() {
-        Date now = new Date();
+    public JwtInformation getJwtInformationByRefreshToken(String refreshToken) {
+        if (refreshToken == null) {
+            return null;
+        }
 
-        // 주기적으로(5분마다) Map을 순회하며 만료된 토큰을 메모리에서 제거
-        origin.values().forEach(queue -> {
-            queue.removeIf(info -> {
-                try {
-                    // Provider의 getExpiration 활용하여 현재 시간과 비교
-                    boolean isAccessExpired = jwtTokenProvider.getExpiration(info.getAccessToken()).before(now);
-                    boolean isRefreshExpired = jwtTokenProvider.getExpiration(info.getRefreshToken()).before(now);
+        return origin.values().stream()
+                .flatMap(Queue::stream)
+                .filter(info -> refreshToken.equals(info.getRefreshToken()))
+                .findFirst()
+                .orElse(null);
+    }
 
-                    // 두 토큰 모두 만료되었다면 큐에서 제거
-                    return isAccessExpired && isRefreshExpired;
-                } catch (Exception e) {
-                    // 파싱 실패(손상된 토큰 등) 시 유효하지 않으므로 제거 대상으로 간주
-                    return true;
+    @Override
+    @Transactional
+    public void rollbackRotateJwtInformation(
+            String oldRefreshToken,
+            JwtInformation oldJwtInformation,
+            String newRefreshToken
+    ) {
+        if (oldJwtInformation == null) {
+            return;
+        }
+
+        UUID userId = oldJwtInformation.getUser().id();
+
+        origin.putIfAbsent(userId, new ConcurrentLinkedQueue<>());
+        Queue<JwtInformation> userQueue = origin.get(userId);
+
+        if (newRefreshToken != null) {
+            userQueue.removeIf(info -> {
+                boolean matched = newRefreshToken.equals(info.getRefreshToken());
+
+                if (matched) {
+                    tokenIndex.remove(info.getAccessToken());
                 }
+
+                return matched;
             });
-        });
+        }
+
+        boolean oldTokenAlreadyExists = userQueue.stream()
+                .anyMatch(info -> oldRefreshToken.equals(info.getRefreshToken()));
+
+        if (!oldTokenAlreadyExists) {
+            while (userQueue.size() >= maxActiveJwtCount) {
+                JwtInformation removed = userQueue.poll();
+
+                if (removed != null) {
+                    tokenIndex.remove(removed.getAccessToken());
+                }
+            }
+
+            userQueue.offer(oldJwtInformation);
+            tokenIndex.put(oldJwtInformation.getAccessToken(), oldJwtInformation);
+        }
     }
 }

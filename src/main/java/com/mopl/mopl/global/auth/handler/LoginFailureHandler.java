@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
@@ -20,30 +21,51 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class LoginFailureHandler implements AuthenticationFailureHandler {
+
     private final ObjectMapper objectMapper;
 
     @Override
-    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
-            throws IOException, ServletException {
-        log.error("로그인 실패, 원인: "+ exception.getClass().getSimpleName());
+    public void onAuthenticationFailure(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AuthenticationException exception
+    ) throws IOException, ServletException {
 
-        String errorMessage ="";
-        if(exception instanceof BadCredentialsException){
+        log.error("로그인 실패, 원인: {}", exception.getClass().getSimpleName());
+
+        String errorMessage;
+        String errorCode;
+        int status;
+
+        if (exception instanceof BadCredentialsException) {
             errorMessage = "ID/PW가 올바르지 않습니다.";
+            errorCode = "AUTHENTICATION_FAILED";
+            status = HttpServletResponse.SC_UNAUTHORIZED;
+
+        } else if (exception instanceof LockedException) {
+            errorMessage = "잠긴 계정입니다. 관리자에게 문의하세요.";
+            errorCode = "ACCOUNT_LOCKED";
+            status = HttpServletResponse.SC_FORBIDDEN;
+
         } else if (exception instanceof DisabledException) {
             errorMessage = "비활성 계정입니다.";
-        }else{
+            errorCode = "AUTHENTICATION_FAILED";
+            status = HttpServletResponse.SC_FORBIDDEN;
+
+        } else {
             errorMessage = "로그인 실패 입니다.";
+            errorCode = "AUTHENTICATION_FAILED";
+            status = HttpServletResponse.SC_UNAUTHORIZED;
         }
 
         Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("success",false);
-        errorResponse.put("error","AUTHENTICATION_FAILED");
-        errorResponse.put("message",errorMessage);
+        errorResponse.put("success", false);
+        errorResponse.put("error", errorCode);
+        errorResponse.put("message", errorMessage);
 
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setStatus(status);
 
         String responseBody = objectMapper.writeValueAsString(errorResponse);
         response.getWriter().write(responseBody);

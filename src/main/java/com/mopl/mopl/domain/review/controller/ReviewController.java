@@ -1,7 +1,9 @@
 package com.mopl.mopl.domain.review.controller;
 
 import com.mopl.mopl.domain.review.dto.request.ReviewCreateRequest;
+import com.mopl.mopl.domain.review.dto.request.ReviewSearchRequest;
 import com.mopl.mopl.domain.review.dto.request.ReviewUpdateRequest;
+import com.mopl.mopl.domain.review.dto.response.CursorResponseReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewDto;
 import com.mopl.mopl.domain.review.service.ReviewService;
 import com.mopl.mopl.domain.user.entity.User;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,7 +35,6 @@ public class ReviewController {
       @Valid @RequestBody ReviewCreateRequest request,
       @AuthenticationPrincipal User user // Spring Security가 현재 로그인한 사용자 정보를 주입해 줍니다.
   ) {
-    // TODO: Service의 createReview 구현하면 정상작동 함
     ReviewDto responseDto = reviewService.createReview(request, user);
     return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
   }
@@ -45,6 +47,20 @@ public class ReviewController {
   ) {
     ReviewDto responseDto = reviewService.updateReview(reviewId, request, user);
     return ResponseEntity.ok(responseDto);
+  }
+
+  @GetMapping("/{reviewId}")
+  public ResponseEntity<ReviewDto> findReviewById(@PathVariable UUID reviewId) {
+    ReviewDto responseDto = reviewService.findReviewById(reviewId);
+    return ResponseEntity.ok(responseDto);
+  }
+
+  @GetMapping
+  public ResponseEntity<CursorResponseReviewDto> findReviews(
+      @Valid ReviewSearchRequest request
+  ) {
+    CursorResponseReviewDto response = reviewService.findReviews(request);
+    return ResponseEntity.ok(response);
   }
 
   @DeleteMapping("/{reviewId}")

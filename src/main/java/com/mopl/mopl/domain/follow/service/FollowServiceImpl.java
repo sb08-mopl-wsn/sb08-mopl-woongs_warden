@@ -11,9 +11,11 @@ import com.mopl.mopl.domain.follow.mapper.FollowMapper;
 import com.mopl.mopl.domain.follow.repository.FollowRepository;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.event.FollowEvent;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,7 @@ public class FollowServiceImpl implements FollowService {
   private final FollowRepository followRepository;
   private final UserRepository userRepository;
   private final FollowMapper followMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * 특정 유저를 팔로우하는 메서드
@@ -43,7 +46,6 @@ public class FollowServiceImpl implements FollowService {
       throw new SelfFollowException();
     }
 
-    // TODO: 추후 유저 관련 exception이 추가되면, 삭제 후 USER쪽에서 만든 exception으로 교체 필요
     User follower = userRepository.findById(followerId)
         .orElseThrow(FollowerNotFoundException::new);
     User followee = userRepository.findById(request.followeeId())
@@ -62,7 +64,14 @@ public class FollowServiceImpl implements FollowService {
 
     try {
       Follow savedFollow = followRepository.save(follow);
-      // TODO: 추후 알림 Event 발행 시 이 곳에 작성
+
+      // 팔로우 완료 후 이벤트 발행
+      eventPublisher.publishEvent(new FollowEvent(
+          follower.getId(),
+          follower.getName(),
+          followee.getId()
+      ));
+
       return followMapper.toDto(savedFollow);
     } catch (DataIntegrityViolationException e) {
       /*

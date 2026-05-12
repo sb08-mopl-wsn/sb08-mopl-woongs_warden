@@ -72,6 +72,9 @@ public class JwtLogoutHandler implements LogoutHandler {
 
     private UUID extractUserIdFromToken(String token) throws Exception {
         if(!tokenProvider.validateRefreshToken(token)) {
+            if (tokenProvider.validateAccessToken(token) || tokenProvider.validateRefreshToken(token)) {
+                return tokenProvider.getUserIdFromToken(token);
+            }
             return null;
         }
 

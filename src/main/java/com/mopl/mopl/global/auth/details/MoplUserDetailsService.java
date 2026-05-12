@@ -16,21 +16,24 @@ import java.time.Instant;
 
 @Slf4j
 @Service
-@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class MoplUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
     @Override
+    @Transactional(noRollbackFor = CredentialsExpiredException.class)
     public UserDetails loadUserByUsername(String username) {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
-        if (user.isTemporaryPassword()
-                && user.getTemporaryPasswordExpiredAt() != null
-                && user.getTemporaryPasswordExpiredAt().isBefore(Instant.now())) {
-            throw new CredentialsExpiredException("임시 비밀번호가 만료되었습니다.");
+        if (user.isInit_password()&&
+                user.getTemporaryPasswordExpiredAt().isBefore(Instant.now())) {
+            // 임시 비밀번호로 되어있던것 다시 원래 비밀번호로 롤백
+            String originalPassword = user.getTemporaryPassword();
+            user.updatePassword(originalPassword);
+
+            throw new CredentialsExpiredException("임시 비밀번호가 만료되었습니다. 원래 비밀번로를 입력하세.");
         }
 
         return new MoplUserDetails(userMapper.toDto(user), user.getPassword());

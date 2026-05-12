@@ -13,20 +13,27 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -119,22 +126,33 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * 유저 비밀번호 초기화 및
+     */
+    @Override
     @Transactional
     public void initUserPassword(String email) {
         User target = userRepository.findByEmail(email)
                 .orElseThrow(UserNotFoundException::new);
 
+        String originPassword = target.getPassword();
         String rawPassword = generateInitPassword();
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        target.updateTemporaryPassword(
-                encodedPassword,
-                Instant.now().plus(Duration.ofMinutes(3))
-        );
+        // 임시 비밀번호 유효시간 전달
+        Instant expiredAt = Instant.now().plus(Duration.ofMinutes(3));
 
-        sendInitPassword(target.getEmail(), rawPassword);
+        // 임시 비번 적용 및 원본 비번 저장
+        target.updateTemporaryPassword(encodedPassword,originPassword, expiredAt);
+
+        // 메일 전송
+        sendInitPassword(target.getEmail(), rawPassword, expiredAt);
     }
 
+    /**
+     * 임시 비밀번호 생성
+     *
+     */
     private String generateInitPassword() {
         StringBuilder password = new StringBuilder();
         String all = upper + lower + digit + special;
@@ -160,18 +178,48 @@ public class AuthServiceImpl implements AuthService {
                 .toString();
     }
 
-    private void sendInitPassword(String to, String rawPassword) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject("[MOPL] 임시 비밀번호 안내");
-        message.setText("""
-                임시 비밀번호가 발급되었습니다.
-                
-                임시 비밀번호: %s
-                
-                로그인 후 반드시 비밀번호를 변경해주세요.
-                """.formatted(rawPassword));
+    /**
+     * 임시 비밀번호를 이메일로 전송
+     */
+    private void sendInitPassword(String to, String rawPassword, Instant expiredAt) {
+        try {
+            String html = loadMailTemplate("templates/mail/init-password.html");
 
-        mailSender.send(message);
+            String expiredAtText = DateTimeFormatter
+                    .ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(ZoneId.of("Asia/Seoul"))
+                    .format(expiredAt);
+
+            html = html.replace("{{TEMP_PASSWORD}}", rawPassword);
+            html = html.replace("{{EXPIRED_AT}}", expiredAtText);
+
+            MimeMessage message = mailSender.createMimeMessage();
+
+            MimeMessageHelper helper = new MimeMessageHelper(
+                    message,
+                    false,
+                    "UTF-8"
+            );
+
+            helper.setTo(to);
+            helper.setSubject("[MOPL] 임시 비밀번호 안내");
+            helper.setText(html, true);
+
+            mailSender.send(message);
+
+        } catch (MessagingException e) {
+            throw new RuntimeException("메일 발송 실패", e);
+        }
+    }
+
+    // 이메일 템플릿 불러오기
+    private String loadMailTemplate(String path) {
+        try {
+            ClassPathResource resource = new ClassPathResource(path);
+            byte[] bytes = resource.getInputStream().readAllBytes();
+            return new String(bytes, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("메일 템플릿 로드 실패", e);
+        }
     }
 }

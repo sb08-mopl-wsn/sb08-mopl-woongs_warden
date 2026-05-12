@@ -21,12 +21,16 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
     private final AuthService authService;
 
+    /**
+     * CSRF 요청*/
     @GetMapping("/csrf-token")
     public ResponseEntity<Void> getCsrfToken(CsrfToken csrfToken) {
         log.debug("CSRF 토큰 요청: {}", csrfToken.getToken());
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * resfresh 요청*/
     @PostMapping("/refresh")
     public ResponseEntity<JwtDTO> refresh(
             @CookieValue(
@@ -47,6 +51,9 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
     }
+
+    /**
+     * 유저 비밀번호 초기화*/
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(
             @RequestBody ResetPasswordRequest request

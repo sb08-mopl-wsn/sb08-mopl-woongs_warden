@@ -1,8 +1,8 @@
 package com.mopl.mopl.infrastructure.external.exception;
 
-public class TmdbEmptyResponseException extends ApiException
+public class ApiEmptyResponseException extends ApiException
 {
-    public TmdbEmptyResponseException() {
+    public ApiEmptyResponseException() {
         super(ApiErrorCode.TMDB_EMPTY_RESPONSE);
     }
 }

@@ -1,7 +1,7 @@
 package com.mopl.mopl.infrastructure.external.tmdb;
 
 import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
-import com.mopl.mopl.infrastructure.external.exception.TmdbEmptyResponseException;
+import com.mopl.mopl.infrastructure.external.exception.ApiEmptyResponseException;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbGenreListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbMovieListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbTvListResponse;
@@ -34,7 +34,7 @@ public class TmdbApiClient
                 .body(TmdbMovieListResponse.class);
 
         if (response == null) {
-            throw new TmdbEmptyResponseException();
+            throw new ApiEmptyResponseException();
         }
 
         return response;
@@ -53,7 +53,7 @@ public class TmdbApiClient
                 .body(TmdbTvListResponse.class);
 
         if (response == null) {
-            throw new TmdbEmptyResponseException();
+            throw new ApiEmptyResponseException();
         }
 
         return response;

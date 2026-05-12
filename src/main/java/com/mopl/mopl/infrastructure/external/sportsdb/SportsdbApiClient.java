@@ -1,6 +1,7 @@
 package com.mopl.mopl.infrastructure.external.sportsdb;
 
 import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
+import com.mopl.mopl.infrastructure.external.exception.ApiEmptyResponseException;
 import com.mopl.mopl.infrastructure.external.sportsdb.dto.SportsdbEvent;
 import com.mopl.mopl.infrastructure.external.sportsdb.dto.response.SportsdbEventResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -36,7 +37,7 @@ public class SportsdbApiClient
                     .retrieve()
                     .body(SportsdbEventResponse.class);
         } catch (RestClientException ex) {
-            throw new IllegalStateException(String.valueOf(leagueId));
+            throw new ApiEmptyResponseException();
         }
 
         return response != null && response.events() != null

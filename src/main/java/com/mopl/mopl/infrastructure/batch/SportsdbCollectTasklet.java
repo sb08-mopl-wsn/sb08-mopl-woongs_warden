@@ -2,6 +2,7 @@ package com.mopl.mopl.infrastructure.batch;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.batch.exception.SportsdbBatchCollectException;
 import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.dto.SportsdbEvent;
@@ -27,29 +28,34 @@ public class SportsdbCollectTasklet implements Tasklet
 
     @Override
     public @Nullable RepeatStatus execute(@NonNull StepContribution contribution, @NonNull ChunkContext chunkContext) throws Exception {
-        int saved = 0;
-        int failed = 0;
+        try {
+            int saved = 0;
+            int failed = 0;
 
-        for (int leagueId: ExternalApiConstants.LEAGUE_IDS) {
-            try {
-                List<SportsdbEvent> events = sportsdbApiClient.fetchSeasonEvents(leagueId);
+            for (int leagueId: ExternalApiConstants.LEAGUE_IDS) {
+                try {
+                    List<SportsdbEvent> events = sportsdbApiClient.fetchSeasonEvents(leagueId);
 
-                for (SportsdbEvent event : events) {
-                    Content content = sportsdbContentMapper.sportToContent(event);
-                    boolean exists = contentRepository.existsByExternalIdAndContentType(content.getExternalId(), content.getContentType());
+                    for (SportsdbEvent event : events) {
+                        Content content = sportsdbContentMapper.sportToContent(event);
+                        boolean exists = contentRepository.existsByExternalIdAndContentType(content.getExternalId(), content.getContentType());
 
-                    if (!exists) {
-                        contentRepository.save(content);
-                        saved++;
+                        if (!exists) {
+                            contentRepository.save(content);
+                            saved++;
+                        }
                     }
+                } catch (Exception e) {
+                    failed++;
+                    log.warn("Sportsdb 리그 {} 수집 실패", leagueId);
                 }
-            } catch (Exception e) {
-                failed++;
-                log.warn("Sportsdb 리그 {} 수집 실패: {}", leagueId, e.getMessage());
             }
+
+            log.info("Sportsdb 수집 완료 - 저장 {}건, 실패 {}건", saved, failed);
+            return RepeatStatus.FINISHED;
+        } catch (Exception e) {
+            throw new SportsdbBatchCollectException();
         }
 
-        log.info("Sportsdb 수집 완료 - 저장 {}건, 실패 {}건", saved, failed);
-        return RepeatStatus.FINISHED;
     }
 }

@@ -20,7 +20,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import java.time.ZoneOffset;
+import java.time.Duration;
+import java.time.LocalDateTime;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -96,8 +97,16 @@ public class BatchJobConfig
 
             @Override
             public void afterJob(@NonNull JobExecution jobExecution) {
-                long duration = jobExecution.getEndTime().toEpochSecond(ZoneOffset.UTC)
-                        - jobExecution.getStartTime().toEpochSecond(ZoneOffset.UTC);
+                LocalDateTime startTime = jobExecution.getStartTime();
+                LocalDateTime endTime = jobExecution.getEndTime();
+
+                if (startTime == null || endTime == null) {
+                    log.debug("Job 종료: {} - 상태: {} (시간 정보 없음)",
+                            jobExecution.getJobInstance().getJobName(),
+                            jobExecution.getStatus());
+                }
+
+                long duration = Duration.between(startTime, endTime).getSeconds();
 
                 log.debug("Job 종료: {} - 상태: {}, 소요시간: {}s",
                         jobExecution.getJobInstance().getJobName(),

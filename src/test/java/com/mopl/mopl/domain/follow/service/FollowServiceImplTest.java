@@ -19,15 +19,18 @@ import com.mopl.mopl.domain.follow.mapper.FollowMapper;
 import com.mopl.mopl.domain.follow.repository.FollowRepository;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.event.FollowEvent;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +47,9 @@ class FollowServiceImplTest {
 
   @Mock
   private FollowMapper followMapper;
+
+  @Mock
+  private ApplicationEventPublisher eventPublisher;
 
   private User follower;
   private User followee;
@@ -83,6 +89,13 @@ class FollowServiceImplTest {
     assertThat(result).isNotNull();
     assertThat(result.followerId()).isEqualByComparingTo(followerId);
     verify(followRepository).save(any(Follow.class));
+
+    ArgumentCaptor<FollowEvent> eventCaptor = ArgumentCaptor.forClass(FollowEvent.class);
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+    FollowEvent publishedEvent = eventCaptor.getValue();
+    assertThat(publishedEvent.followerId()).isEqualTo(followerId);
+    assertThat(publishedEvent.followeeId()).isEqualTo(followeeId);
   }
 
   @Test
@@ -120,6 +133,7 @@ class FollowServiceImplTest {
     // then
     assertThat(result).isNotNull();
     verify(followRepository, never()).save(any(Follow.class));
+    verify(eventPublisher, never()).publishEvent(any(FollowEvent.class));
   }
 
   @Test

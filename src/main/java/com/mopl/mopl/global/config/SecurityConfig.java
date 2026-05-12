@@ -64,6 +64,7 @@ public class SecurityConfig {
                                 // 유저 관련
                                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/users/{userId}").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/users").hasRole("ADMIN")
                                 .requestMatchers(HttpMethod.PATCH, "/api/users/{userId}/password").permitAll()
                                 .requestMatchers(HttpMethod.PATCH, "/api/users/*/role").hasRole("ADMIN")
                                 .requestMatchers(HttpMethod.PATCH, "/api/users/*/locked").hasRole("ADMIN")

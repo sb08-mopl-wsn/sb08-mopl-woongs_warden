@@ -14,6 +14,7 @@ import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Slice;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -40,6 +41,7 @@ public class ContentServiceImpl implements ContentService
      * @param thumbnailImage        썸네일 이미지
      * @return 등록된 콘텐츠 정보
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     @Override
     public ContentDto create(ContentCreateRequest contentCreateRequest, MultipartFile thumbnailImage) {
@@ -118,6 +120,7 @@ public class ContentServiceImpl implements ContentService
      * @return 수정된 콘텐츠 정보
      * @throws ContentNotFoundException 콘텐츠가 존재하지 않을 때
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     @Override
     public ContentDto update(UUID contentId, ContentUpdateRequest contentUpdateRequest) {
@@ -141,6 +144,7 @@ public class ContentServiceImpl implements ContentService
      * @param contentId 삭제할 콘텐츠 ID
      * @throws ContentNotFoundException 콘텐츠가 존재하지 않을 때
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     @Override
     public void delete(UUID contentId) {

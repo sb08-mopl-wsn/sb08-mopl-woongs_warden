@@ -46,6 +46,9 @@ public class Content extends BaseUpdatableEntity
     @Column(name = "watcher_count", nullable = false)
     private int watcherCount = 0;
 
+    @Column(name = "external_id", length = 50)
+    private String externalId;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "tags", columnDefinition = "JSONB", nullable = false)
     private List<String> tags;
@@ -54,13 +57,14 @@ public class Content extends BaseUpdatableEntity
     private Instant releaseDate;
 
     @Builder
-    public Content(String title, String description, ContentType contentType, String thumbnailKey, List<String> tags, Instant releaseDate) {
+    public Content(String title, String description, ContentType contentType, String thumbnailKey, List<String> tags, Instant releaseDate, String externalId) {
         this.title = title;
         this.description = description;
         this.contentType = contentType;
         this.thumbnailKey = thumbnailKey;
         this.tags = tags != null ? tags : new ArrayList<>();
         this.releaseDate = releaseDate;
+        this.externalId = (externalId == null || externalId.isBlank()) ? null : externalId;
     }
 
     public void update(String title, String description, List<String> tags) {

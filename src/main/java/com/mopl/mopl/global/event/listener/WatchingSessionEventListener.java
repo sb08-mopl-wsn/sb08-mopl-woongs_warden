@@ -32,7 +32,7 @@ public class WatchingSessionEventListener {
      * @param event 시청 세션 변경 정보와 콘텐츠 ID를 포함한 이벤트 객체
      */
 
-    @Async
+    @Async("watchingSessionExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleWatchingSessionEvent(WatchingSessionEvent event) {
         String destination = createSessionDestination(event.contentId());

@@ -1,6 +1,6 @@
 package com.mopl.mopl.domain.notification.controller;
 
-import com.mopl.mopl.domain.notification.dto.CursorPaginationRequest;
+import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import com.mopl.mopl.domain.notification.service.NotificationService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;

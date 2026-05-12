@@ -28,7 +28,6 @@ logging:
     root: info
     org.springframework.web.socket: DEBUG
 
-# S3
 cloud:
   aws:
     credentials:
@@ -38,6 +37,18 @@ cloud:
     s3:
       bucket: ${AWS_S3_BUCKET}
       cdn-url: ${AWS_S3_CDN_URL}
+
+external:
+  tmdb:
+    api:
+      token: ${TMDB_API_TOKEN}
+      base-url: ${TMDB_BASE_URL}
+  sportsdb:
+    api:
+      base-url: ${SPORTSDB_BASE_URL}
+  timeout:
+    connect-timeout: 5000
+    read-timeout: 5000
 
 management:
   endpoints:

@@ -1,4 +1,4 @@
-package com.mopl.mopl.infrastructure.s3;
+package com.mopl.mopl.infrastructure.s3.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

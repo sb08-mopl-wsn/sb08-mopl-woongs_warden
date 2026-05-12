@@ -1,11 +1,10 @@
 package com.mopl.mopl.domain.user.service;
 
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
+import com.mopl.mopl.domain.user.dto.CursorResponseUserDto;
 import com.mopl.mopl.domain.user.dto.UserDto;
-import com.mopl.mopl.domain.user.dto.request.ChangePasswordRequest;
-import com.mopl.mopl.domain.user.dto.request.UserCreateRequest;
-import com.mopl.mopl.domain.user.dto.request.UserLockUpdateRequest;
-import com.mopl.mopl.domain.user.dto.request.UserRoleUpdateRequest;
+import com.mopl.mopl.domain.user.dto.request.*;
+import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserDuplicateException;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
@@ -13,12 +12,15 @@ import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -57,6 +59,53 @@ public class UserServiceImpl implements UserService {
         // todo 나중에 이벤트로 알리기
         userRepository.save(user);
         return userMapper.toDto(user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('ADMIN')")
+    public CursorResponseUserDto getAllUsers(CursorUserRequest request) {
+        Instant cursorTime = null;
+        if (request.cursor() != null && !request.cursor().isBlank()) {
+            cursorTime = Instant.parse(request.cursor());
+        }
+
+        PageRequest pageRequest = PageRequest.of(0, request.limit() + 1);
+
+        String emailLike = request.emailLike();
+        Role roleEqual = request.roleEqual();
+
+        List<User> users = userRepository.findUsersByCursor(
+                emailLike,
+                roleEqual,
+                cursorTime,
+                request.idAfter(),
+                request.sortDirection(),
+                pageRequest
+        );
+
+        boolean hasNext = users.size() > request.limit();
+        if (hasNext) {
+            users.remove(request.limit().intValue());
+        }
+
+        String nextCursor = null;
+        UUID nextIdAfter = null;
+        if (hasNext && !users.isEmpty()) {
+            User lastUser = users.get(users.size() - 1);
+            nextCursor = lastUser.getCreatedAt().toString();
+            nextIdAfter = lastUser.getId();
+        }
+
+        long userCount = cursorTime == null
+                ? userRepository.countUsersByEmailAndRole(emailLike, roleEqual)
+                : -1L;
+
+        List<UserDto> data = users.stream()
+                .map(userMapper::toDto)
+                .toList();
+
+        return new CursorResponseUserDto(data, nextCursor, nextIdAfter, hasNext, userCount, request.sortBy(), request.sortDirection());
     }
 
     @Override

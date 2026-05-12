@@ -2,7 +2,6 @@ package com.mopl.mopl.infrastructure.batch;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
-import com.mopl.mopl.infrastructure.batch.exception.TmdbBatchCollectException;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,31 +27,27 @@ public class TmdbCollectTasklet implements Tasklet
 
     @Override
     public @Nullable RepeatStatus execute(@NonNull StepContribution contribution, @NonNull ChunkContext chunkContext) throws Exception {
-        try {
-            int failed = 0;
-            int saved = 0;
+        int failed = 0;
+        int saved = 0;
 
-            for (int page = 1; page <= totalPages; page++) {
-                try {
-                    saved += importMovies(page);
-                } catch (Exception e) {
-                    failed++;
-                    log.warn("TMDB 영화 {}페이지 수집 실패", page, e);
-                }
-
-                try {
-                    saved += importTv(page);
-                } catch (Exception e) {
-                    failed++;
-                    log.warn("TMDB TV {}페이지 수집 실패", page, e);
-                }
+        for (int page = 1; page <= totalPages; page++) {
+            try {
+                saved += importMovies(page);
+            } catch (Exception e) {
+                failed++;
+                log.warn("TMDB 영화 {}페이지 수집 실패", page, e);
             }
 
-            log.info("TMDB 수집 완료 - 저장: {}건, 실패: {}건", saved, failed);
-            return RepeatStatus.FINISHED;
-        } catch (Exception e) {
-            throw new TmdbBatchCollectException();
+            try {
+                saved += importTv(page);
+            } catch (Exception e) {
+                failed++;
+                log.warn("TMDB TV {}페이지 수집 실패", page, e);
+            }
         }
+
+        log.info("TMDB 수집 완료 - 저장: {}건, 실패: {}건", saved, failed);
+        return RepeatStatus.FINISHED;
     }
 
     private int importMovies(int page) {

@@ -1,4 +1,4 @@
-package com.mopl.mopl.entity;
+package com.mopl.mopl.domain.conversation.entity;
 
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.global.base.BaseUpdatableEntity;

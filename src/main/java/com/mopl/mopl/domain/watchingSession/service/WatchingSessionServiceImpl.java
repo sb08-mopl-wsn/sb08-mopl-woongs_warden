@@ -17,6 +17,8 @@ import com.mopl.mopl.domain.watchingSession.mapper.WatchingSessionMapper;
 import com.mopl.mopl.domain.watchingSession.repository.WatchingSessionRepository;
 import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
+import com.mopl.mopl.global.exception.BusinessException;
+import com.mopl.mopl.global.exception.GlobalErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -120,6 +122,12 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
         if (!contentRepository.existsById(contentId)) {
             throw new ContentNotFoundException(contentId);
+        }
+
+        // 채팅 송신자에 대한 시청 세션 참여 검증
+        // 해당 콘텐츠를 시청 중이지 않은 사용자도 임의의 콘텐츠 채팅에 메시지를 보낼 수 있어 권한 경계가 무너질 수 있음.
+        if (watchingSessionRepository.findByContentIdAndUserId(contentId, senderId).isEmpty()) {
+            throw new WatchingSessionNotFoundException(contentId, senderId);
         }
 
         UserSummary sender = new UserSummary(

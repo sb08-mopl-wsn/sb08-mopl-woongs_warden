@@ -108,11 +108,23 @@ public class WatchingSessionStompEventListener {
 
     // STOMP 헤더의 인증 정보에서 사용자 ID를 추출한다.
     private UUID extractUserId(StompHeaderAccessor accessor) {
+        // 1. Principal 존재 여부 확인
+        var principal = accessor.getUser();
 
-        UsernamePasswordAuthenticationToken authentication =
-                (UsernamePasswordAuthenticationToken) accessor.getUser();
+        if (principal == null) {
+            throw new IllegalStateException("인증되지 않은 사용자입니다.");
+        }
 
-        MoplUserDetails userDetails = (MoplUserDetails) authentication.getPrincipal();
+        // 2. 인증 객체 타입 확인 (패턴 매칭 사용)
+        if (!(principal instanceof UsernamePasswordAuthenticationToken auth)) {
+            throw new IllegalStateException("지원하지 않는 인증 타입입니다.");
+        }
+
+        // 3. UserDetails 타입 확인
+        if (!(auth.getPrincipal() instanceof MoplUserDetails userDetails)) {
+            throw new IllegalStateException("유효하지 않은 사용자 정보입니다.");
+        }
+
         return userDetails.getUserDto().id();
     }
 }

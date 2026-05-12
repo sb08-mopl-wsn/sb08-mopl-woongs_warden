@@ -45,11 +45,12 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
         return message;
     }
 
+    // TODO: 추후 예외 처리 필
     private void handleAuthentication(StompHeaderAccessor accessor) {
         log.info("[WebSocket] CONNECT 수신");  // 추가
         String token = resolveToken(accessor)
                 .orElseThrow(() -> new RuntimeException("유효하지 않은 토큰입니다."));
-        log.info("[WebSocket] 토큰 추출 성공: {}", token.substring(0, 20));
+        log.info("[WebSocket] 토큰 추출 성공");
 
         // HTTP 필터와 동일한 로직: 토큰 검증 + JWT 세션 확인
         if (tokenProvider.validateAccessToken(token)

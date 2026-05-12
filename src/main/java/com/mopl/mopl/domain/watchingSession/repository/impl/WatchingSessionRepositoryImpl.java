@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 
@@ -65,7 +66,14 @@ public class WatchingSessionRepositoryImpl implements WatchingSessionRepositoryC
             return null;
         }
 
-        Instant cursorTime = Instant.parse(cursor);
+        final Instant cursorTime;
+
+        // TODO: 추후 예외 처리 필수
+        try {
+            cursorTime = Instant.parse(cursor);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("유효하지 않은 cursor 형식입니다.", e);
+        }
 
         // 오름차순: (createdAt > cursorTime) OR (createdAt == cursorTime AND id > idAfter)
         if (sortDirection == SortDirection.ASCENDING) {

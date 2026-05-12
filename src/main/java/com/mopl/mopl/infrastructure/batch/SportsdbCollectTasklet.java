@@ -14,6 +14,7 @@ import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 
@@ -39,8 +40,12 @@ public class SportsdbCollectTasklet implements Tasklet
                     boolean exists = contentRepository.existsByExternalIdAndContentType(content.getExternalId(), content.getContentType());
 
                     if (!exists) {
-                        contentRepository.save(content);
-                        saved++;
+                        try {
+                            contentRepository.save(content);
+                            saved++;
+                        } catch (DataIntegrityViolationException e) {
+                            log.debug("중복 콘텐츠 건너뜀: externalId={}, type={}", content.getExternalId(), content.getContentType());
+                        }
                     }
                 }
             } catch (Exception e) {

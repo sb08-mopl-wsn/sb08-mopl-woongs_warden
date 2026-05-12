@@ -12,6 +12,7 @@ import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.function.Function;
@@ -68,13 +69,17 @@ public class TmdbCollectTasklet implements Tasklet
         int saved = 0;
         for (T item : items) {
             Content content = mapper.apply(item);
-            boolean exists = contentRepository.existsByExternalIdAndContentType(
-                    content.getExternalId(), content.getContentType()
-            );
-            if (!exists) {
-                contentRepository.save(content);
-                saved++;
-            }
+             try {
+                 boolean exists = contentRepository.existsByExternalIdAndContentType(
+                         content.getExternalId(), content.getContentType()
+                 );
+                 if (!exists) {
+                     contentRepository.save(content);
+                     saved++;
+                 }
+             } catch (DataIntegrityViolationException e) {
+                 log.debug("중복 콘텐츠 스킵: externalId={}", content.getExternalId());
+             }
         }
         return saved;
     }

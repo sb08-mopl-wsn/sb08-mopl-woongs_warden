@@ -69,8 +69,7 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.PATCH, "/api/users/*/locked").hasRole("ADMIN")
 
                                 // 인증 관련
-                                .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
+                                .requestMatchers("/api/auth/**").permitAll()
 
                                 .requestMatchers("/api/**").authenticated()
                                 .anyRequest().authenticated()

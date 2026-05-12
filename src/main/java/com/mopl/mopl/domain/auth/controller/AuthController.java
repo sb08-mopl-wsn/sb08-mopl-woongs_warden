@@ -2,12 +2,15 @@ package com.mopl.mopl.domain.auth.controller;
 
 import com.mopl.mopl.domain.auth.service.AuthService;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
+import com.mopl.mopl.domain.user.dto.request.ResetPasswordRequest;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,5 +46,12 @@ public class AuthController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
+    }
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(
+            @RequestBody ResetPasswordRequest request
+    ) {
+        authService.initUserPassword(request.email());
+        return ResponseEntity.ok().build();
     }
 }

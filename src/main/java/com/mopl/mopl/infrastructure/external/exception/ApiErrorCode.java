@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 public enum ApiErrorCode implements ErrorCode
 {
     TMDB_EMPTY_RESPONSE(8501,"TMDB_EMPTY_RESPONSE", HttpStatus.BAD_GATEWAY, "TMDB 응답 본문이 비어 있습니다."),
-    SPORTSDB_API_ERROR(8502,"INTERNAL_SERVER_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "SportsDB API 호출에 실패했습니다.");
+    SPORTSDB_API_ERROR(8502,"SPORTSDB_API_ERROR", HttpStatus.BAD_GATEWAY, "SportsDB API 호출에 실패했습니다.");
 
     private final int numeric;
     private final String errorKey;

@@ -123,7 +123,7 @@ public class ReviewServiceImpl implements ReviewService {
         .orElseThrow(() -> new ReviewNotFoundException(reviewId));
 
     if (!review.getUser().getId().equals(user.getId())) {
-      throw new ReviewException(ReviewErrorCode.FORBIDDEN);
+      throw new ReviewException(ReviewErrorCode.REVIEW_FORBIDDEN);
     }
     return review;
   }

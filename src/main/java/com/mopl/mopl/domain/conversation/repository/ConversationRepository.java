@@ -17,7 +17,9 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
 
   // 내가 참여 중인 모든 대화방 목록 조회 (최근 업데이트된 방 순서대로 정렬 - DESCENDING)
   @Query("SELECT c FROM Conversation c " +
-        "WHERE (c.sender.id = :userId OR c.receiver.id = :userId) " +
+      "JOIN FETCH c.sender " +
+      "JOIN FETCH c.receiver " +
+      "WHERE (c.sender.id = :userId OR c.receiver.id = :userId) " +
       "AND (CAST(:cursor AS timestamp) IS NULL OR " +
       "    c.updatedAt < :cursor OR " +
       "    (c.updatedAt = :cursor AND (:idAfter IS NULL OR c.id < :idAfter))) " +
@@ -31,6 +33,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
 
   // 대화방 목록 오름차순 정렬 - ASCENDING
   @Query("SELECT c FROM Conversation c " +
+      "JOIN FETCH c.sender " +
+      "JOIN FETCH c.receiver " +
       "WHERE (c.sender.id = :userId OR c.receiver.id = :userId) " +
       "AND (CAST(:cursor AS timestamp) IS NULL OR " +
       "     c.updatedAt > :cursor OR " +
@@ -44,6 +48,6 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
   );
 
   // 내가 참여 중인 대화방의 총 개수
-  @Query("SELECT COUNT(c) FROM Conversation c WHERE c.sender.id = :userId OR c.receiver.id = :userId")
-  long countMyConversations(@Param("userId") UUID userId);
+  long countBySenderId(UUID senderId);
+  long countByReceiverId(UUID receiverId);
 }

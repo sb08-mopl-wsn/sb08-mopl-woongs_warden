@@ -14,7 +14,7 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
-import com.mopl.mopl.global.exception.mail.MailFailedLordException;
+import com.mopl.mopl.global.exception.mail.MailFailedLoadException;
 import com.mopl.mopl.global.exception.mail.MailFailedSendException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -227,7 +227,7 @@ public class AuthServiceImpl implements AuthService {
                 return new String(bytes, StandardCharsets.UTF_8);
             }
         } catch (IOException e) {
-            throw new MailFailedLordException(e.getMessage());
+            throw new MailFailedLoadException(e.getMessage());
         }
     }
 }

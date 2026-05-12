@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface WatchingSessionRepository extends JpaRepository<WatchingSession, UUID> {
+public interface WatchingSessionRepository extends JpaRepository<WatchingSession, UUID>, WatchingSessionRepositoryCustom {
 
     // 시청자 수를 카운트
     long countByContentId(UUID contentId);

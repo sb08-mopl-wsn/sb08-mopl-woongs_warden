@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.user.mapper;
 
 import com.mopl.mopl.domain.user.dto.UserDto;
+import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.dto.request.UserCreateRequest;
 import com.mopl.mopl.domain.user.entity.User;
 import org.mapstruct.Mapper;
@@ -24,4 +25,9 @@ public abstract class UserMapper {
         String baseUrl = (imageBaseUrl == null) ? "" : imageBaseUrl;
         return imageBaseUrl + profileImageKey;
     }
+
+    @Mapping(target = "userId", source = "id")
+    @Mapping(target = "name", source = "name")
+    @Mapping(target = "profileImageUrl", source = "profileImageKey", qualifiedByName = "buildProfileImageUrl")
+    public abstract UserSummary toUserSummary(User user);
 }

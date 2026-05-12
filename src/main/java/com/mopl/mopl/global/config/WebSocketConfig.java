@@ -11,9 +11,13 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.security.messaging.access.intercept.AuthorizationChannelInterceptor;
 import org.springframework.security.messaging.access.intercept.MessageMatcherDelegatingAuthorizationManager;
 import org.springframework.security.messaging.context.SecurityContextChannelInterceptor;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -21,15 +25,15 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
-//    private final JwtAuthenticationChannelInterceptor jwtAuthenticationChannelInterceptor;
-//
-//    private AuthorizationChannelInterceptor authorizationChannelInterceptor() {
-//        return new AuthorizationChannelInterceptor(
-//                MessageMatcherDelegatingAuthorizationManager.builder()
-//                        .anyMessage().hasRole(Role.USER.name())
-//                        .build()
-//        );
-//    }
+    private final JwtAuthenticationChannelInterceptor jwtAuthenticationChannelInterceptor;
+
+    private AuthorizationChannelInterceptor authorizationChannelInterceptor() {
+        return new AuthorizationChannelInterceptor(
+                MessageMatcherDelegatingAuthorizationManager.builder()
+                        .anyMessage().hasRole(Role.USER.name())
+                        .build()
+        );
+    }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -60,12 +64,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         log.debug("[STOMP 엔드포인트] 경로: /ws, SockJS 폴백: 활성화, CORS: 모든 오리진 허용");
     }
 
-//    @Override
-//    public void configureClientInboundChannel(ChannelRegistration registration) {
-//        registration.interceptors(
-//                jwtAuthenticationChannelInterceptor, // 1순위 - 인증
-//                new SecurityContextChannelInterceptor(), // 2순위
-//                authorizationChannelInterceptor() // 3순위 - 인가
-//        );
-//    }
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(
+                jwtAuthenticationChannelInterceptor, // 1순위 - 인증
+                new SecurityContextChannelInterceptor(), // 2순위
+                authorizationChannelInterceptor() // 3순위 - 인가
+        );
+    }
 }

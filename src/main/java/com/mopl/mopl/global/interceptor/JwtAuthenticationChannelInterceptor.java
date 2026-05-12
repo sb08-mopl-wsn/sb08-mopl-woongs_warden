@@ -39,35 +39,41 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
         );
         // TODO: 커스텀 예외 처리 필
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-            String token = resolveToken(accessor)
-                    .orElseThrow(() -> new RuntimeException("유효하지 않은 토큰입니다."));
-
-            // HTTP 필터와 동일한 로직: 토큰 검증 + JWT 세션 확인
-            if (tokenProvider.validateAccessToken(token)
-                    && jwtRegistry.hasActiveJwtInformationByAccessToken(token)) {
-
-                MoplUserDetails userDetails = tokenProvider.parseAccessToken(token);
-                UserDto userDto = userDetails.getUserDto();
-
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            roleHierarchy.getReachableGrantedAuthorities(
-                                userDetails.getAuthorities()
-                            )
-                        );
-
-                accessor.setUser(authentication);
-                log.debug("웹 소켓 유저를 위한 인증 설정 완료. user: {}", userDto.name());
-            } else {
-                // TODO: 커스텀 예외 처리 필
-                log.debug("웹소켓 통신을 위한 유효하지 않은 JWT 토큰");
-                throw new RuntimeException("INVALID_TOKEN");
-            }
+            handleAuthentication(accessor);
         }
 
         return message;
+    }
+
+    private void handleAuthentication(StompHeaderAccessor accessor) {
+        log.info("[WebSocket] CONNECT 수신");  // 추가
+        String token = resolveToken(accessor)
+                .orElseThrow(() -> new RuntimeException("유효하지 않은 토큰입니다."));
+        log.info("[WebSocket] 토큰 추출 성공: {}", token.substring(0, 20));
+
+        // HTTP 필터와 동일한 로직: 토큰 검증 + JWT 세션 확인
+        if (tokenProvider.validateAccessToken(token)
+                && jwtRegistry.hasActiveJwtInformationByAccessToken(token)) {
+
+            MoplUserDetails userDetails = tokenProvider.parseAccessToken(token);
+            UserDto userDto = userDetails.getUserDto();
+
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            roleHierarchy.getReachableGrantedAuthorities(
+                                    userDetails.getAuthorities()
+                            )
+                    );
+
+            accessor.setUser(authentication);
+            log.debug("웹 소켓 유저를 위한 인증 설정 완료. user: {}", userDto.name());
+        } else {
+            // TODO: 커스텀 예외 처리 필
+            log.debug("웹소켓 통신을 위한 유효하지 않은 JWT 토큰");
+            throw new RuntimeException("INVALID_TOKEN");
+        }
     }
 
     // STOMP 헤더에서 Access Token을 추출

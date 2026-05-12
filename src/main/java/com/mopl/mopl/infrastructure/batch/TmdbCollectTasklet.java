@@ -70,13 +70,8 @@ public class TmdbCollectTasklet implements Tasklet
         for (T item : items) {
             Content content = mapper.apply(item);
              try {
-                 boolean exists = contentRepository.existsByExternalIdAndContentType(
-                         content.getExternalId(), content.getContentType()
-                 );
-                 if (!exists) {
-                     contentRepository.save(content);
-                     saved++;
-                 }
+                 contentRepository.save(content);
+                 saved++;
              } catch (DataIntegrityViolationException e) {
                  log.debug("중복 콘텐츠 스킵: externalId={}", content.getExternalId());
              }

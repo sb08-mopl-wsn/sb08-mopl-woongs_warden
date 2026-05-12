@@ -6,7 +6,7 @@ public class ConversationAccessDeniedException extends ConversationException {
   }
 
   public ConversationAccessDeniedException(String message) {
-    super(ConversationErrorCode.CONVERSATION_NOT_FOUND);
+    super(ConversationErrorCode.CONVERSATION_ACCESS_DENIED, message);
   }
 
 }

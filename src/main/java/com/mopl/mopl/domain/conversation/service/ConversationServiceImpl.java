@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,8 +47,9 @@ public class ConversationServiceImpl implements ConversationService{
     User receiver = userRepository.findById(request.withUserId())
         .orElseThrow(() -> new UserNotFoundException(request.withUserId()));
 
+    String pairKey = Conversation.buildPairKey(currentUserId, request.withUserId());
     // 이미 둘 사이에 대화방이 있는지 확인
-    Optional<Conversation> existingConv = conversationRepository.findConversationBetweenUsers(currentUserId, request.withUserId());
+    Optional<Conversation> existingConv = conversationRepository.findByParticipantPairKey(pairKey);
 
     if (existingConv.isPresent()) {
       return conversationMapper.toDto(existingConv.get(), currentUserId); // 기존 방 리턴
@@ -59,16 +61,26 @@ public class ConversationServiceImpl implements ConversationService{
         .receiver(receiver)
         .build();
 
-    Conversation savedConv = conversationRepository.save(newConv);
-    return conversationMapper.toDto(savedConv, currentUserId);
+    try {
+      Conversation savedConv = conversationRepository.save(newConv);
+      return conversationMapper.toDto(savedConv, currentUserId);
+    } catch (DataIntegrityViolationException e) {
+      Conversation concurrentConv = conversationRepository.findByParticipantPairKey(pairKey)
+          .orElseThrow(() -> new ConversationNotFoundException(request.withUserId(), "동시성 충돌 복구 중 방을 찾을 수 없습니다."));
+
+      return conversationMapper.toDto(concurrentConv, currentUserId);
+    }
   }
 
   @Override
   public CursorResponseConversationDto getMyConversations(UUID currentUserId, CursorPaginationRequest request) {
 
+    // 파라미터가 비어있으면 기본값 updatedAt으로 덮어씌움
+    String sortBy = (request.sortBy() == null || request.sortBy().isBlank()) ? "updatedAt" : request.sortBy();
+
     // 정렬 파라미터 검증
-    if (!"updatedAt".equals(request.sortBy()) && !"createdAt".equals(request.sortBy())) {
-      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 기준(sortBy)은 'updatedAt' 또는 'createdAt'을 지원합니다.");
+    if (!"updatedAt".equals(sortBy)) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 기준(sortBy)은 'updatedAt'만 지원합니다.");
     }
     if (!"ASCENDING".equalsIgnoreCase(request.sortDirection()) && !"DESCENDING".equalsIgnoreCase(request.sortDirection())) {
       throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 방향(sortDirection)은 'ASCENDING' 또는 'DESCENDING'만 지원합니다.");
@@ -121,7 +133,7 @@ public class ConversationServiceImpl implements ConversationService{
         .toList();
 
     return new CursorResponseConversationDto(
-        data, nextCursor, nextIdAfter, hasNext, totalCount, request.sortBy(), request.sortDirection()
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, request.sortDirection()
     );
   }
 
@@ -138,7 +150,8 @@ public class ConversationServiceImpl implements ConversationService{
   @Override
   public ConversationDto getConversationWith(UUID currentUserId, UUID withUserId) {
 
-    Conversation conv = conversationRepository.findConversationBetweenUsers(currentUserId, withUserId)
+    String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
+    Conversation conv = conversationRepository.findByParticipantPairKey(pairKey)
         .orElseThrow(() -> new ConversationNotFoundException(withUserId)); // 상대방과의 방이 없을 때
 
     return conversationMapper.toDto(conv, currentUserId);

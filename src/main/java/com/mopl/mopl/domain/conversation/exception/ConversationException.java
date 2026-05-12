@@ -6,4 +6,8 @@ public class ConversationException extends BusinessException {
   public ConversationException(ConversationErrorCode errorCode) {
     super(errorCode);
   }
+
+  public ConversationException(ConversationErrorCode errorCode, String message) {
+    super(errorCode, message);
+  }
 }

@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.mopl.mopl.domain.conversation.dto.ConversationCreateRequest;
@@ -20,6 +21,7 @@ import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.dto.CursorPaginationRequest;
+import com.mopl.mopl.global.exception.BusinessException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -78,7 +81,9 @@ class ConversationServiceImplTest {
 
     given(userRepository.findById(currentUserId)).willReturn(Optional.of(sender));
     given(userRepository.findById(withUserId)).willReturn(Optional.of(receiver));
-    given(conversationRepository.findConversationBetweenUsers(currentUserId, withUserId)).willReturn(Optional.empty());
+
+    String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
+    given(conversationRepository.findByParticipantPairKey(pairKey)).willReturn(Optional.empty());
     given(conversationRepository.save(any(Conversation.class))).willReturn(newConv);
     given(conversationMapper.toDto(newConv, currentUserId)).willReturn(expectedDto);
 
@@ -102,7 +107,8 @@ class ConversationServiceImplTest {
     given(userRepository.findById(currentUserId)).willReturn(Optional.of(sender));
     given(userRepository.findById(withUserId)).willReturn(Optional.of(receiver));
     // 기존 방이 존재한다고 설정
-    given(conversationRepository.findConversationBetweenUsers(currentUserId, withUserId)).willReturn(Optional.of(existingConv));
+    String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
+    given(conversationRepository.findByParticipantPairKey(pairKey)).willReturn(Optional.of(existingConv));
     given(conversationMapper.toDto(existingConv, currentUserId)).willReturn(expectedDto);
 
     // when
@@ -172,5 +178,110 @@ class ConversationServiceImplTest {
     // then
     assertThat(result.totalCount()).isEqualTo(5L);
     verify(conversationRepository).countMyConversations(currentUserId);
+  }
+
+  @Test
+  @DisplayName("목록 조회 - sortBy 파라미터가 updatedAt이 아닌 다른 값이면 400 에러 발생")
+  void getMyConversations_InvalidSortBy_ThrowsException() {
+
+    // given
+    // 클라이언트가 지원하지 않는 createdAt이나 invalidSort를 보낸 상황
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "createdAt");
+
+    // when & then
+    assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("'updatedAt'만 지원합니다.");
+
+    verify(conversationRepository, never()).findMyConversationsByCursorDesc(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("목록 조회 - 커서가 존재하는 두 번째 페이지부터는 count 쿼리를 실행하지 않고 -1을 반환한다.")
+  void getMyConversations_WithCursor_DoesNotCount() {
+
+    // given
+    String cursor = Instant.now().toString();
+    CursorPaginationRequest request = new CursorPaginationRequest(cursor, null, 10, "DESCENDING", "updatedAt");
+
+    given(conversationRepository.findMyConversationsByCursorDesc(eq(currentUserId), any(Instant.class), eq(null), any(PageRequest.class)))
+        .willReturn(new ArrayList<>());
+
+    // when
+    CursorResponseConversationDto result = conversationService.getMyConversations(currentUserId, request);
+
+    // then
+    assertThat(result.totalCount()).isEqualTo(-1L);
+    verify(conversationRepository, never()).countMyConversations(any());
+  }
+
+  @Test
+  @DisplayName("목록 조회 - limit(2)보다 많은 3개의 데이터가 반환되면, 1개를 잘라내고 hasNext=true, 정확한 nextCursor를 반환한다.")
+  void getMyConversations_HasNextTrue_TruncatesAndSetsNextCursor() {
+    // given
+    int limit = 2;
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, limit, "DESCENDING", "updatedAt");
+
+    List<Conversation> mockConvs = new ArrayList<>();
+    // limit(2) 보다 1개 더 많은 3개 생성
+    for (int i = 0; i < 3; i++) {
+      Conversation conv = Conversation.builder().sender(sender).receiver(receiver).build();
+      ReflectionTestUtils.setField(conv, "id", UUID.randomUUID());
+      ReflectionTestUtils.setField(conv, "updatedAt", Instant.now().minusSeconds(i * 10));
+      mockConvs.add(conv);
+    }
+
+    // 마지막 데이터의 값 추출
+    String expectedNextCursor = mockConvs.get(1).getUpdatedAt().toString();
+    UUID expectedNextIdAfter = mockConvs.get(1).getId();
+
+    given(conversationRepository.findMyConversationsByCursorDesc(eq(currentUserId), eq(null), eq(null), any(PageRequest.class)))
+        .willReturn(mockConvs);
+    given(conversationRepository.countMyConversations(currentUserId)).willReturn(10L);
+    given(conversationMapper.toDto(any(), any())).willReturn(
+        new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false)
+    );
+
+    //when
+    CursorResponseConversationDto result = conversationService.getMyConversations(currentUserId, request);
+
+    // then
+    assertThat(result.hasNext()).isTrue();
+    assertThat(result.data()).hasSize(limit); // 3개가 2개로 정확히 잘렸는지 확인
+    assertThat(result.totalCount()).isEqualTo(10L);
+    assertThat(result.nextCursor()).isEqualTo(expectedNextCursor); // 마지막 데이터의 값과 일치하는지 확인
+    assertThat(result.nextIdAfter()).isEqualTo(expectedNextIdAfter);
+  }
+
+  @Test
+  @DisplayName("대화방 생성 - 동시에 생성 요청이 들어와서 유니크 제약 에러가 발생하면, 기존 방을 조회하여 반환한다 (TOCTOU 방어)")
+  void createdConversation_RaceCondition_RecoversAndReturnsExisting() {
+
+    // given
+    ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
+    Conversation concurrentConv = Conversation.builder().sender(sender).receiver(receiver).build();
+    ConversationDto expectedDto = new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false);
+    String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
+
+    given(userRepository.findById(currentUserId)).willReturn(Optional.of(sender));
+    given(userRepository.findById(withUserId)).willReturn(Optional.of(receiver));
+
+    // 첫 조회 때는 방이 없다고 속임 (동시성 상황 가정)
+    given(conversationRepository.findByParticipantPairKey(pairKey))
+        .willReturn(Optional.empty()) // 첫번째 조회
+        .willReturn(Optional.of(concurrentConv)); // catch 블록에서 두번째 조회
+
+    // save 시 DB에서 유니크 에러 터짐
+    given(conversationRepository.save(any(Conversation.class)))
+        .willThrow(new DataIntegrityViolationException("Unique constraint violation"));
+
+    given(conversationMapper.toDto(concurrentConv, currentUserId)).willReturn(expectedDto);
+
+    // when
+    ConversationDto result = conversationService.createConversation(currentUserId, request);
+
+    // then
+    assertThat(result).isNotNull();
+    verify(conversationRepository, times(2)).findByParticipantPairKey(pairKey);
   }
 }

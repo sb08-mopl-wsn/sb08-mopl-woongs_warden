@@ -50,8 +50,11 @@ public class NotificationServiceImpl implements NotificationService {
   @Override
   public CursorResponseNotificationDto getNotifications(UUID userId, CursorPaginationRequest request) {
 
+    // 파라미터가 비어있으면 기본값 createdAt으로 덮어씌움
+    String sortBy = (request.sortBy() == null || request.sortBy().isBlank()) ? "createdAt" : request.sortBy();
+
     // 정렬 파라미터 검증 (WhiteList 검사)
-    if (!"createdAt".equals(request.sortBy())) {
+    if (!"createdAt".equals(sortBy)) {
       throw new InvalidSortParameterException("정렬 기준(sortBy)은 'createdAt'만 지원합니다.");
     }
 
@@ -107,7 +110,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     // dto 리턴
     return new CursorResponseNotificationDto(
-        data, nextCursor, nextIdAfter, hasNext, totalCount, request.sortBy(), request.sortDirection()
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, request.sortDirection()
     );
   }
 }

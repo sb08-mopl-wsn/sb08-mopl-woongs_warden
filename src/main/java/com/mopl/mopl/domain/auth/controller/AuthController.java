@@ -4,13 +4,11 @@ import com.mopl.mopl.domain.auth.service.AuthService;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.mopl.domain.user.dto.request.ResetPasswordRequest;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
-import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,15 +20,16 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * CSRF 요청*/
+     * CSRF 요청
+     */
     @GetMapping("/csrf-token")
     public ResponseEntity<Void> getCsrfToken(CsrfToken csrfToken) {
-        log.debug("CSRF 토큰 요청: {}", csrfToken.getToken());
         return ResponseEntity.noContent().build();
     }
 
     /**
-     * resfresh 요청*/
+     * resfresh 요청
+     */
     @PostMapping("/refresh")
     public ResponseEntity<JwtDTO> refresh(
             @CookieValue(
@@ -53,7 +52,8 @@ public class AuthController {
     }
 
     /**
-     * 유저 비밀번호 초기화*/
+     * 유저 비밀번호 초기화
+     */
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(
             @RequestBody ResetPasswordRequest request

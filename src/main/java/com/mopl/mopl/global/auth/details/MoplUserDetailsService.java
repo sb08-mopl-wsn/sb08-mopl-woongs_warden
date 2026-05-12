@@ -29,13 +29,8 @@ public class MoplUserDetailsService implements UserDetailsService {
 
         Instant expiredAt = user.getTemporaryPasswordExpiredAt();
 
-        if (user.isInit_password() && expiredAt != null
-                && !expiredAt.isAfter(Instant.now())) {
-            // 임시 비밀번호로 되어있던것 다시 원래 비밀번호로 롤백
-            String originalPassword = user.getTemporaryPassword();
-            user.updatePassword(originalPassword);
-
-            throw new CredentialsExpiredException("임시 비밀번호가 만료되었습니다. 원래 비밀번로를 입력하세요.");
+        if (user.isInitPassword() && expiredAt != null && !expiredAt.isAfter(Instant.now())) {
+            throw new CredentialsExpiredException("임시 비밀번호가 만료되었습니다.");
         }
 
         return new MoplUserDetails(userMapper.toDto(user), user.getPassword());

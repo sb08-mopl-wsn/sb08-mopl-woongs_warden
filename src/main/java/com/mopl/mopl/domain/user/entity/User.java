@@ -47,18 +47,11 @@ public class User  extends BaseEntity {
     @Column(nullable = true)
     private Instant temporaryPasswordExpiredAt;
 
-    /**
-     * 임시 비밀번호 생성시 원본을 저장<br>
-     * 임시 비밀번호가 만료되면<br>
-     * 이걸로 원래 비밀번호로 롤백시킴<br>
-     * 비번을 바꾼다하면<br>
-     * 이전 비밀번호로 남겨서 나중에<br>
-     * 사용했던 비번입니다로 응용가능*/
     @Column(length = 255, nullable = true)
     private String temporaryPassword;
 
     @Column(nullable = false)
-    private boolean init_password;
+    private boolean initPassword;
 
     @Builder(
             builderMethodName = "builder",
@@ -73,7 +66,7 @@ public class User  extends BaseEntity {
         this.profileImageKey = null;
         this.socialType = socialType != null ? socialType : null;
         this.socialId = socialId != null ? socialId:null;
-        this.init_password = false;
+        this.initPassword = false;
     }
 
     @Builder(
@@ -99,7 +92,7 @@ public class User  extends BaseEntity {
 
     public User updatePassword(String encryptedPassword) {
         this.password = encryptedPassword;
-        this.init_password = false;
+        this.initPassword = false;
         return this;
     }
 
@@ -127,6 +120,6 @@ public class User  extends BaseEntity {
         this.temporaryPassword = originPassword;
         this.password = initPassowrd;
         this.temporaryPasswordExpiredAt = expiredAt;
-        this.init_password = true;
+        this.initPassword = true;
     }
 }

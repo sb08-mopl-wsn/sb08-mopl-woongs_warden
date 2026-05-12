@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.auth;
 
 import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
+import com.mopl.mopl.domain.auth.exception.AuthFailedRefrshToken;
 import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
 import com.mopl.mopl.domain.auth.service.AuthServiceImpl;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
@@ -15,6 +16,7 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
+import com.mopl.mopl.global.exception.mail.MailFailedSendException;
 import com.nimbusds.jose.JOSEException;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -237,7 +239,7 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("토큰 생성 중 예외 발생 시 rollback 후 RuntimeException")
+        @DisplayName("토큰 생성 중 예외 발생 시 rollback 후 AuthFailedRefrshToken")
         void refresh_fail_tokenGenerationException() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
@@ -269,8 +271,7 @@ class AuthServiceImplTest {
                     .thenThrow(new RuntimeException("access token fail"));
 
             assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessage("토큰 재발급 중 오류가 발생했습니다.");
+                    .isInstanceOf(AuthFailedRefrshToken.class);
 
             verify(jwtRegistry, never()).rotateJwtInformation(any(), any());
             verify(jwtRegistry).rollbackRotateJwtInformation(
@@ -281,7 +282,7 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("쿠키 추가 실패 시 rollback 후 RuntimeException")
+        @DisplayName("쿠키 추가 실패 시 rollback 후 AuthFailedRefrshToken")
         void refresh_fail_addRefreshCookieException() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
@@ -319,8 +320,7 @@ class AuthServiceImplTest {
                     .addRefreshCookie(response, newRefreshToken);
 
             assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessage("토큰 재발급 중 오류가 발생했습니다.");
+                    .isInstanceOf(AuthFailedRefrshToken.class);
 
             verify(jwtRegistry).rotateJwtInformation(any(), any());
             verify(jwtRegistry).rollbackRotateJwtInformation(
@@ -383,7 +383,7 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("메일 발송 실패 시 RuntimeException")
+        @DisplayName("메일 주소 설정 실패 시 MailFailedSendException")
         void initUserPassword_mailSendFail() {
             String email = "user@test.com";
             String originPassword = "originEncodedPassword";
@@ -396,23 +396,20 @@ class AuthServiceImplTest {
 
             when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
             when(user.getPassword()).thenReturn(originPassword);
-            when(user.getEmail()).thenReturn(email);
+            when(user.getEmail()).thenReturn("");
             when(passwordEncoder.encode(anyString())).thenReturn(encodedTempPassword);
             when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
 
-            doThrow(new RuntimeException("mail fail"))
-                    .when(mailSender)
-                    .send(mimeMessage);
-
             assertThatThrownBy(() -> authService.initUserPassword(email))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessage("mail fail");
+                    .isInstanceOf(MailFailedSendException.class);
 
             verify(user).updateTemporaryPassword(
                     eq(encodedTempPassword),
                     eq(originPassword),
                     any(Instant.class)
             );
+
+            verify(mailSender, never()).send(any(MimeMessage.class));
         }
     }
 }

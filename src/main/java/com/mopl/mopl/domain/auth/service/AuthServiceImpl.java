@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.auth.service;
 
 import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
+import com.mopl.mopl.domain.auth.exception.AuthFailedRefrshToken;
 import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
@@ -13,6 +14,8 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
+import com.mopl.mopl.global.exception.mail.MailFailedLordException;
+import com.mopl.mopl.global.exception.mail.MailFailedSendException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +37,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -121,8 +127,7 @@ public class AuthServiceImpl implements AuthService {
                     newRefreshToken
             );
 
-            log.error("토큰 재발급 중 오류 발생", e);
-            throw new RuntimeException("토큰 재발급 중 오류가 발생했습니다.", e);
+            throw new AuthFailedRefrshToken();
         }
     }
 
@@ -132,11 +137,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void initUserPassword(String email) {
-        User target = userRepository.findByEmail(email).orElse(null);
-
-        if (target == null) {
-            throw new UserNotFoundException();
-        }
+        User target = userRepository.findByEmail(email).
+                orElseThrow(() -> new UserNotFoundException());
 
         String originPassword = target.getPassword();
         String rawPassword = generateInitPassword();
@@ -171,11 +173,11 @@ public class AuthServiceImpl implements AuthService {
             password.append(all.charAt(secureRandom.nextInt(all.length())));
         }
 
-        java.util.List<Character> chars = password.chars()
+        List<Character> chars = password.chars()
                 .mapToObj(c -> (char) c)
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
 
-        java.util.Collections.shuffle(chars, secureRandom);
+        Collections.shuffle(chars, secureRandom);
         StringBuilder shuffled = new StringBuilder(chars.size());
         chars.forEach(shuffled::append);
 
@@ -212,7 +214,7 @@ public class AuthServiceImpl implements AuthService {
             mailSender.send(message);
 
         } catch (MessagingException e) {
-            throw new RuntimeException("메일 발송 실패", e);
+            throw new MailFailedSendException(e.getMessage());
         }
     }
 
@@ -225,7 +227,7 @@ public class AuthServiceImpl implements AuthService {
                 return new String(bytes, StandardCharsets.UTF_8);
             }
         } catch (IOException e) {
-            throw new RuntimeException("메일 템플릿 로드 실패", e);
+            throw new MailFailedLordException(e.getMessage());
         }
     }
 }

@@ -1,11 +1,10 @@
 package com.mopl.mopl.domain.notification.service;
 
-import com.mopl.mopl.domain.notification.dto.CursorPaginationRequest;
+import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.notification.exception.InvalidCursorFormatException;
-import com.mopl.mopl.domain.notification.exception.InvalidLimitValueException;
 import com.mopl.mopl.domain.notification.exception.InvalidSortParameterException;
 import com.mopl.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.mopl.mopl.domain.notification.mapper.NotificationMapper;

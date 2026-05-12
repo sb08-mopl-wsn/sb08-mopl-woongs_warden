@@ -1,4 +1,4 @@
-package com.mopl.mopl.domain.notification.dto;
+package com.mopl.mopl.global.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;

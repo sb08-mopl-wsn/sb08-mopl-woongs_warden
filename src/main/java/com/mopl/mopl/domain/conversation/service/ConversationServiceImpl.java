@@ -67,8 +67,8 @@ public class ConversationServiceImpl implements ConversationService{
   public CursorResponseConversationDto getMyConversations(UUID currentUserId, CursorPaginationRequest request) {
 
     // 정렬 파라미터 검증
-    if (!"updatedAt".equals(request.sortBy())) {
-      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 기준(sortBy)은 'updatedAt'만 지원합니다.");
+    if (!"updatedAt".equals(request.sortBy()) && !"createdAt".equals(request.sortBy())) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 기준(sortBy)은 'updatedAt' 또는 'createdAt'을 지원합니다.");
     }
     if (!"ASCENDING".equalsIgnoreCase(request.sortDirection()) && !"DESCENDING".equalsIgnoreCase(request.sortDirection())) {
       throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 방향(sortDirection)은 'ASCENDING' 또는 'DESCENDING'만 지원합니다.");

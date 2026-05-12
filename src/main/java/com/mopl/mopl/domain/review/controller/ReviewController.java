@@ -6,7 +6,6 @@ import com.mopl.mopl.domain.review.dto.request.ReviewUpdateRequest;
 import com.mopl.mopl.domain.review.dto.response.CursorResponseReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewDto;
 import com.mopl.mopl.domain.review.service.ReviewService;
-import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.validation.Valid;
 import java.util.UUID;

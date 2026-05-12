@@ -1,4 +1,4 @@
-package com.mopl.mopl.domain.notification.dto;
+package com.mopl.mopl.global.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
@@ -17,7 +17,6 @@ public record CursorPaginationRequest(
   // 기본값 설정 컴팩트 생성자
   public CursorPaginationRequest {
     if (limit == null) limit = 20;
-    if (sortDirection == null) sortDirection = "DESCENDING";
-    if (sortBy == null) sortBy = "createdAt";
+    if (sortDirection == null || sortDirection.isBlank()) sortDirection = "DESCENDING";
   }
 }

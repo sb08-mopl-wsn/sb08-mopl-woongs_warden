@@ -1,6 +1,6 @@
 package com.mopl.mopl.domain.notification.service;
 
-import com.mopl.mopl.domain.notification.dto.CursorPaginationRequest;
+import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import java.util.UUID;
 

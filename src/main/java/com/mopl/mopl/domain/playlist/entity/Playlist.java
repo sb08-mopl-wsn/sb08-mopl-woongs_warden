@@ -50,8 +50,8 @@ public class Playlist extends BaseUpdatableEntity {
         if (title != null && !title.isBlank()) {
             this.title = title;
         }
-        //플리 설명이 null이 아닐 때만 업데이트
-        if (description != null) {
+        //플리 설명이 null이 아니고, 공백만으로 이루어져 있지 않을 때만 업데이트
+        if (description != null && !description.isBlank()) {
             this.description = description;
         }
     }

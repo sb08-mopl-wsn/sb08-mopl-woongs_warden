@@ -106,7 +106,9 @@ public class WatchingSessionStompEventListener {
         return UUID.fromString(parts[3]);
     }
 
+
     // STOMP 헤더의 인증 정보에서 사용자 ID를 추출한다.
+    // TODO: 추후 에러 처리 구현 예정
     private UUID extractUserId(StompHeaderAccessor accessor) {
         // 1. Principal 존재 여부 확인
         var principal = accessor.getUser();

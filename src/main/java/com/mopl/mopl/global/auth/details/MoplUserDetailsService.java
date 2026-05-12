@@ -35,7 +35,7 @@ public class MoplUserDetailsService implements UserDetailsService {
             String originalPassword = user.getTemporaryPassword();
             user.updatePassword(originalPassword);
 
-            throw new CredentialsExpiredException("임시 비밀번호가 만료되었습니다. 원래 비밀번로를 입력하세.");
+            throw new CredentialsExpiredException("임시 비밀번호가 만료되었습니다. 원래 비밀번로를 입력하세요.");
         }
 
         return new MoplUserDetails(userMapper.toDto(user), user.getPassword());

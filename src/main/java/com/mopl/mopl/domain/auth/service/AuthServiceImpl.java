@@ -220,8 +220,10 @@ public class AuthServiceImpl implements AuthService {
     private String loadMailTemplate(String path) {
         try {
             ClassPathResource resource = new ClassPathResource(path);
-            byte[] bytes = resource.getInputStream().readAllBytes();
-            return new String(bytes, StandardCharsets.UTF_8);
+            try (var in = resource.getInputStream()) {
+                byte[] bytes = in.readAllBytes();
+                return new String(bytes, StandardCharsets.UTF_8);
+            }
         } catch (IOException e) {
             throw new RuntimeException("메일 템플릿 로드 실패", e);
         }

@@ -2,7 +2,6 @@ package com.mopl.mopl.global.config;
 
 import com.mopl.mopl.global.auth.JwtAuthenticationFilter;
 import com.mopl.mopl.global.auth.handler.*;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -55,6 +54,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                                 // 문서 관련
                                 .requestMatchers("/", "/index.html").permitAll()
+                                .requestMatchers("/ws/**").permitAll()
                                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
 
                                 // 로그인/아웃 관련
@@ -69,8 +69,9 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.PATCH, "/api/users/*/locked").hasRole("ADMIN")
 
                                 // 인증 관련
-                                .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll() 
                                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
 
                                 .requestMatchers("/api/**").authenticated()
                                 .anyRequest().authenticated()

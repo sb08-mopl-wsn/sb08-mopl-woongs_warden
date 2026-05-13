@@ -2,6 +2,44 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.14'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+}
+
+jacoco {
+	toolVersion = "0.8.14"
+}
+
+test {
+	useJUnitPlatform()
+	finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+	dependsOn test
+
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = false
+	}
+
+	afterEvaluate {
+		classDirectories.setFrom(files(classDirectories.files.collect {
+			fileTree(dir: it, exclude: [
+					'**/dto/**',
+					'**/entity/**',
+					"**/entity/Q*",
+					'**/*Config*',
+					'**/*Application*',
+					'**/*Exception*',
+					'**/*Constants*',
+					'**/repository/**',
+					'**/controller/**'
+			])
+		}))
+	}
+
+	finalizedBy jacocoTestCoverageVerification  // 리포트 후 커버리지 기준 검증
 }
 
 group = 'com.mopl'
@@ -67,6 +105,9 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation 'org.testcontainers:postgresql'
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+
+	// email, 임시 비밀번호 발급에 필요
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
 }
 
 tasks.named('test') {

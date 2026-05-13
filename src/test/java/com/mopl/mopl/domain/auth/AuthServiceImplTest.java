@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.auth;
 
 import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
+import com.mopl.mopl.domain.auth.exception.AuthFailedRefrshToken;
 import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
 import com.mopl.mopl.domain.auth.service.AuthServiceImpl;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
@@ -15,7 +16,12 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
+import com.mopl.mopl.global.exception.mail.MailFailedSendException;
+import com.nimbusds.jose.JOSEException;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -24,12 +30,18 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.mail.javamail.JavaMailSender;
 
+import java.time.Instant;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,10 +63,24 @@ class AuthServiceImplTest {
     private MoplUserDetailsService userDetailsService;
 
     @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JavaMailSender mailSender;
+
+    @Mock
     private HttpServletResponse response;
 
     @InjectMocks
     private AuthServiceImpl authService;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(authService, "upper", "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        ReflectionTestUtils.setField(authService, "lower", "abcdefghijklmnopqrstuvwxyz");
+        ReflectionTestUtils.setField(authService, "digit", "0123456789");
+        ReflectionTestUtils.setField(authService, "special", "@$!%*#?&");
+    }
 
     @Nested
     @DisplayName("현재 사용자 조회")
@@ -100,10 +126,8 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("사용자를 찾을 수 없으면 예외")
         void getCurrentUserInfo_userNotFound() {
-            UUID userId = UUID.randomUUID();
-
             UserDto userDto = new UserDto(
-                    userId,
+                    UUID.randomUUID(),
                     null,
                     "missing@test.com",
                     "missing",
@@ -127,15 +151,14 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("refresh 성공")
-        void refresh_success() throws Exception {
+        void refresh_success() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
             String newAccessToken = "new.access.token";
             String newRefreshToken = "new.refresh.token";
 
-            UUID userId = UUID.randomUUID();
             UserDto userDto = new UserDto(
-                    userId,
+                    UUID.randomUUID(),
                     null,
                     "admin@admin.com",
                     "관리자",
@@ -216,8 +239,8 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("토큰 생성 중 예외 발생 시 rollback 후 RuntimeException")
-        void refresh_fail_tokenGenerationException() throws Exception {
+        @DisplayName("토큰 생성 중 예외 발생 시 rollback 후 AuthFailedRefrshToken")
+        void refresh_fail_tokenGenerationException() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
 
@@ -248,8 +271,7 @@ class AuthServiceImplTest {
                     .thenThrow(new RuntimeException("access token fail"));
 
             assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessage("토큰 재발급 중 오류가 발생했습니다.");
+                    .isInstanceOf(AuthFailedRefrshToken.class);
 
             verify(jwtRegistry, never()).rotateJwtInformation(any(), any());
             verify(jwtRegistry).rollbackRotateJwtInformation(
@@ -260,8 +282,8 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("쿠키 추가 실패 시 rollback 후 RuntimeException")
-        void refresh_fail_addRefreshCookieException() throws Exception {
+        @DisplayName("쿠키 추가 실패 시 rollback 후 AuthFailedRefrshToken")
+        void refresh_fail_addRefreshCookieException() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
             String newAccessToken = "new.access.token";
@@ -298,8 +320,7 @@ class AuthServiceImplTest {
                     .addRefreshCookie(response, newRefreshToken);
 
             assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessage("토큰 재발급 중 오류가 발생했습니다.");
+                    .isInstanceOf(AuthFailedRefrshToken.class);
 
             verify(jwtRegistry).rotateJwtInformation(any(), any());
             verify(jwtRegistry).rollbackRotateJwtInformation(
@@ -307,6 +328,88 @@ class AuthServiceImplTest {
                     oldJwtInfo,
                     newRefreshToken
             );
+        }
+    }
+
+    @Nested
+    @DisplayName("비밀번호 초기화")
+    class InitUserPassword {
+
+        @Test
+        @DisplayName("비밀번호 초기화 성공")
+        void initUserPassword_success() {
+            String email = "user@test.com";
+            String originPassword = "originEncodedPassword";
+            String encodedTempPassword = "encodedTempPassword";
+
+            User user = mock(User.class);
+            MimeMessage mimeMessage = new MimeMessage(
+                    Session.getDefaultInstance(new Properties())
+            );
+
+            when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+            when(user.getPassword()).thenReturn(originPassword);
+            when(user.getEmail()).thenReturn(email);
+            when(passwordEncoder.encode(anyString())).thenReturn(encodedTempPassword);
+            when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+            authService.initUserPassword(email);
+
+            ArgumentCaptor<String> rawPasswordCaptor = ArgumentCaptor.forClass(String.class);
+            verify(passwordEncoder).encode(rawPasswordCaptor.capture());
+
+            String rawPassword = rawPasswordCaptor.getValue();
+            assertThat(rawPassword).hasSize(8);
+
+            verify(user).updateTemporaryPassword(
+                    eq(encodedTempPassword),
+                    eq(originPassword),
+                    any(Instant.class)
+            );
+            verify(mailSender).send(mimeMessage);
+        }
+
+        @Test
+        @DisplayName("사용자가 없으면 UserNotFoundException")
+        void initUserPassword_userNotFound() {
+            String email = "missing@test.com";
+
+            when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authService.initUserPassword(email))
+                    .isInstanceOf(UserNotFoundException.class);
+
+            verifyNoInteractions(passwordEncoder, mailSender);
+        }
+
+        @Test
+        @DisplayName("메일 주소 설정 실패 시 MailFailedSendException")
+        void initUserPassword_mailSendFail() {
+            String email = "user@test.com";
+            String originPassword = "originEncodedPassword";
+            String encodedTempPassword = "encodedTempPassword";
+
+            User user = mock(User.class);
+            MimeMessage mimeMessage = new MimeMessage(
+                    Session.getDefaultInstance(new Properties())
+            );
+
+            when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+            when(user.getPassword()).thenReturn(originPassword);
+            when(user.getEmail()).thenReturn("");
+            when(passwordEncoder.encode(anyString())).thenReturn(encodedTempPassword);
+            when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+            assertThatThrownBy(() -> authService.initUserPassword(email))
+                    .isInstanceOf(MailFailedSendException.class);
+
+            verify(user).updateTemporaryPassword(
+                    eq(encodedTempPassword),
+                    eq(originPassword),
+                    any(Instant.class)
+            );
+
+            verify(mailSender, never()).send(any(MimeMessage.class));
         }
     }
 }

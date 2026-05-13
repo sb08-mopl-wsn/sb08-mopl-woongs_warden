@@ -10,9 +10,9 @@ import java.util.UUID;
 
 public interface ReviewService {
 
-  ReviewDto createReview(ReviewCreateRequest request, User user);
+  ReviewDto createReview(ReviewCreateRequest request, UUID userId);
   ReviewDto findReviewById(UUID reviewId);
   CursorResponseReviewDto findReviews(ReviewSearchRequest request);
-  ReviewDto updateReview(UUID reviewId, ReviewUpdateRequest request, User user);
-  void deleteReview(UUID reviewId, User user);
+  ReviewDto updateReview(UUID reviewId, ReviewUpdateRequest request, UUID userId);
+  void deleteReview(UUID reviewId, UUID userId);
 }

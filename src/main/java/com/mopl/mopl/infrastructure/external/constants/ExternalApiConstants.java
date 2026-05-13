@@ -1,5 +1,7 @@
 package com.mopl.mopl.infrastructure.external.constants;
 
+import java.util.List;
+
 public class ExternalApiConstants
 {
     /* sports */
@@ -8,6 +10,7 @@ public class ExternalApiConstants
 
     public static final int PREMIER_LEAGUE_ID = 4328;
     public static final int LA_LIGA_ID = 4335;
+    public static List<Integer> LEAGUE_IDS = List.of(PREMIER_LEAGUE_ID, LA_LIGA_ID);
 
     /* tmdb */
     public static final String IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";

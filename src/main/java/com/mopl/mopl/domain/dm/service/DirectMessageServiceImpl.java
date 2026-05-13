@@ -74,12 +74,14 @@ public class DirectMessageServiceImpl implements DirectMessageService{
         request.content()
     ));
 
+    DirectMessageDto messageDto = messageMapper.toDto(savedMessage);
+
     eventPublisher.publishEvent(new DirectMessageSentEvent(
             conversationId,
-            messageMapper.toDto(savedMessage)
+            messageDto
     ));
 
-    return messageMapper.toDto(savedMessage);
+    return messageDto;
   }
 
   @Override

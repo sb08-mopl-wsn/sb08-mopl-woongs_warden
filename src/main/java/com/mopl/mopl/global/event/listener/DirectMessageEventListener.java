@@ -49,7 +49,11 @@ public class DirectMessageEventListener {
 
     String destination = createDirectMessageDestination(event.conversationId());
 
-    messagingTemplate.convertAndSend(destination, event.messageDto());
+    try {
+      messagingTemplate.convertAndSend(destination, event.messageDto());
+    } catch (Exception e) {
+      log.warn("DM WebSocket 전송 실패 - conversationId: {}, destination: {}", event.conversationId(), destination, e);
+    }
   }
 
   private String createDirectMessageDestination(UUID conversationId) {

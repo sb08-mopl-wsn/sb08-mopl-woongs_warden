@@ -121,9 +121,16 @@ public class ConversationServiceImpl implements ConversationService{
     PageRequest pageRequest = PageRequest.of(0, request.limit() + 1);
     List<Conversation> conversations;
 
-    if ("ASCENDING".equalsIgnoreCase(request.sortDirection())) {
+    boolean isAsc = "ASCENDING".equalsIgnoreCase(request.sortDirection());
+    boolean byCreatedAt = "createdAt".equals(sortBy);
+
+    if (isAsc && byCreatedAt) {
+      conversations = conversationRepository.findMyConversationsByCreatedAtCursorAsc(currentUserId, cursorTime, request.idAfter(), pageRequest);
+    } else if (isAsc) { // 기본값 updatedAt ASC
       conversations = conversationRepository.findMyConversationsByCursorAsc(currentUserId, cursorTime, request.idAfter(), pageRequest);
-    } else {
+    } else if (byCreatedAt) {
+      conversations = conversationRepository.findMyConversationsByCreatedAtCursorDesc(currentUserId, cursorTime, request.idAfter(), pageRequest);
+    } else { // 기본값 updatedAt DESC
       conversations = conversationRepository.findMyConversationsByCursorDesc(currentUserId, cursorTime, request.idAfter(), pageRequest);
     }
 
@@ -138,7 +145,7 @@ public class ConversationServiceImpl implements ConversationService{
     UUID nextIdAfter = null;
     if (!conversations.isEmpty()) {
       Conversation lastConv = conversations.get(conversations.size() -1);
-      nextCursor = lastConv.getUpdatedAt().toString();
+      nextCursor = (byCreatedAt ? lastConv.getCreatedAt() : lastConv.getUpdatedAt()).toString();
       nextIdAfter = lastConv.getId();
     }
 

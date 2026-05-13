@@ -303,4 +303,26 @@ class ConversationServiceImplTest {
     assertThat(result).isNotNull();
     verify(conversationRepository, times(2)).findByParticipantPairKey(pairKey);
   }
+
+  @Test
+  @DisplayName("목록 조회 - sortBy가 createdAt이면 정상 조회된다.")
+  void getMyConversations_SortByCreatedAt_Success() {
+
+    // given
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "createdAt");
+    given(conversationRepository.findMyConversationsByCreatedAtCursorDesc(eq(currentUserId), eq(null), eq(null), any(PageRequest.class)))
+        .willReturn(new ArrayList<>());
+
+    given(conversationRepository.countBySenderId(currentUserId)).willReturn(0L);
+    given(conversationRepository.countByReceiverId(currentUserId)).willReturn(0L);
+
+    // when
+    CursorResponseConversationDto result = conversationService.getMyConversations(currentUserId, request);
+
+    // then
+    assertThat(result).isNotNull();
+    verify(conversationRepository).findMyConversationsByCreatedAtCursorDesc(eq(currentUserId), eq(null), eq(null), any(PageRequest.class));
+    verify(conversationRepository).countBySenderId(currentUserId);
+    verify(conversationRepository).countByReceiverId(currentUserId);
+  }
 }

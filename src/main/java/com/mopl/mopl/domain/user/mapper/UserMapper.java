@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.user.mapper;
 
 import com.mopl.mopl.domain.user.dto.UserDto;
+import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
@@ -41,4 +42,9 @@ public abstract class UserMapper {
         String normalizedKey = profileImageKey.startsWith("/") ? profileImageKey.substring(1) : profileImageKey;
         return normalizedBaseUrl + "/" + normalizedKey;
     }
+
+    @Mapping(target = "userId", source = "id")
+    @Mapping(target = "name", source = "name")
+    @Mapping(target = "profileImageUrl", source = "profileImageKey", qualifiedByName = "buildProfileImageUrl")
+    public abstract UserSummary toUserSummary(User user);
 }

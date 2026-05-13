@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                                 // 문서 관련
                                 .requestMatchers("/", "/index.html").permitAll()
+                                .requestMatchers("/ws/**").permitAll()
                                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
 
                                 // 로그인/아웃 관련

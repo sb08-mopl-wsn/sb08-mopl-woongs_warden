@@ -65,7 +65,7 @@ public class WatchingSessionStompEventListener {
             log.warn("[Subscribe FAIL] destination={}, code={}, message={}",
                     destination, e.getErrorCode().getCode(), e.getMessage());
         } catch (Exception e) {
-            log.error("[Subscribe ERROR] detination={}", destination, e);
+            log.error("[Subscribe ERROR] destination={}", destination, e);
         }
     }
 

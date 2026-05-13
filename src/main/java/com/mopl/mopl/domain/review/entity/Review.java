@@ -2,10 +2,8 @@ package com.mopl.mopl.domain.review.entity;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.review.exception.InvalidReviewInputException;
-import com.mopl.mopl.domain.review.exception.ReviewErrorCode;
-import com.mopl.mopl.domain.review.exception.ReviewException;
-import com.mopl.mopl.global.base.BaseUpdatableEntity;
 import com.mopl.mopl.domain.user.entity.User;
+import com.mopl.mopl.global.base.BaseUpdatableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

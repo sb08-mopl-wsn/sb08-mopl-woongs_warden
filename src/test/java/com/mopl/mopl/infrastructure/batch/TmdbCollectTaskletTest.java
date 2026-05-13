@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 
@@ -80,13 +81,14 @@ class TmdbCollectTaskletTest
         Content movieContent = Content.builder().title("영화").externalId("1").contentType(ContentType.movie).build();
 
         when(tmdbContentMapper.movieToContent(movie)).thenReturn(movieContent);
+        when(contentRepository.save(any(Content.class)))
+                .thenThrow(new DataIntegrityViolationException("중복"));
 
         // when
         RepeatStatus status = tasklet.execute(contribution, chunkContext);
 
         // then
         assertThat(status).isEqualTo(RepeatStatus.FINISHED);
-        verify(contentRepository, times(1)).save(any(Content.class));
     }
 
     @Test

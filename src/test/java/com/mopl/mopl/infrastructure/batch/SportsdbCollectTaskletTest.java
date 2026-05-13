@@ -95,9 +95,10 @@ class SportsdbCollectTaskletTest
         when(contentRepository.existsByExternalIdAndContentType("123", ContentType.sport)).thenReturn(true);
 
         // when
-        tasklet.execute(contribution, chunkContext);
+        RepeatStatus status = tasklet.execute(contribution, chunkContext);
 
         // then
+        assertThat(status).isEqualTo(RepeatStatus.FINISHED);
         verify(contentRepository, never()).save(any(Content.class));
     }
 

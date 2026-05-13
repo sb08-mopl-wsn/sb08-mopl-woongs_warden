@@ -8,6 +8,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -19,14 +20,14 @@ public class DirectMessageRepositoryCustomImpl implements DirectMessageRepositor
   private final JPAQueryFactory queryFactory;
 
   @Override
-  public DirectMessage findLatestMessage(UUID conversationId) {
-    return queryFactory
+  public Optional<DirectMessage> findLatestMessage(UUID conversationId) {
+    return Optional.ofNullable(queryFactory
         .selectFrom(directMessage)
         .join(directMessage.sender, user).fetchJoin()
         .where(directMessage.conversation.id.eq(conversationId))
         .orderBy(directMessage.createdAt.desc(), directMessage.id.desc())
         .limit(1)
-        .fetchOne();
+        .fetchOne());
   }
 
   @Override

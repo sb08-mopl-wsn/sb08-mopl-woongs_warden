@@ -14,14 +14,15 @@ import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.domain.dm.entity.DirectMessage;
 import com.mopl.mopl.global.dto.CursorPaginationRequest;
+import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
-import com.mopl.mopl.global.sse.service.SseService;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +36,7 @@ public class DirectMessageServiceImpl implements DirectMessageService{
   private final UserRepository userRepository;
   private final DirectMessageMapper messageMapper;
 
-  private final SseService sseService;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   @Transactional
@@ -66,7 +67,11 @@ public class DirectMessageServiceImpl implements DirectMessageService{
         : conversation.getSender().getId();
 
     // TODO: EventPublisher 형식으로 디커플링 가능
-    sseService.sendNotification(receiverId, "새로운 메시지가 도착했습니다: " + request.content());
+    eventPublisher.publishEvent(new DirectMessageCreatedEvent(
+        savedMessage.getId(),
+        receiverId,
+        request.content()
+    ));
 
     return messageMapper.toDto(savedMessage);
   }
@@ -78,6 +83,16 @@ public class DirectMessageServiceImpl implements DirectMessageService{
         .orElseThrow(() -> new ConversationNotFoundException(conversationId));
 
     validateConversationAccess(conversation, currentUserId);
+
+    if (request.limit() == null || request.limit() <= 0) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "limit은 1 이상의 값이어야 합니다.");
+    }
+
+    boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();
+    boolean hasIdAfter = request.idAfter() != null;
+    if (hasCursor != hasIdAfter) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "cursor와 idAfter는 항상 함께 전달되어야 합니다.");
+    }
 
     // 정렬 파라미터 검증
     if (!"createdAt".equals(request.sortBy())) {

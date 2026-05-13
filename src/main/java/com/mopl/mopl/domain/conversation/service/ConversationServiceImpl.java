@@ -8,10 +8,13 @@ import com.mopl.mopl.domain.conversation.exception.ConversationAccessDeniedExcep
 import com.mopl.mopl.domain.conversation.exception.ConversationNotFoundException;
 import com.mopl.mopl.domain.conversation.mapper.ConversationMapper;
 import com.mopl.mopl.domain.conversation.repository.ConversationRepository;
-import com.mopl.mopl.global.dto.CursorPaginationRequest;
+import com.mopl.mopl.domain.dm.dto.DirectMessageDto;
+import com.mopl.mopl.domain.dm.mapper.DirectMessageMapper;
+import com.mopl.mopl.domain.dm.repository.DirectMessageRepository;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import java.time.Instant;
@@ -34,6 +37,9 @@ public class ConversationServiceImpl implements ConversationService{
   private final UserRepository userRepository;
   private final ConversationMapper conversationMapper;
 
+  private final DirectMessageRepository directMessageRepository;
+  private final DirectMessageMapper directMessageMapper;
+
   @Override
   @Transactional
   public ConversationDto createConversation(UUID currentUserId, ConversationCreateRequest request) {
@@ -52,7 +58,7 @@ public class ConversationServiceImpl implements ConversationService{
     Optional<Conversation> existingConv = conversationRepository.findByParticipantPairKey(pairKey);
 
     if (existingConv.isPresent()) {
-      return conversationMapper.toDto(existingConv.get(), currentUserId); // 기존 방 리턴
+      return mapToConversationDto(existingConv.get(), currentUserId); // 기존 방 리턴
     }
 
     // 없으면 새로 생성
@@ -63,17 +69,29 @@ public class ConversationServiceImpl implements ConversationService{
 
     try {
       Conversation savedConv = conversationRepository.save(newConv);
-      return conversationMapper.toDto(savedConv, currentUserId);
+      return mapToConversationDto(savedConv, currentUserId);
     } catch (DataIntegrityViolationException e) {
       Conversation concurrentConv = conversationRepository.findByParticipantPairKey(pairKey)
           .orElseThrow(() -> new ConversationNotFoundException(request.withUserId(), "동시성 충돌 복구 중 방을 찾을 수 없습니다."));
 
-      return conversationMapper.toDto(concurrentConv, currentUserId);
+      return mapToConversationDto(concurrentConv, currentUserId);
     }
   }
 
   @Override
   public CursorResponseConversationDto getMyConversations(UUID currentUserId, CursorPaginationRequest request) {
+
+    // limit 값 검증
+    if (request.limit() == null || request.limit() <= 0) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "limit은 1 이상의 값이어야 합니다.");
+    }
+
+    // 커서-id 쌍 검증
+    boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();
+    boolean hasIdAfter = request.idAfter() != null;
+    if (hasCursor != hasIdAfter) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "cursor와 idAfter는 항상 함께 전달되어야 합니다.");
+    }
 
     // 파라미터가 비어있으면 기본값 updatedAt으로 덮어씌움
     String sortBy = (request.sortBy() == null || request.sortBy().isBlank()) ? "updatedAt" : request.sortBy();
@@ -131,7 +149,7 @@ public class ConversationServiceImpl implements ConversationService{
 
     // DTO 변환
     List<ConversationDto> data = conversations.stream()
-        .map(conv -> conversationMapper.toDto(conv, currentUserId))
+        .map(conv -> mapToConversationDto(conv, currentUserId))
         .toList();
 
     return new CursorResponseConversationDto(
@@ -146,7 +164,7 @@ public class ConversationServiceImpl implements ConversationService{
 
     validateConversationAccess(conv, currentUserId);
 
-    return conversationMapper.toDto(conv, currentUserId);
+    return mapToConversationDto(conv, currentUserId);
   }
 
   @Override
@@ -156,12 +174,20 @@ public class ConversationServiceImpl implements ConversationService{
     Conversation conv = conversationRepository.findByParticipantPairKey(pairKey)
         .orElseThrow(() -> new ConversationNotFoundException(withUserId)); // 상대방과의 방이 없을 때
 
-    return conversationMapper.toDto(conv, currentUserId);
+    return mapToConversationDto(conv, currentUserId);
   }
 
   private void validateConversationAccess(Conversation conv, UUID userId) {
     if (!conv.getSender().getId().equals(userId) && !conv.getReceiver().getId().equals(userId)) {
       throw new ConversationAccessDeniedException();
     }
+  }
+
+  private ConversationDto mapToConversationDto(Conversation conv, UUID currentUserId) {
+    DirectMessageDto latestMessageDto = directMessageRepository.findLatestMessage(conv.getId())
+        .map(directMessageMapper::toDto)
+        .orElse(null);
+
+    return conversationMapper.toDto(conv, currentUserId, latestMessageDto);
   }
 }

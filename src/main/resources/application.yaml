@@ -27,6 +27,21 @@ spring:
       initialize-schema: never
     job:
       enabled: false
+  # 임시비빌번호에서 사용
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+          starttls:
+            enable: true
 
 logging:
   level:

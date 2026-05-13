@@ -11,6 +11,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -42,6 +44,15 @@ public class User  extends BaseEntity {
     @Column(length = 100, nullable = true)
     private String socialId;
 
+    @Column(nullable = true)
+    private Instant temporaryPasswordExpiredAt;
+
+    @Column(length = 255, nullable = true)
+    private String temporaryPassword;
+
+    @Column(nullable = false)
+    private boolean initPassword;
+
     @Builder(
             builderMethodName = "builder",
             builderClassName = "UserBuilder"
@@ -55,6 +66,7 @@ public class User  extends BaseEntity {
         this.profileImageKey = null;
         this.socialType = socialType != null ? socialType : null;
         this.socialId = socialId != null ? socialId:null;
+        this.initPassword = false;
     }
 
     @Builder(
@@ -80,6 +92,7 @@ public class User  extends BaseEntity {
 
     public User updatePassword(String encryptedPassword) {
         this.password = encryptedPassword;
+        this.initPassword = false;
         return this;
     }
 
@@ -101,5 +114,12 @@ public class User  extends BaseEntity {
     public User unlock() {
         this.isLocked = false;
         return this;
+    }
+
+    public void updateTemporaryPassword(String initPassowrd,String originPassword, Instant expiredAt) {
+        this.temporaryPassword = originPassword;
+        this.password = initPassowrd;
+        this.temporaryPasswordExpiredAt = expiredAt;
+        this.initPassword = true;
     }
 }

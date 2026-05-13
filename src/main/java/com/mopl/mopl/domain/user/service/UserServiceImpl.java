@@ -162,7 +162,7 @@ public class UserServiceImpl implements UserService {
             user.updateProfileImage(key);
         }
 
-        if (request.name() != null && !request.name().isEmpty()) {
+        if (request.name() != null && !request.name().isBlank()) {
             user.updateName(request.name());
         }
 

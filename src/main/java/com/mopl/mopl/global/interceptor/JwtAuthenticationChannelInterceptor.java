@@ -4,6 +4,8 @@ import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.exception.BusinessException;
+import com.mopl.mopl.global.exception.GlobalErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -37,7 +39,7 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
                 message, StompHeaderAccessor.class
         );
-        // TODO: 커스텀 예외 처리 필
+
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
             handleAuthentication(accessor);
         }
@@ -45,11 +47,10 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
         return message;
     }
 
-    // TODO: 추후 예외 처리 필
     private void handleAuthentication(StompHeaderAccessor accessor) {
         log.info("[WebSocket] CONNECT 수신");  // 추가
         String token = resolveToken(accessor)
-                .orElseThrow(() -> new RuntimeException("유효하지 않은 토큰입니다."));
+                .orElseThrow(() -> new BusinessException(GlobalErrorCode.UNAUTHORIZED));
         log.info("[WebSocket] 토큰 추출 성공");
 
         // HTTP 필터와 동일한 로직: 토큰 검증 + JWT 세션 확인
@@ -57,6 +58,12 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
                 && jwtRegistry.hasActiveJwtInformationByAccessToken(token)) {
 
             MoplUserDetails userDetails = tokenProvider.parseAccessToken(token);
+
+            if (userDetails.getUserDto() == null) {
+                log.error("[WebSocket] 토큰 파싱은 성공했으나 UserDto가 null입니다.");
+                throw new BusinessException(GlobalErrorCode.UNAUTHORIZED);
+            }
+
             UserDto userDto = userDetails.getUserDto();
 
             UsernamePasswordAuthenticationToken authentication =
@@ -71,9 +78,8 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
             accessor.setUser(authentication);
             log.debug("웹 소켓 유저를 위한 인증 설정 완료. user: {}", userDto.name());
         } else {
-            // TODO: 커스텀 예외 처리 필
             log.debug("웹소켓 통신을 위한 유효하지 않은 JWT 토큰");
-            throw new RuntimeException("INVALID_TOKEN");
+            throw new BusinessException(GlobalErrorCode.UNAUTHORIZED);
         }
     }
 

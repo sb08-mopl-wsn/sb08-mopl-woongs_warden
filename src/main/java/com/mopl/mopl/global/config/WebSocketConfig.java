@@ -6,14 +6,18 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.handler.invocation.HandlerMethodArgumentResolver;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.security.messaging.access.intercept.AuthorizationChannelInterceptor;
 import org.springframework.security.messaging.access.intercept.MessageMatcherDelegatingAuthorizationManager;
+import org.springframework.security.messaging.context.AuthenticationPrincipalArgumentResolver;
 import org.springframework.security.messaging.context.SecurityContextChannelInterceptor;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -37,7 +41,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         log.info("[WebSocket 설정] 메시지 브로커 설정 시작");
 
         // [구독] 클라이언트가 메시지를 받을 때 사용하는 경로
-        config.enableSimpleBroker("/sub");
+        config.enableSimpleBroker("/sub", "/user");
 
         // [발행] 클라이언트가 메시지를 보낼 때 사용하는 경로
         config.setApplicationDestinationPrefixes("/pub");
@@ -67,5 +71,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 new SecurityContextChannelInterceptor(), // 2순위
                 authorizationChannelInterceptor() // 3순위 - 인가
         );
+    }
+
+    @Override
+    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> argumentResolvers) {
+        argumentResolvers.add(new AuthenticationPrincipalArgumentResolver());
     }
 }

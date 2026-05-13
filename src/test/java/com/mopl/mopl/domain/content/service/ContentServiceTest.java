@@ -282,7 +282,7 @@ class ContentServiceTest
             given(contentMapper.toContentDto(content)).willReturn(contentDto);
             
             // when
-            ContentDto result = contentService.update(contentId, contentUpdateRequest);
+            ContentDto result = contentService.update(contentId, contentUpdateRequest, null);
             
             // then
             assertThat(result.title()).isEqualTo("test content");
@@ -305,7 +305,7 @@ class ContentServiceTest
             given(contentRepository.findById(contentId)).willReturn(Optional.empty());
             
             // when & then
-            assertThatThrownBy(() -> contentService.update(contentId, contentUpdateRequest))
+            assertThatThrownBy(() -> contentService.update(contentId, contentUpdateRequest, null))
                     .isInstanceOf(ContentNotFoundException.class);
         }
     }

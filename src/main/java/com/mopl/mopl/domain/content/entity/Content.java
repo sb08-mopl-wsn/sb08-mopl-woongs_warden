@@ -67,7 +67,11 @@ public class Content extends BaseUpdatableEntity
         this.externalId = (externalId == null || externalId.isBlank()) ? null : externalId;
     }
 
-    public void update(String title, String description, List<String> tags) {
+    public void update(String thumbnailKey, String title, String description, List<String> tags) {
+        if (thumbnailKey != null) {
+            this.thumbnailKey = thumbnailKey;
+        }
+
         if (title != null) {
             this.title = title;
         }

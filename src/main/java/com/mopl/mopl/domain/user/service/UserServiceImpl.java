@@ -17,11 +17,15 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import static org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK;
 
 @Service
 @RequiredArgsConstructor
@@ -159,6 +163,20 @@ public class UserServiceImpl implements UserService {
 
         if (profile != null && !profile.isEmpty()) {
             key = s3ImageStorage.upload(profile, "profile");
+
+            String uploadedKey = key;
+
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            if (status == STATUS_ROLLED_BACK) {
+                                s3ImageStorage.delete(uploadedKey);
+                            }
+                        }
+                    }
+            );
+
             user.updateProfileImage(key);
         }
 

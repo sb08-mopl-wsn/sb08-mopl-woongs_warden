@@ -100,8 +100,8 @@ public class ConversationServiceImpl implements ConversationService{
     String sortBy = (request.sortBy() == null || request.sortBy().isBlank()) ? "updatedAt" : request.sortBy();
 
     // 정렬 파라미터 검증
-    if (!"updatedAt".equals(sortBy)) {
-      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 기준(sortBy)은 'updatedAt'만 지원합니다.");
+    if (!"updatedAt".equals(sortBy) && !"createdAt".equals(sortBy)) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 기준(sortBy)은 'updatedAt' 또는 'createdAt'을 지원합니다.");
     }
     if (!"ASCENDING".equalsIgnoreCase(request.sortDirection()) && !"DESCENDING".equalsIgnoreCase(request.sortDirection())) {
       throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "정렬 방향(sortDirection)은 'ASCENDING' 또는 'DESCENDING'만 지원합니다.");
@@ -121,9 +121,16 @@ public class ConversationServiceImpl implements ConversationService{
     PageRequest pageRequest = PageRequest.of(0, request.limit() + 1);
     List<Conversation> conversations;
 
-    if ("ASCENDING".equalsIgnoreCase(request.sortDirection())) {
+    boolean isAsc = "ASCENDING".equalsIgnoreCase(request.sortDirection());
+    boolean byCreatedAt = "createdAt".equals(sortBy);
+
+    if (isAsc && byCreatedAt) {
+      conversations = conversationRepository.findMyConversationsByCreatedAtCursorAsc(currentUserId, cursorTime, request.idAfter(), pageRequest);
+    } else if (isAsc) { // 기본값 updatedAt ASC
       conversations = conversationRepository.findMyConversationsByCursorAsc(currentUserId, cursorTime, request.idAfter(), pageRequest);
-    } else {
+    } else if (byCreatedAt) {
+      conversations = conversationRepository.findMyConversationsByCreatedAtCursorDesc(currentUserId, cursorTime, request.idAfter(), pageRequest);
+    } else { // 기본값 updatedAt DESC
       conversations = conversationRepository.findMyConversationsByCursorDesc(currentUserId, cursorTime, request.idAfter(), pageRequest);
     }
 
@@ -138,7 +145,7 @@ public class ConversationServiceImpl implements ConversationService{
     UUID nextIdAfter = null;
     if (!conversations.isEmpty()) {
       Conversation lastConv = conversations.get(conversations.size() -1);
-      nextCursor = lastConv.getUpdatedAt().toString();
+      nextCursor = (byCreatedAt ? lastConv.getCreatedAt() : lastConv.getUpdatedAt()).toString();
       nextIdAfter = lastConv.getId();
     }
 

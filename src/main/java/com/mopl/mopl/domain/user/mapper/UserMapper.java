@@ -41,4 +41,9 @@ public abstract class UserMapper {
         String normalizedKey = profileImageKey.startsWith("/") ? profileImageKey.substring(1) : profileImageKey;
         return normalizedBaseUrl + "/" + normalizedKey;
     }
+
+    @Mapping(target = "userId", source = "id")
+    @Mapping(target = "name", source = "name")
+    @Mapping(target = "profileImageUrl", source = "profileImageKey", qualifiedByName = "buildProfileImageUrl")
+    public abstract UserSummary toUserSummary(User user);
 }

@@ -22,8 +22,8 @@ import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.dto.CursorPaginationRequest;
+import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
 import com.mopl.mopl.global.exception.BusinessException;
-import com.mopl.mopl.global.sse.service.SseService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,9 +33,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,7 +59,7 @@ class DirectMessageServiceImplTest {
   private DirectMessageMapper messageMapper;
 
   @Mock
-  private SseService sseService;
+  private ApplicationEventPublisher eventPublisher;
 
   private User sender;
   private User receiver;
@@ -111,7 +113,13 @@ class DirectMessageServiceImplTest {
     assertThat(conversation.isHasUnread()).isTrue();
 
     verify(messageRepository).save(any(DirectMessage.class));
-    verify(sseService).sendNotification(eq(receiverUserId), any(String.class));
+
+    ArgumentCaptor<DirectMessageCreatedEvent> eventCaptor = ArgumentCaptor.forClass(DirectMessageCreatedEvent.class);
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+    DirectMessageCreatedEvent publishedEvent = eventCaptor.getValue();
+    assertThat(publishedEvent.receiverId()).isEqualTo(receiverUserId);
+    assertThat(publishedEvent.content()).isEqualTo("안녕하세요~~");
   }
 
   @Test
@@ -129,7 +137,7 @@ class DirectMessageServiceImplTest {
         .isInstanceOf(ConversationAccessDeniedException.class);
 
     verify(messageRepository, never()).save(any(DirectMessage.class));
-    verify(sseService, never()).sendNotification(any(), any());
+    verify(eventPublisher, never()).publishEvent(any());
   }
 
   @Test
@@ -182,10 +190,11 @@ class DirectMessageServiceImplTest {
 
     // given
     String cursor = Instant.now().toString();
-    CursorPaginationRequest request = new CursorPaginationRequest(cursor, null, 10, "DESCENDING", "createdAt");
+    UUID idAfter = UUID.randomUUID();
+    CursorPaginationRequest request = new CursorPaginationRequest(cursor, idAfter, 10, "DESCENDING", "createdAt");
 
     given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
-    given(messageRepository.findMessagesByCursor(eq(conversationId), any(Instant.class), eq(null), eq(10), eq("DESCENDING")))
+    given(messageRepository.findMessagesByCursor(any(), any(), any(), any(Integer.class), any()))
         .willReturn(new ArrayList<>()); // 빈 리스트 반환
 
     // when
@@ -236,5 +245,36 @@ class DirectMessageServiceImplTest {
     assertThat(result.totalCount()).isEqualTo(10L);
     assertThat(result.nextCursor()).isEqualTo(expectedNextCursor);
     assertThat(result.nextIdAfter()).isEqualTo(expectedNextIdAfter);
+  }
+
+  @Test
+  @DisplayName("메시지 목록 조회 - limit이 0 이하일 경우 400 예외 발생")
+  void getMessages_InvalidLimit_ThrowsException() {
+
+    //given
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 0, "DESCENDING", "createdAt");
+
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.getMessages(currentUserId, conversationId, request))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("limit은 1 이상의 값");
+  }
+
+  @Test
+  @DisplayName("메시지 목록 조회 - cursor와 idAfter 중 하나만 전달될 경우 400 예외 발생")
+  void getMessages_MismatchedCursor_ThrowsException() {
+
+    // given
+    // cursor는 있는데 idAfter는 없는 요청
+    CursorPaginationRequest request = new CursorPaginationRequest(Instant.now().toString(), null, 10, "DESCENDING", "createdAt");
+
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.getMessages(currentUserId, conversationId, request))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("항상 함께 전달되어야 합니다.");
   }
 }

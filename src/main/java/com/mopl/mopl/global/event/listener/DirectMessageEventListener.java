@@ -21,12 +21,16 @@ public class DirectMessageEventListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onDirectMessageCreated(DirectMessageCreatedEvent event) {
 
-    log.debug("DM 이벤트 수신 - receiver: {}", event.receiverId());
+    log.debug("DM 이벤트 수신 - messageId: {}", event.messageId());
 
     // SSE 푸시 알림 발송
-    sseService.sendNotification(
-        event.receiverId(),
-        "새로운 메시지가 도착했습니다: " + event.content()
-    );
+    try {
+      sseService.sendNotification(
+          event.receiverId(),
+          "새로운 메시지가 도착했습니다: " + event.content()
+      );
+    } catch (Exception e) {
+      log.warn("DM SSE 전송 실패 - messageId: {}, receiverId: {}", event.messageId(), event.receiverId(), e);
+    }
   }
 }

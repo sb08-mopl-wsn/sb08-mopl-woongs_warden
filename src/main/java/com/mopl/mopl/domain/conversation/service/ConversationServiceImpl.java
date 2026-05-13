@@ -85,6 +85,9 @@ public class ConversationServiceImpl implements ConversationService{
     if (request.limit() == null || request.limit() <= 0) {
       throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "limit은 1 이상의 값이어야 합니다.");
     }
+    if (request.limit() > 100) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "limit은 100 이하의 값이어야 합니다.");
+    }
 
     // 커서-id 쌍 검증
     boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();

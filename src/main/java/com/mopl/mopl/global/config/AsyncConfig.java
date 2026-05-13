@@ -15,11 +15,7 @@ public class AsyncConfig implements AsyncConfigurer {
 
     public static final String WATCHING_SESSION_EXECUTOR = "watchingSessionExecutor";
     public static final String NOTIFICATION_EXECUTOR = "notificationExecutor";
-
-    // TODO: 추후 추가할 예정
-//    @Override
-//    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
-//    }
+    public static final String DIRECT_MESSAGE_EXECUTOR = "directMessageExecutor";
 
     @Bean(name = WATCHING_SESSION_EXECUTOR)
     public Executor watchingSessionExecutor() {
@@ -50,6 +46,21 @@ public class AsyncConfig implements AsyncConfigurer {
 
         // 큐 500개도 꽉 차면, 알림을 발생시킨 스레드가 직접 처리하게 함
         // TODO: 추후 Kafka 기반 알림 비동기 큐가 도입되고 Retry 로직 구축 후에는 메인 스레드 지연을 막기 위해 AbortPolicy로 변경할 것
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(20);
+        return executor;
+    }
+
+    @Bean(name = DIRECT_MESSAGE_EXECUTOR)
+    public Executor directMessageExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("dm-async");
+
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
 
         executor.setWaitForTasksToCompleteOnShutdown(true);

@@ -15,6 +15,7 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.domain.dm.entity.DirectMessage;
 import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
+import com.mopl.mopl.global.event.DirectMessageSentEvent;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import java.time.Instant;
@@ -73,7 +74,14 @@ public class DirectMessageServiceImpl implements DirectMessageService{
         request.content()
     ));
 
-    return messageMapper.toDto(savedMessage);
+    DirectMessageDto messageDto = messageMapper.toDto(savedMessage);
+
+    eventPublisher.publishEvent(new DirectMessageSentEvent(
+            conversationId,
+            messageDto
+    ));
+
+    return messageDto;
   }
 
   @Override

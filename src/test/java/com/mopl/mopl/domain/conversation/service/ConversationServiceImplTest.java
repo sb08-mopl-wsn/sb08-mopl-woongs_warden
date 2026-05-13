@@ -17,6 +17,8 @@ import com.mopl.mopl.domain.conversation.entity.Conversation;
 import com.mopl.mopl.domain.conversation.exception.ConversationAccessDeniedException;
 import com.mopl.mopl.domain.conversation.mapper.ConversationMapper;
 import com.mopl.mopl.domain.conversation.repository.ConversationRepository;
+import com.mopl.mopl.domain.dm.mapper.DirectMessageMapper;
+import com.mopl.mopl.domain.dm.repository.DirectMessageRepository;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
@@ -53,6 +55,12 @@ class ConversationServiceImplTest {
   @Mock
   private ConversationMapper conversationMapper;
 
+  @Mock
+  private DirectMessageRepository directMessageRepository;
+
+  @Mock
+  private DirectMessageMapper directMessageMapper;
+
   private User sender;
   private User receiver;
   private UUID currentUserId;
@@ -85,7 +93,8 @@ class ConversationServiceImplTest {
     String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
     given(conversationRepository.findByParticipantPairKey(pairKey)).willReturn(Optional.empty());
     given(conversationRepository.save(any(Conversation.class))).willReturn(newConv);
-    given(conversationMapper.toDto(newConv, currentUserId)).willReturn(expectedDto);
+    given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
+    given(conversationMapper.toDto(newConv, currentUserId, null)).willReturn(expectedDto);
 
     // when
     ConversationDto result = conversationService.createConversation(currentUserId, request);
@@ -109,7 +118,8 @@ class ConversationServiceImplTest {
     // 기존 방이 존재한다고 설정
     String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
     given(conversationRepository.findByParticipantPairKey(pairKey)).willReturn(Optional.of(existingConv));
-    given(conversationMapper.toDto(existingConv, currentUserId)).willReturn(expectedDto);
+    given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
+    given(conversationMapper.toDto(existingConv, currentUserId, null)).willReturn(expectedDto);
 
     // when
     ConversationDto result = conversationService.createConversation(currentUserId, request);
@@ -204,9 +214,11 @@ class ConversationServiceImplTest {
 
     // given
     String cursor = Instant.now().toString();
-    CursorPaginationRequest request = new CursorPaginationRequest(cursor, null, 10, "DESCENDING", "updatedAt");
+    UUID idAfter = UUID.randomUUID();
 
-    given(conversationRepository.findMyConversationsByCursorDesc(eq(currentUserId), any(Instant.class), eq(null), any(PageRequest.class)))
+    CursorPaginationRequest request = new CursorPaginationRequest(cursor, idAfter, 10, "DESCENDING", "updatedAt");
+
+    given(conversationRepository.findMyConversationsByCursorDesc(any(UUID.class), any(Instant.class), any(UUID.class), any(PageRequest.class)))
         .willReturn(new ArrayList<>());
 
     // when
@@ -242,8 +254,9 @@ class ConversationServiceImplTest {
         .willReturn(mockConvs);
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(6L);
     given(conversationRepository.countByReceiverId(currentUserId)).willReturn(4L);
+    given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
 
-    given(conversationMapper.toDto(any(), any())).willReturn(
+    given(conversationMapper.toDto(any(), any(), any())).willReturn(
         new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false)
     );
 
@@ -280,7 +293,8 @@ class ConversationServiceImplTest {
     given(conversationRepository.save(any(Conversation.class)))
         .willThrow(new DataIntegrityViolationException("Unique constraint violation"));
 
-    given(conversationMapper.toDto(concurrentConv, currentUserId)).willReturn(expectedDto);
+    given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
+    given(conversationMapper.toDto(concurrentConv, currentUserId, null)).willReturn(expectedDto);
 
     // when
     ConversationDto result = conversationService.createConversation(currentUserId, request);

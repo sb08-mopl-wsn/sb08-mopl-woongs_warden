@@ -193,17 +193,17 @@ class ConversationServiceImplTest {
   }
 
   @Test
-  @DisplayName("목록 조회 - sortBy 파라미터가 updatedAt이 아닌 다른 값이면 400 에러 발생")
+  @DisplayName("목록 조회 - sortBy 파라미터가 updatedAt 또는 createdAt이 아닌 다른 값이면 400 에러 발생")
   void getMyConversations_InvalidSortBy_ThrowsException() {
 
     // given
     // 클라이언트가 지원하지 않는 createdAt이나 invalidSort를 보낸 상황
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "createdAt");
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "invalidSort");
 
     // when & then
     assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
         .isInstanceOf(BusinessException.class)
-        .hasMessageContaining("'updatedAt'만 지원합니다.");
+        .hasMessageContaining("지원합니다.");
 
     verify(conversationRepository, never()).findMyConversationsByCursorDesc(any(), any(), any(), any());
   }

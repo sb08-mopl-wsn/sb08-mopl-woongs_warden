@@ -10,8 +10,8 @@ import org.springframework.beans.factory.annotation.Value;
 
 @Mapper(componentModel = "spring")
 public abstract class UserMapper {
-//    @Value()   // 나중에 이미지 기본경로 추가해주기, yaml에서 불러와야할 듯
-    protected String imageBaseUrl = null; // 임시로 null
+    @Value("${cloud.aws.s3.cdn-url}")   // 나중에 이미지 기본경로 추가해주기, yaml에서 불러와야할 듯
+    protected String imageBaseUrl; // 임시로 null
 
     @Mapping(target = "profileImageUrl",  source = "profileImageKey", qualifiedByName = "buildProfileImageUrl")
     public abstract UserDto toDto(User user);
@@ -21,7 +21,17 @@ public abstract class UserMapper {
         if (profileImageKey == null || profileImageKey.isEmpty()) {
             return null;  // 기본 이미지 있다면 그걸로 바꾸기
         }
-        String baseUrl = (imageBaseUrl == null) ? "" : imageBaseUrl;
-        return imageBaseUrl + profileImageKey;
+
+        String baseUrl = imageBaseUrl;
+
+        if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
+            baseUrl = "https://" + baseUrl;
+        }
+
+        if (baseUrl.endsWith("/")) {
+            return baseUrl + profileImageKey;
+        }
+
+        return baseUrl + "/" + profileImageKey;
     }
 }

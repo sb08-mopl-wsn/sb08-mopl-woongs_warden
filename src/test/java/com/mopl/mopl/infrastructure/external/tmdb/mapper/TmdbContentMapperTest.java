@@ -62,6 +62,8 @@ class TmdbContentMapperTest
 
         assertThat(content.getTitle()).isEqualTo("기묘한 이야기");
         assertThat(content.getContentType()).isEqualTo(ContentType.tvSeries);
+        assertThat(content.getThumbnailKey()).isEqualTo(ExternalApiConstants.IMAGE_BASE_URL + "/tv_poster.jpg");
+        assertThat(content.getExternalId()).isEqualTo("2");
     }
 
     @Test

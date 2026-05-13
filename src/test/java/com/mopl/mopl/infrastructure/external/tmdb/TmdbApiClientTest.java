@@ -1,7 +1,10 @@
 package com.mopl.mopl.infrastructure.external.tmdb;
 
+import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.TmdbMovie;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.TmdbTv;
+import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbGenreListResponse;
+import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbGenreListResponse.Genre;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbMovieListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbTvListResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,10 +19,12 @@ import org.springframework.web.client.RestClient.RequestHeadersUriSpec;
 import org.springframework.web.client.RestClient.ResponseSpec;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -77,5 +82,43 @@ class TmdbApiClientTest
         // then
         assertThat(result.results()).hasSize(1);
         assertThat(result.results().getFirst().name()).isEqualTo("테스트 TV");
+    }
+
+    @Test
+    @DisplayName("장르 맵 조회 성공")
+    void givenValidUri_whenFetchGenreMap_thenReturnsGenreMap() {
+        // given
+        Genre action = new Genre(28, "액션");
+        Genre thriller = new Genre(53, "스릴러");
+        TmdbGenreListResponse expected = new TmdbGenreListResponse(List.of(action, thriller));
+
+        doReturn(requestHeadersUriSpec).when(restClient).get();
+        doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
+        doReturn(responseSpec).when(requestHeadersSpec).retrieve();
+        doReturn(expected).when(responseSpec).body(TmdbGenreListResponse.class);
+
+        // when
+        Map<Integer, String> result = tmdbApiClient.fetchGenreMap(ExternalApiConstants.MOVIE_GENRE_LIST);
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result.get(28)).isEqualTo("액션");
+        assertThat(result.get(53)).isEqualTo("스릴러");
+    }
+
+    @Test
+    @DisplayName("장르 응답이 null이면 빈 맵 반환")
+    void givenNullResponse_whenFetchGenreMap_thenReturnsEmptyMap() {
+        // given
+        doReturn(requestHeadersUriSpec).when(restClient).get();
+        doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
+        doReturn(responseSpec).when(requestHeadersSpec).retrieve();
+        doReturn(null).when(responseSpec).body(TmdbGenreListResponse.class);
+
+        // when
+        Map<Integer, String> result = tmdbApiClient.fetchGenreMap(ExternalApiConstants.MOVIE_GENRE_LIST);
+
+        // then
+        assertThat(result).isEmpty();
     }
 }

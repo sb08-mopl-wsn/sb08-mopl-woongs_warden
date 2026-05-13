@@ -53,7 +53,7 @@ class SportsdbContentMapperTest
     @DisplayName("dateEvent가 null이면 releaseDate도 null")
     void givenNullDateEvent_whenSportToContent_thenReleaseDateIsNull() {
         SportsdbEvent event = new SportsdbEvent(
-                "Test Match", "1", null, "filename",
+                "Test Match", "1", "https://thumb.jpg", "filename",
                 "venue", "La Liga", "Soccer", "123", null
         );
 

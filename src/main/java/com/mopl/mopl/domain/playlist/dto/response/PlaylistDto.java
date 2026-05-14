@@ -1,5 +1,6 @@
 package com.mopl.mopl.domain.playlist.dto.response;
 
+import com.mopl.mopl.domain.content.dto.response.ContentSummary;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import java.time.Instant;
 import java.util.List;
@@ -13,9 +14,6 @@ public record PlaylistDto(
     Instant updatedAt,
     Long subscriberCount,
     Boolean subscribedByMe,
-
-    // TODO: ContentSummary DTO 생성 후 아래 라인의 주석을 해제, List<Object> 라인을 제거
-    // List<ContentSummary> contents
-    List<Object> contents // 임시 List<Object>사용
+    List<ContentSummary> contents
 ) {
 }

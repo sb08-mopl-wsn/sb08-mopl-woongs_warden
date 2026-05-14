@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -206,11 +207,20 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
      * @return 시청 세션 정보 (시청 중이 아니면 Empty)
      */
     @Override
-    public WatchingSessionDto findCurrentWatchingSessionByUserId(UUID userId) {
+    public Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID userId, UUID currentUserId) {
 
-        return watchingSessionRepository.findByUserId(userId)
-                .map(sessionMapper::toDto)
-                .orElseThrow(() -> new UserNotFoundException(userId));
+        // 실시간 같이 보기에서 자신의 프로필을 누른 경우 API가 STOMP보다 빨리 실행되어 자신의 시청 세션이 삭제되지 않음.
+        if (userId.equals(currentUserId)) {
+            return Optional.empty();
+        }
+
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
+        }
+
+        // 시청 세션 조회: 없으면 null 반환 (Swagger 명세 준수)
+        return watchingSessionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+                .map(sessionMapper::toDto);
     }
 
     // 시청 세션 이벤트 발행

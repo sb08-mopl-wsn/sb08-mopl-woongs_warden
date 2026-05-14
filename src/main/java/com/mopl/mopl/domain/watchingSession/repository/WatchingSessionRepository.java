@@ -30,5 +30,5 @@ public interface WatchingSessionRepository extends JpaRepository<WatchingSession
             ORDER BY ws.createdAt DESC
             LIMIT 1
     """)
-    Optional<WatchingSession> findByUserId(@Param("userId") UUID userId);
+    Optional<WatchingSession> findFirstByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId);
 }

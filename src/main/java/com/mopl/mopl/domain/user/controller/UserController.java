@@ -17,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -98,24 +99,10 @@ public class UserController {
             @PathVariable UUID watcherId,
             @AuthenticationPrincipal MoplUserDetails userDetails
     ) {
-        UUID currentId = userDetails.getUserDto().id();
+        UUID currentUserId = userDetails.getUserDto().id();
 
-        // 해당 주석은 코드 리뷰 이후 삭제하겠습니다.
-        // 실시간 채팅에서 시청자 목록에 있는 자신의 프로필을 클릭할 경우
-        // STOMP 리스너에서 API 호출이 handleUnSubscribe보다 빨리 실행돼서 시청 세션이 조회되는 문제가 생깁니다.
-        // 결국 페이지 이동이 일어나기 때문에 시청 세션이 날아가고
-        // 현재 접속자의 ID와 특정 시청자의 ID가 같을 경우 null을 반환하도록 설정하였습니다.
-        if (currentId.equals(watcherId)) {
-            return ResponseEntity.
-                    status(HttpStatus.OK)
-                    .body(null);
-        }
+        Optional<WatchingSessionDto> sessionDto = watchingSessionService.findCurrentWatchingSessionByUserId(watcherId, currentUserId);
 
-        WatchingSessionDto sessionDto =
-                watchingSessionService.findCurrentWatchingSessionByUserId(watcherId);
-
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(sessionDto);
+        return ResponseEntity.ok(sessionDto.orElse(null));
     }
 }

@@ -5,6 +5,7 @@ import com.mopl.mopl.domain.playlist.dto.request.PlaylistSearchRequest;
 import com.mopl.mopl.domain.playlist.dto.request.PlaylistUpdateRequest;
 import com.mopl.mopl.domain.playlist.dto.response.CursorResponsePlaylistDto;
 import com.mopl.mopl.domain.playlist.dto.response.PlaylistDto;
+import com.mopl.mopl.domain.playlist.service.PlaylistContentService;
 import com.mopl.mopl.domain.playlist.service.PlaylistService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.validation.Valid;
@@ -29,6 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlaylistController {
 
   private final PlaylistService playlistService;
+  private final PlaylistContentService playlistContentService;
+
 
   @PostMapping
   public ResponseEntity<PlaylistDto> createPlaylist(
@@ -78,6 +81,28 @@ public class PlaylistController {
   ) {
     UUID userId = userDetails.getUserDto().id();
     playlistService.deletePlaylist(playlistId, userId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/{playlistId}/contents/{contentId}")
+  public ResponseEntity<Void> addContentToPlaylist(
+      @PathVariable UUID playlistId,
+      @PathVariable UUID contentId,
+      @AuthenticationPrincipal MoplUserDetails userDetails
+  ) {
+    UUID userId = userDetails.getUserDto().id();
+    playlistContentService.addContentToPlaylist(playlistId, contentId, userId);
+    return ResponseEntity.status(HttpStatus.CREATED).build();
+  }
+
+  @DeleteMapping("/{playlistId}/contents/{contentId}")
+  public ResponseEntity<Void> removeContentFromPlaylist(
+      @PathVariable UUID playlistId,
+      @PathVariable UUID contentId,
+      @AuthenticationPrincipal MoplUserDetails userDetails
+  ) {
+    UUID userId = userDetails.getUserDto().id();
+    playlistContentService.removeContentFromPlaylist(playlistId, contentId, userId);
     return ResponseEntity.noContent().build();
   }
 }

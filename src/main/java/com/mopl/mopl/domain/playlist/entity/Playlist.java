@@ -55,4 +55,14 @@ public class Playlist extends BaseUpdatableEntity {
             this.description = description;
         }
     }
+
+    public void increaseContentCount() {
+        this.contentCount++;
+    }
+
+    public void decreaseContentCount() {
+        if (this.contentCount > 0) {
+            this.contentCount--;
+        }
+    }
 }

@@ -16,10 +16,8 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
-import com.mopl.mopl.global.exception.mail.MailFailedSendException;
+import com.mopl.mopl.global.event.user.UserPasswordInitEvent;
 import com.nimbusds.jose.JOSEException;
-import jakarta.mail.Session;
-import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,13 +28,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.mail.javamail.JavaMailSender;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,13 +63,13 @@ class AuthServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private JavaMailSender mailSender;
-
-    @Mock
     private HttpServletResponse response;
 
     @InjectMocks
     private AuthServiceImpl authService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @BeforeEach
     void setUp() {
@@ -343,22 +340,23 @@ class AuthServiceImplTest {
             String encodedTempPassword = "encodedTempPassword";
 
             User user = mock(User.class);
-            MimeMessage mimeMessage = new MimeMessage(
-                    Session.getDefaultInstance(new Properties())
-            );
 
             when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
             when(user.getPassword()).thenReturn(originPassword);
             when(user.getEmail()).thenReturn(email);
+            when(user.getName()).thenReturn("테스트유저");
+            when(user.getId()).thenReturn(UUID.randomUUID());
             when(passwordEncoder.encode(anyString())).thenReturn(encodedTempPassword);
-            when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
 
             authService.initUserPassword(email);
 
-            ArgumentCaptor<String> rawPasswordCaptor = ArgumentCaptor.forClass(String.class);
+            ArgumentCaptor<String> rawPasswordCaptor =
+                    ArgumentCaptor.forClass(String.class);
+
             verify(passwordEncoder).encode(rawPasswordCaptor.capture());
 
             String rawPassword = rawPasswordCaptor.getValue();
+
             assertThat(rawPassword).hasSize(8);
 
             verify(user).updateTemporaryPassword(
@@ -366,7 +364,10 @@ class AuthServiceImplTest {
                     eq(originPassword),
                     any(Instant.class)
             );
-            verify(mailSender).send(mimeMessage);
+
+            verify(eventPublisher).publishEvent(
+                    isA(UserPasswordInitEvent.class)
+            );
         }
 
         @Test
@@ -379,37 +380,7 @@ class AuthServiceImplTest {
             assertThatThrownBy(() -> authService.initUserPassword(email))
                     .isInstanceOf(UserNotFoundException.class);
 
-            verifyNoInteractions(passwordEncoder, mailSender);
-        }
-
-        @Test
-        @DisplayName("메일 주소 설정 실패 시 MailFailedSendException")
-        void initUserPassword_mailSendFail() {
-            String email = "user@test.com";
-            String originPassword = "originEncodedPassword";
-            String encodedTempPassword = "encodedTempPassword";
-
-            User user = mock(User.class);
-            MimeMessage mimeMessage = new MimeMessage(
-                    Session.getDefaultInstance(new Properties())
-            );
-
-            when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
-            when(user.getPassword()).thenReturn(originPassword);
-            when(user.getEmail()).thenReturn("");
-            when(passwordEncoder.encode(anyString())).thenReturn(encodedTempPassword);
-            when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-
-            assertThatThrownBy(() -> authService.initUserPassword(email))
-                    .isInstanceOf(MailFailedSendException.class);
-
-            verify(user).updateTemporaryPassword(
-                    eq(encodedTempPassword),
-                    eq(originPassword),
-                    any(Instant.class)
-            );
-
-            verify(mailSender, never()).send(any(MimeMessage.class));
+            verifyNoInteractions(passwordEncoder, eventPublisher);
         }
     }
 }

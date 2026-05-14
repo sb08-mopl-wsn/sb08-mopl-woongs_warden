@@ -6,6 +6,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -49,7 +50,7 @@ public class MailService {
 
             mailSender.send(message);
 
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             throw new MailFailedSendException(e.getMessage());
         }
     }
@@ -59,13 +60,9 @@ public class MailService {
         try {
             String html = loadMailTemplate("templates/mail/AccountLock.html");
 
-            String meg = null;
-            if (lock) {
-                meg = "계정이 정지 되었습니다. 운영자 이메일로 문의해보세요.";
-            } else {
-                meg = "계정 정지가 해제 되었습니다.";
-            }
-
+            String meg = lock
+                    ? "계정이 정지 되었습니다. 운영자 이메일로 문의해보세요."
+                    : "계정 정지가 해제 되었습니다.";
 
             html = html.replace("{{meg}}", meg);
             html = html.replace("{{name}}", name);
@@ -84,7 +81,7 @@ public class MailService {
 
             mailSender.send(message);
 
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             throw new MailFailedSendException(e.getMessage());
         }
     }

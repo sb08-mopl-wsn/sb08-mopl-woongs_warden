@@ -45,7 +45,7 @@ public class UserEventListener {
         // SSE 푸시 알림 발송
         try {
             mailService.userLockedUpdate(
-                    event.userEamil(),
+                    event.userEmail(),
                     event.isLocked(),
                     event.name()
             );
@@ -57,7 +57,7 @@ public class UserEventListener {
 
     @Async(AsyncConfig.USER_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onUserPassowrdInit(UserPasswordInitEvent event) {
+    public void onUserPasswordInit(UserPasswordInitEvent event) {
         log.info("[UserEvent] 비밀번호 초기화 이벤트 발생 - name: {}, id: {}", event.username(), event.userId());
 
         // SSE 푸시 알림 발송

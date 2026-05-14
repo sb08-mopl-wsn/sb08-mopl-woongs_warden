@@ -6,6 +6,6 @@ public record UserUpdateLockEvent(
         UUID userId,
         String name,
         boolean isLocked,
-        String userEamil
+        String userEmail
 ) {
 }

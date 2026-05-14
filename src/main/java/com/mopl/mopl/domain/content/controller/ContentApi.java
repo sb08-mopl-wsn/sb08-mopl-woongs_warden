@@ -35,7 +35,7 @@ public interface ContentApi
                     responseCode = "201",
                     description = "콘텐츠 생성 성공",
                     content = @Content(
-                            mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = ContentDto.class)
                     )
             )

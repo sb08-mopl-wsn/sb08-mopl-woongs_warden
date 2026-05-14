@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -197,6 +198,18 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                 request.sortBy(),
                 request.sortDirection()
         );
+    }
+
+    @Override
+    public WatchingSessionDto findByUserInWatchingSession(UUID userId) {
+
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
+        }
+
+        return watchingSessionRepository.findByUserId(userId)
+                .map(sessionMapper::toDto)
+                .orElse(null);
     }
 
     // 시청 세션 이벤트 발행

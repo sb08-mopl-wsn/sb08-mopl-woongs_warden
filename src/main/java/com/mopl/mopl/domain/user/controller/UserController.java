@@ -4,6 +4,9 @@ import com.mopl.mopl.domain.user.dto.CursorResponseUserDto;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.dto.request.*;
 import com.mopl.mopl.domain.user.service.UserService;
+import com.mopl.mopl.domain.watchingSession.dto.response.WatchingSessionDto;
+import com.mopl.mopl.domain.watchingSession.entity.WatchingSession;
+import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +26,7 @@ import java.util.UUID;
 @Slf4j
 public class UserController {
     private final UserService userService;
+    private final WatchingSessionService watchingSessionService;
 
     @PostMapping
     public ResponseEntity<UserDto> createUser(
@@ -88,5 +92,16 @@ public class UserController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(updatedUser);
+    }
+
+    @GetMapping("/{watcherId}/watching-sessions")
+    public ResponseEntity<WatchingSessionDto> findWatchingSession(
+            @PathVariable UUID watcherId
+    ) {
+        WatchingSessionDto sessionDto = watchingSessionService.findByUserInWatchingSession(watcherId);
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(sessionDto);
     }
 }

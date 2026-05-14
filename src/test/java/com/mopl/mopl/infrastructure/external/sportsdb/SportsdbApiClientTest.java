@@ -49,12 +49,12 @@ class SportsdbApiClientTest
         SportsdbEventResponse expected = new SportsdbEventResponse(List.of(event));
 
         when(restClient.get()).thenReturn(requestHeadersUriSpec);
-        when(requestHeadersUriSpec.uri(anyString(), anyInt(), anyString())).thenReturn(requestHeadersSpec);
+        when(requestHeadersUriSpec.uri(anyString(), anyString(), anyInt())).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(SportsdbEventResponse.class)).thenReturn(expected);
 
         // when
-        List<SportsdbEvent> result = sportsDbApiClient.fetchSeasonEvents(4328);
+        List<SportsdbEvent> result = sportsDbApiClient.fetchDayEvents(4328);
 
         // then
         assertThat(result).hasSize(1);
@@ -66,12 +66,12 @@ class SportsdbApiClientTest
     void givenNullResponse_whenFetchSeasonEvents_thenReturnsEmptyList() {
         // given
         when(restClient.get()).thenReturn(requestHeadersUriSpec);
-        when(requestHeadersUriSpec.uri(anyString(), anyInt(), anyString())).thenReturn(requestHeadersSpec);
+        when(requestHeadersUriSpec.uri(anyString(), anyString(), anyInt())).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(SportsdbEventResponse.class)).thenReturn(null);
 
         // when
-        List<SportsdbEvent> result = sportsDbApiClient.fetchSeasonEvents(4328);
+        List<SportsdbEvent> result = sportsDbApiClient.fetchDayEvents(4328);
 
         // then
         assertThat(result).isEmpty();

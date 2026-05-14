@@ -51,4 +51,18 @@ public class DirectMessageController {
     DirectMessageDto response = messageService.sendMessage(currentUserId, conversationId, request);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
+
+  // 메시지 읽음 처리
+  @PostMapping("/{directMessageId}/read")
+  public ResponseEntity<Void> readMessage(
+      @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
+      @PathVariable("conversationId") UUID conversationId,
+      @PathVariable("directMessageId") UUID directMessageId
+  ) {
+
+    UUID currentUserId = userDetails.getUserDto().id();
+    messageService.readMessage(currentUserId, conversationId, directMessageId);
+
+    return ResponseEntity.ok().build();
+  }
 }

@@ -13,4 +13,7 @@ public interface DirectMessageService {
 
   // 이전 대화 내역 불러오기
   CursorResponseDirectMessageDto getMessages(UUID currentUserId, UUID conversationId, CursorPaginationRequest request);
+
+  // 대화방의 읽음 상태 업데이트
+  void readMessage(UUID currentUserId, UUID conversationId, UUID messageId);
 }

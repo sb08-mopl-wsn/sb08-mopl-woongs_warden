@@ -10,8 +10,12 @@ import com.mopl.mopl.domain.user.exception.UserDuplicateException;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.event.user.UserEvent;
+import com.mopl.mopl.global.event.user.UserUpdateLockEvent;
+import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,8 +29,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import static org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK;
-
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -35,6 +37,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtRegistry jwtRegistry;  //todo 분산에서는 다른걸로
     private final S3ImageStorage s3ImageStorage;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -46,9 +49,9 @@ public class UserServiceImpl implements UserService {
         String password = passwordEncoder.encode(request.password());
         User user = new User(request.name(), request.email(), password, null, null);
 
-        // todo 나중에 이벤트로 알리기
-        userRepository.save(user);
-        return userMapper.toDto(user);
+        UserDto userDto = userMapper.toDto(userRepository.save(user));
+        eventPublisher.publishEvent(UserEvent.of(user));
+        return userDto;
     }
 
     @Override
@@ -113,8 +116,8 @@ public class UserServiceImpl implements UserService {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        // todo 이벤트로 변경 알리기
         target.updateRole(request.role());
+        eventPublisher.publishEvent(UserUpdateRoleEvent.of(target));
         return userMapper.toDto(target);
     }
 
@@ -145,7 +148,8 @@ public class UserServiceImpl implements UserService {
         } else {
             target.unlock();
         }
-        // todo 나중에 이벤트 변경 알리기, 정지면 메일로 보내야 할거 같다
+
+        eventPublisher.publishEvent(UserUpdateLockEvent.of(target));
         return userMapper.toDto(target);
     }
 
@@ -176,7 +180,6 @@ public class UserServiceImpl implements UserService {
                         }
                     }
             );
-
             user.updateProfileImage(key);
         }
 
@@ -184,6 +187,7 @@ public class UserServiceImpl implements UserService {
             user.updateName(request.name());
         }
 
+        eventPublisher.publishEvent(UserEvent.of(user));
         return userMapper.toDto(user);
     }
 }

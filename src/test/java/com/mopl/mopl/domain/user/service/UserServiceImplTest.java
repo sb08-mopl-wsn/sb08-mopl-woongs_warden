@@ -17,6 +17,9 @@ import com.mopl.mopl.domain.user.exception.UserDuplicateException;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.event.user.UserEvent;
+import com.mopl.mopl.global.event.user.UserUpdateLockEvent;
+import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -64,6 +68,9 @@ class UserServiceImplTest {
     @Mock
     private S3ImageStorage s3ImageStorage;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private UserServiceImpl userService;
 
     @BeforeEach
@@ -73,7 +80,8 @@ class UserServiceImplTest {
                 userMapper,
                 passwordEncoder,
                 jwtRegistry,
-                s3ImageStorage
+                s3ImageStorage,
+                eventPublisher
         );
     }
 
@@ -275,7 +283,11 @@ class UserServiceImplTest {
 
         given(userRepository.existsByEmail(request.email())).willReturn(false);
         given(passwordEncoder.encode(request.password())).willReturn("encoded-password");
-        given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(userRepository.save(any(User.class))).willAnswer(invocation -> {
+            User savedUser = invocation.getArgument(0);
+            ReflectionTestUtils.setField(savedUser, "id", userId);
+            return savedUser;
+        });
         given(userMapper.toDto(any(User.class))).willReturn(expected);
 
         UserDto result = userService.createUser(request);
@@ -292,6 +304,8 @@ class UserServiceImplTest {
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
         assertThat(savedUser.getRole()).isEqualTo(Role.USER);
         assertThat(savedUser.isLocked()).isFalse();
+
+        verify(eventPublisher).publishEvent(isA(UserEvent.class));
     }
 
     @Test
@@ -309,7 +323,7 @@ class UserServiceImplTest {
                 .isInstanceOf(UserDuplicateException.class);
 
         verify(userRepository, never()).save(any(User.class));
-        verifyNoInteractions(passwordEncoder, userMapper);
+        verifyNoInteractions(passwordEncoder, userMapper, eventPublisher);
     }
 
     @Test
@@ -365,6 +379,8 @@ class UserServiceImplTest {
 
         assertThat(result).isEqualTo(expected);
         assertThat(user.getRole()).isEqualTo(Role.ADMIN);
+
+        verify(eventPublisher).publishEvent(isA(UserUpdateRoleEvent.class));
     }
 
     @Test
@@ -378,7 +394,7 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> userService.updateUserRole(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 
-        verifyNoInteractions(userMapper);
+        verifyNoInteractions(userMapper, eventPublisher);
     }
 
     @Test
@@ -400,6 +416,7 @@ class UserServiceImplTest {
         assertThat(user.getPassword()).isEqualTo("new-encoded-password");
 
         verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -413,7 +430,7 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> userService.updateUserPassword(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 
-        verifyNoInteractions(passwordEncoder, jwtRegistry, userMapper);
+        verifyNoInteractions(passwordEncoder, jwtRegistry, userMapper, eventPublisher);
     }
 
     @Test
@@ -443,6 +460,7 @@ class UserServiceImplTest {
         assertThat(user.isLocked()).isTrue();
 
         verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
+        verify(eventPublisher).publishEvent(isA(UserUpdateLockEvent.class));
     }
 
     @Test
@@ -473,6 +491,7 @@ class UserServiceImplTest {
         assertThat(user.isLocked()).isFalse();
 
         verify(jwtRegistry, never()).invalidateJwtInformationByUserId(any(UUID.class));
+        verify(eventPublisher).publishEvent(isA(UserUpdateLockEvent.class));
     }
 
     @Test
@@ -486,7 +505,7 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> userService.updateUserLocked(userId, request))
                 .isInstanceOf(UserNotFoundException.class);
 
-        verifyNoInteractions(jwtRegistry, userMapper);
+        verifyNoInteractions(jwtRegistry, userMapper, eventPublisher);
     }
 
     @Test
@@ -530,6 +549,7 @@ class UserServiceImplTest {
 
         verify(s3ImageStorage).upload(profile, "profile");
         verify(userMapper).toDto(user);
+        verify(eventPublisher).publishEvent(isA(UserEvent.class));
     }
 
     @Test
@@ -577,6 +597,7 @@ class UserServiceImplTest {
 
         verify(s3ImageStorage).upload(profile, "profile");
         verify(s3ImageStorage).delete(uploadedKey);
+        verify(eventPublisher).publishEvent(isA(UserEvent.class));
     }
 
     @Test
@@ -607,6 +628,7 @@ class UserServiceImplTest {
 
         verifyNoInteractions(s3ImageStorage);
         verify(userMapper).toDto(user);
+        verify(eventPublisher).publishEvent(isA(UserEvent.class));
     }
 
     @Test
@@ -650,6 +672,7 @@ class UserServiceImplTest {
 
         verify(s3ImageStorage).upload(profile, "profile");
         verify(userMapper).toDto(user);
+        verify(eventPublisher).publishEvent(isA(UserEvent.class));
     }
 
     @Test
@@ -687,6 +710,7 @@ class UserServiceImplTest {
 
         verifyNoInteractions(s3ImageStorage);
         verify(userMapper).toDto(user);
+        verify(eventPublisher).publishEvent(isA(UserEvent.class));
     }
 
     @Test
@@ -700,7 +724,7 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> userService.updateProfile(userId, request, null))
                 .isInstanceOf(UserNotFoundException.class);
 
-        verifyNoInteractions(s3ImageStorage, userMapper);
+        verifyNoInteractions(s3ImageStorage, userMapper, eventPublisher);
     }
 
     private void initTransactionSynchronization() {

@@ -208,13 +208,9 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
     @Override
     public WatchingSessionDto findCurrentWatchingSessionByUserId(UUID userId) {
 
-        if (!userRepository.existsById(userId)) {
-            throw new UserNotFoundException(userId);
-        }
-
         return watchingSessionRepository.findByUserId(userId)
                 .map(sessionMapper::toDto)
-                .orElse(null);
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 
     // 시청 세션 이벤트 발행

@@ -12,4 +12,9 @@ public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSu
 
   // 사용자와 플레이리스트로 특정 구독 정보를 찾기 위해 사용 (구독 여부 확인, 구독 취소 시)
   Optional<PlaylistSubscription> findByUserAndPlaylist(User user, Playlist playlist);
+
+  boolean existsByUserIdAndPlaylistId(UUID userId, UUID playlistId);
+
+  //플리가 삭제될 때 구독자 정보 모두 삭제
+  void deleteAllByPlaylistId(UUID playlistId);
 }

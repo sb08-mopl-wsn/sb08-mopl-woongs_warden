@@ -199,8 +199,14 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
         );
     }
 
+    /**
+     * 특정 유저가 현재 시청 중인 세션을 조회합니다.
+     *
+     * @param userId 조회할 유저 ID
+     * @return 시청 세션 정보 (시청 중이 아니면 Empty)
+     */
     @Override
-    public WatchingSessionDto findByUserInWatchingSession(UUID userId) {
+    public WatchingSessionDto findCurrentWatchingSessionByUserId(UUID userId) {
 
         if (!userRepository.existsById(userId)) {
             throw new UserNotFoundException(userId);

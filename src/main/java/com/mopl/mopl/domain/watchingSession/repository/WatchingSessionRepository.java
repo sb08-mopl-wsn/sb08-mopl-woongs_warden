@@ -21,11 +21,14 @@ public interface WatchingSessionRepository extends JpaRepository<WatchingSession
     // 특정 세션 조회
     Optional<WatchingSession> findByContentIdAndUserId(UUID contentId, UUID userId);
 
+    // 하나의 사용자가 다른 콘텐츠를 시청은 가능하므로 최신 기준으로 하나 가져옵니다.
     @Query("""
             SELECT ws FROM WatchingSession ws
             JOIN FETCH ws.user
             JOIN FETCH ws.content
             WHERE ws.user.id = :userId
+            ORDER BY ws.createdAt DESC
+            LIMIT 1
     """)
     Optional<WatchingSession> findByUserId(@Param("userId") UUID userId);
 }

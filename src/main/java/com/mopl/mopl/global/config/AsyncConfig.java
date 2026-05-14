@@ -16,6 +16,7 @@ public class AsyncConfig implements AsyncConfigurer {
     public static final String WATCHING_SESSION_EXECUTOR = "watchingSessionExecutor";
     public static final String NOTIFICATION_EXECUTOR = "notificationExecutor";
     public static final String DIRECT_MESSAGE_EXECUTOR = "directMessageExecutor";
+    public static final String USER_EXECUTOR = "userExecutor";
 
     @Bean(name = WATCHING_SESSION_EXECUTOR)
     public Executor watchingSessionExecutor() {
@@ -60,6 +61,21 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(10);
         executor.setQueueCapacity(200);
         executor.setThreadNamePrefix("dm-async");
+
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(20);
+        return executor;
+    }
+
+    @Bean(name = USER_EXECUTOR)
+    public Executor userExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("user-");
 
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
 

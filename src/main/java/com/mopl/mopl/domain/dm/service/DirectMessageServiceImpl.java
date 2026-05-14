@@ -67,14 +67,14 @@ public class DirectMessageServiceImpl implements DirectMessageService{
         ? conversation.getReceiver().getId()
         : conversation.getSender().getId();
 
+    DirectMessageDto messageDto = messageMapper.toDto(savedMessage);
+
     // TODO: EventPublisher 형식으로 디커플링 가능
     eventPublisher.publishEvent(new DirectMessageCreatedEvent(
-        savedMessage.getId(),
+        conversationId,
         receiverId,
-        request.content()
+        messageDto
     ));
-
-    DirectMessageDto messageDto = messageMapper.toDto(savedMessage);
 
     eventPublisher.publishEvent(new DirectMessageSentEvent(
             conversationId,
@@ -155,6 +155,21 @@ public class DirectMessageServiceImpl implements DirectMessageService{
         request.sortDirection()
     );
   }
+
+  @Override
+  @Transactional
+  public void readMessage(UUID currentUserId, UUID conversationId, UUID messageId) {
+
+    Conversation conversation = conversationRepository.findById(conversationId)
+        .orElseThrow(() -> new ConversationNotFoundException(conversationId));
+
+    // 내 방인지 권한 검사
+    validateConversationAccess(conversation, currentUserId);
+
+    // 방의 읽음 상태(hasUnread)를 false로 업데이트
+    conversation.updateUnreadStatus(false);
+  }
+
 
   private void validateConversationAccess(Conversation conv, UUID userId) {
     if (!conv.getSender().getId().equals(userId) && !conv.getReceiver().getId().equals(userId)) {

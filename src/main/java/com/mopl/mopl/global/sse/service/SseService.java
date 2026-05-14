@@ -83,6 +83,7 @@ public class SseService {
 
       // notifications 이벤트로 데이터 전송
       emitter.send(SseEmitter.event()
+          .id(UUID.randomUUID().toString())
           .name("notifications")
           .data(data));
       return true; // 전송 성공
@@ -125,5 +126,30 @@ public class SseService {
     log.info("알림 전송 완료 - userId: {}, 성공: {}/{}", userId, successCount, emitters.size());
 
     // TODO: 분산 환경 전환 시 위 단일 서버 환경 로직 대신 Redis Pub/Sub 구조 도입 후 메시지 발행하도록 수정
+  }
+
+  // 외부에서 호출 가능한 범용 알림 메서드
+  public void sendCustomNotification(UUID userId, String eventName, Object data) {
+    Objects.requireNonNull(userId, "userId는 null일 수 없습니다.");
+    Objects.requireNonNull(data, "data는 null일 수 없습니다.");
+
+    List<SseEmitter> emitters = emitterRepository.findAllByUserId(userId);
+    if (emitters.isEmpty()) return;
+
+    emitters.forEach(emitter -> sendToClientWithEventName(emitter, userId, eventName, data));
+  }
+
+  private boolean sendToClientWithEventName(SseEmitter emitter, UUID userId, String eventName, Object data) {
+    try {
+      emitter.send(SseEmitter.event()
+          .id(UUID.randomUUID().toString())
+          .name(eventName)
+          .data(data));
+      return true;
+    } catch (IOException e) {
+      log.info("SSE 연결이 이미 끊어졌거나 전송 실패 - userId: {}", userId);
+      emitterRepository.delete(userId, emitter);
+      return false;
+    }
   }
 }

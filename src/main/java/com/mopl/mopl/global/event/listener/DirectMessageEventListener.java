@@ -1,5 +1,6 @@
 package com.mopl.mopl.global.event.listener;
 
+import com.mopl.mopl.domain.dm.service.RoomPresenceManager;
 import com.mopl.mopl.global.config.AsyncConfig;
 import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
 import com.mopl.mopl.global.event.DirectMessageSentEvent;
@@ -22,6 +23,8 @@ public class DirectMessageEventListener {
   private final SseService sseService;
   private final SimpMessagingTemplate messagingTemplate;
 
+  private final RoomPresenceManager roomPresenceManager;
+
   private static final String DIRECT_MESSAGE_PREFIX = "/sub/conversations/";
   private static final String DIRECT_MESSAGE_SUFFIX = "/direct-messages";
 
@@ -29,16 +32,27 @@ public class DirectMessageEventListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onDirectMessageCreated(DirectMessageCreatedEvent event) {
 
-    log.debug("DM 이벤트 수신 - messageId: {}", event.messageId());
+    log.debug("DM 이벤트 수신 - messageId: {}", event.messageDto().id());
 
     // SSE 푸시 알림 발송
     try {
-      sseService.sendNotification(
-          event.receiverId(),
-          "새로운 메시지가 도착했습니다: " + event.content()
-      );
+      // 수신자가 현재 채팅방을 열어두고 웹소켓으로 보고 있는지 여부
+      boolean isInRoom = roomPresenceManager.isUserInRoom(event.receiverId(), event.conversationId());
+
+      // 채팅창 밖에 있을 때만 팝업(SSE) 푸시 전송
+      if (!isInRoom) {
+        sseService.sendCustomNotification(
+            event.receiverId(),
+            "direct-messages",
+            event.messageDto()
+        );
+
+        log.debug("수신자가 방에 없어 SSE 알림을 발송했습니다. receiverId: {}", event.receiverId());
+      } else {
+        log.debug("수신자가 방에 접속 중이므로 SSE 알림을 생략합니다. receiverId: {}", event.receiverId());
+      }
     } catch (Exception e) {
-      log.warn("DM SSE 전송 실패 - messageId: {}, receiverId: {}", event.messageId(), event.receiverId(), e);
+      log.warn("DM SSE 전송 실패 - receiverId: {}", event.receiverId(), e);
     }
   }
 

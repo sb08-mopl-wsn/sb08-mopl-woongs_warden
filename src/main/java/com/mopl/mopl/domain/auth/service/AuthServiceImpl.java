@@ -145,7 +145,7 @@ public class AuthServiceImpl implements AuthService {
                         target.getName(),
                         target.getId(),
                         target.getEmail(),
-                        encodedPassword,
+                        rawPassword,
                         expiredAt
                 ));
     }

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -28,13 +29,13 @@ public class S3LogStorage
     private final S3Client s3Client;
 
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
-    public void uploadDailyLog() throws Exception {
+    public void uploadDailyLog() {
         LocalDate yesterday = LocalDate.now().minusDays(1);
         String prefix = String.format("mopl-%s.", yesterday);
         Path baseDir = Path.of(logDir);
 
-        if (!Files.exists(baseDir)) {
-            log.warn("로그 디렉토리 없음: {}", baseDir);
+        if (!Files.isDirectory(baseDir)) {
+            log.warn("유효한 로그 디렉토리가 아님: {}", baseDir);
             return;
         }
 
@@ -66,6 +67,8 @@ public class S3LogStorage
                     log.error("로그 업로드 실패: {}", target.getFileName(), e);
                 }
             }
+        } catch (IOException e) {
+            log.warn("유효한 로그 디렉토리가 아님: {}", baseDir);
         }
     }
 }

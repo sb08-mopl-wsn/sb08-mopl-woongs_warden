@@ -79,47 +79,44 @@ public class PlaylistRepositoryCustomImpl implements PlaylistRepositoryCustom {
   }
 
   private BooleanExpression cursorCondition(PlaylistSearchRequest request) {
-    if (request.cursor() == null || request.cursor().isBlank()) {
-      return null;
-    }
+    String cursor = request.cursor();
+    UUID idAfter = request.idAfter();
 
-    if (request.idAfter() == null) {
+    if ((cursor == null || cursor.isBlank()) != (idAfter == null)) {
       throw new PlaylistCursorException();
+    }
+    if (cursor == null || cursor.isBlank()) {
+      return null;
     }
 
     String sortBy = request.sortBy() != null ? request.sortBy().toLowerCase() : "updatedat";
     boolean isAsc = "asc".equalsIgnoreCase(request.sortDirection());
 
-    if ("subscribercount".equals(sortBy)) {
-      final Long cursorValue;
-      try {
-        cursorValue = Long.parseLong(request.cursor());
-      } catch (NumberFormatException e) {
-        throw new PlaylistCursorException();
-      }
-      UUID idAfter = request.idAfter();
-      if (isAsc) {
-        return playlist.subscriberCount.gt(cursorValue)
-            .or(playlist.subscriberCount.eq(cursorValue).and(playlist.id.gt(idAfter)));
-      } else {
-        return playlist.subscriberCount.lt(cursorValue)
-            .or(playlist.subscriberCount.eq(cursorValue).and(playlist.id.gt(idAfter)));
-      }
-    }
-
-    final Instant cursorValue;
     try {
-      cursorValue = Instant.parse(request.cursor());
-    } catch (DateTimeParseException e) {
+      switch (sortBy) {
+        case "subscribercount":
+          Long subCursorValue = Long.parseLong(cursor);
+          if (isAsc) {
+            return playlist.subscriberCount.gt(subCursorValue)
+                .or(playlist.subscriberCount.eq(subCursorValue).and(playlist.id.gt(idAfter)));
+          } else {
+            return playlist.subscriberCount.lt(subCursorValue)
+                .or(playlist.subscriberCount.eq(subCursorValue).and(playlist.id.lt(idAfter)));
+          }
+
+        case "updatedat":
+        default:
+          Instant updateCursorValue = Instant.parse(cursor);
+          if (isAsc) {
+            return playlist.updatedAt.gt(updateCursorValue)
+                .or(playlist.updatedAt.eq(updateCursorValue).and(playlist.id.gt(idAfter)));
+          } else {
+            return playlist.updatedAt.lt(updateCursorValue)
+                .or(playlist.updatedAt.eq(updateCursorValue).and(playlist.id.lt(idAfter)));
+          }
+      }
+    } catch (NumberFormatException | DateTimeParseException e) {
       throw new PlaylistCursorException();
-    }
-    UUID idAfter = request.idAfter();
-    if (isAsc) {
-      return playlist.updatedAt.gt(cursorValue)
-          .or(playlist.updatedAt.eq(cursorValue).and(playlist.id.gt(idAfter)));
-    } else {
-      return playlist.updatedAt.lt(cursorValue)
-          .or(playlist.updatedAt.eq(cursorValue).and(playlist.id.gt(idAfter)));
     }
   }
 

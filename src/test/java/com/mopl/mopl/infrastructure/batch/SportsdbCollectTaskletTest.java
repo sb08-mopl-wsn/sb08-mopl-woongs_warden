@@ -8,6 +8,7 @@ import com.mopl.mopl.infrastructure.external.exception.ApiEmptyResponseException
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.dto.SportsdbEvent;
 import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapper;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,12 +39,13 @@ class SportsdbCollectTaskletTest
     @Mock private ContentRepository contentRepository;
     @Mock private StepContribution contribution;
     @Mock private ChunkContext chunkContext;
+    @Mock private EntityManager entityManager;
 
     private SportsdbCollectTasklet tasklet;
 
     @BeforeEach
     void setUp() {
-        tasklet = new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository);
+        tasklet = new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager);
     }
 
     @Test
@@ -71,7 +73,8 @@ class SportsdbCollectTaskletTest
 
         // then
         assertThat(status).isEqualTo(RepeatStatus.FINISHED);
-        verify(contentRepository, times(ExternalApiConstants.LEAGUE_IDS.size())).save(any(Content.class));
+        verify(contentRepository, times(ExternalApiConstants.LEAGUE_IDS.size())).saveAndFlush(any(Content.class));
+
     }
 
     @Test
@@ -133,6 +136,6 @@ class SportsdbCollectTaskletTest
 
         // then
         assertThat(status).isEqualTo(RepeatStatus.FINISHED);
-        verify(contentRepository, times(1)).save(any(Content.class));
+        verify(contentRepository, times(1)).saveAndFlush(any(Content.class));
     }
 }

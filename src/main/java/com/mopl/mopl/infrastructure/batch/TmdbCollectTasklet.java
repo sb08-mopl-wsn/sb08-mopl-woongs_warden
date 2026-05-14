@@ -4,6 +4,7 @@ import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -12,6 +13,7 @@ import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.function.Function;
@@ -23,6 +25,7 @@ public class TmdbCollectTasklet implements Tasklet
     private final TmdbApiClient tmdbApiClient;
     private final TmdbContentMapper tmdbContentMapper;
     private final ContentRepository contentRepository;
+    private final EntityManager entityManager;
     private final int totalPages;
 
     @Override
@@ -73,8 +76,13 @@ public class TmdbCollectTasklet implements Tasklet
                 log.debug("중복 콘텐츠 스킵: externalId={}", content.getExternalId());
                 continue;
             }
-            contentRepository.save(content);
-            saved++;
+            try {
+                contentRepository.saveAndFlush(content);
+                saved++;
+            } catch (DataIntegrityViolationException e) {
+                log.debug("중복 콘텐츠 경합으로 저장 스킵: externalId={}", content.getExternalId());
+                entityManager.clear();
+            }
         }
         return saved;
     }

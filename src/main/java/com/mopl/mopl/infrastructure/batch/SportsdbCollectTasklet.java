@@ -6,6 +6,7 @@ import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.dto.SportsdbEvent;
 import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapper;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -14,6 +15,7 @@ import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 
@@ -24,6 +26,7 @@ public class SportsdbCollectTasklet implements Tasklet
     private final SportsdbApiClient sportsdbApiClient;
     private final SportsdbContentMapper sportsdbContentMapper;
     private final ContentRepository contentRepository;
+    private final EntityManager entityManager;
 
     @Override
     public @Nullable RepeatStatus execute(@NonNull StepContribution contribution, @NonNull ChunkContext chunkContext) throws Exception {
@@ -40,8 +43,13 @@ public class SportsdbCollectTasklet implements Tasklet
                             content.getExternalId(), content.getContentType())) {
                         continue;
                     }
-                    contentRepository.save(content);
-                    saved++;
+                    try {
+                        contentRepository.saveAndFlush(content);
+                        saved++;
+                    } catch (DataIntegrityViolationException e) {
+                        log.debug("중복 콘텐츠 경합으로 저장 스킵: externalId={}", content.getExternalId());
+                        entityManager.clear();
+                    }
                 }
             } catch (Exception e) {
                 failed++;

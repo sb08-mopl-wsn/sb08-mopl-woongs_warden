@@ -47,7 +47,37 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
       Pageable pageable
   );
 
-  // 내가 참여 중인 대화방의 총 개수
+  @Query("SELECT c FROM Conversation c " +
+      "JOIN FETCH c.sender " +
+      "JOIN FETCH c.receiver " +
+      "WHERE (c.sender.id = :userId OR c.receiver.id = :userId) " +
+      "AND (CAST(:cursor AS timestamp) IS NULL OR " +
+      "    c.createdAt < :cursor OR " +
+      "    (c.createdAt = :cursor AND (:idAfter IS NULL OR c.id < :idAfter))) " +
+      "ORDER BY c.createdAt DESC, c.id DESC")
+  List<Conversation> findMyConversationsByCreatedAtCursorDesc(
+      @Param("userId") UUID userId,
+      @Param("cursor") Instant cursor,
+      @Param("idAfter") UUID idAfter,
+      Pageable pageable
+  );
+
+  @Query("SELECT c FROM Conversation c " +
+      "JOIN FETCH c.sender " +
+      "JOIN FETCH c.receiver " +
+      "WHERE (c.sender.id = :userId OR c.receiver.id = :userId) " +
+      "AND (CAST(:cursor AS timestamp) IS NULL OR " +
+      "     c.createdAt > :cursor OR " +
+      "     (c.createdAt = :cursor AND (:idAfter IS NULL OR c.id > :idAfter))) " +
+      "ORDER BY c.createdAt ASC, c.id ASC")
+  List<Conversation> findMyConversationsByCreatedAtCursorAsc(
+      @Param("userId") UUID userId,
+      @Param("cursor") Instant cursor,
+      @Param("idAfter") UUID idAfter,
+      Pageable pageable
+  );
+
+    // 내가 참여 중인 대화방의 총 개수
   long countBySenderId(UUID senderId);
   long countByReceiverId(UUID receiverId);
 }

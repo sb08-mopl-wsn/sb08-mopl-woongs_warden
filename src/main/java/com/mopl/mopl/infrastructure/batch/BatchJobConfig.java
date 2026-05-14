@@ -5,6 +5,7 @@ import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapper;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -39,24 +40,18 @@ public class BatchJobConfig
 
     private final ContentRepository contentRepository;
 
+    private final EntityManager entityManager;
+
     @Value("${external.tmdb.collect-pages:5}")
     private int collectPages;
 
     /* Job */
     @Bean
-    public Job tmdbCollectJob() {
-        return new JobBuilder("tmdbCollectJob", jobRepository)
+    public Job contentCollectJob() {
+        return new JobBuilder("contentCollectJob", jobRepository)
                 .listener(jobExecutionListener())
                 .start(tmdbCollectStep())
-                .preventRestart()
-                .build();
-    }
-
-    @Bean
-    public Job sportsdbCollectJob() {
-        return new JobBuilder("sportsdbCollectJob", jobRepository)
-                .listener(jobExecutionListener())
-                .start(sportsdbCollectStep())
+                .next(sportsdbCollectStep())
                 .preventRestart()
                 .build();
     }
@@ -79,12 +74,12 @@ public class BatchJobConfig
     /* Tasklet */
     @Bean
     public TmdbCollectTasklet tmdbCollectTasklet() {
-        return new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, collectPages);
+        return new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, collectPages);
     }
 
     @Bean
     public SportsdbCollectTasklet sportsdbCollectTasklet() {
-        return new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository);
+        return new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager);
     }
 
     @Bean

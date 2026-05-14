@@ -4,6 +4,7 @@ import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -24,6 +25,7 @@ public class TmdbCollectTasklet implements Tasklet
     private final TmdbApiClient tmdbApiClient;
     private final TmdbContentMapper tmdbContentMapper;
     private final ContentRepository contentRepository;
+    private final EntityManager entityManager;
     private final int totalPages;
 
     @Override
@@ -69,12 +71,18 @@ public class TmdbCollectTasklet implements Tasklet
         int saved = 0;
         for (T item : items) {
             Content content = mapper.apply(item);
-             try {
-                 contentRepository.save(content);
-                 saved++;
-             } catch (DataIntegrityViolationException e) {
-                 log.debug("중복 콘텐츠 스킵: externalId={}", content.getExternalId());
-             }
+            if (contentRepository.existsByExternalIdAndContentType(
+                    content.getExternalId(), content.getContentType())) {
+                log.debug("중복 콘텐츠 스킵: externalId={}", content.getExternalId());
+                continue;
+            }
+            try {
+                contentRepository.saveAndFlush(content);
+                saved++;
+            } catch (DataIntegrityViolationException e) {
+                log.debug("중복 콘텐츠 경합으로 저장 스킵: externalId={}", content.getExternalId());
+                entityManager.clear();
+            }
         }
         return saved;
     }

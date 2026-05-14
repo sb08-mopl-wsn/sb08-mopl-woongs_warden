@@ -44,7 +44,7 @@ class S3LogStorageTest
     @DisplayName("성공 - 전날 로그 파일이 존재하면 S3에 업로드한다")
     void givenYesterdayLogFileExists_whenUploadDailyLog_thenUploadsToS3() throws Exception {
         // given
-        LocalDate date = LocalDate.of(2026, 5, 13);
+        LocalDate date = LocalDate.now().minusDays(1);
         String fileName = String.format("mopl-%s.0.log", date);
         Files.createFile(tempDir.resolve(fileName));
 
@@ -65,7 +65,7 @@ class S3LogStorageTest
 
     @Test
     @DisplayName("스킵 - 전날 로그 파일이 없으면 업로드하지 않는다")
-    void givenLogFileNotExists_whenUploadDailyLog_thenSkipsUpload() {
+    void givenLogFileNotExists_whenUploadDailyLog_thenSkipsUpload() throws Exception {
         // when
         s3LogStorage.uploadDailyLog();
 
@@ -77,7 +77,7 @@ class S3LogStorageTest
     @DisplayName("실패 - S3 업로드 실패 시 예외를 던지지 않는다")
     void givenS3Fails_whenUploadDailyLog_thenDoesNotThrow() throws Exception {
         // given
-        LocalDate date = LocalDate.of(2026, 5, 13);
+        LocalDate date = LocalDate.now().minusDays(1);
         String fileName = String.format("mopl-%s.0.log", date);
         Files.createFile(tempDir.resolve(fileName));
 

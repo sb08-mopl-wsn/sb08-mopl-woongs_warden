@@ -11,6 +11,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Stream;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -25,28 +27,45 @@ public class S3LogStorage
 
     private final S3Client s3Client;
 
-    @Scheduled(cron = "0 0 4 * * *")
-    public void uploadDailyLog() {
+    @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
+    public void uploadDailyLog() throws Exception {
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        String fileName = String.format("mopl-%s.0.log", yesterday);
-        Path logPath = Path.of(logDir, fileName);
+        String prefix = String.format("mopl-%s.", yesterday);
+        Path baseDir = Path.of(logDir);
 
-        if (!Files.exists(logPath)) {
-            log.warn("업로드할 로그 파일 없음: {}", fileName);
+        if (!Files.exists(baseDir)) {
+            log.warn("로그 디렉토리 없음: {}", baseDir);
             return;
         }
 
-        try {
-            s3Client.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(bucket)
-                            .key("logs/" + fileName)
-                            .build(),
-                    logPath
-            );
-            log.info("로그 업로드 완료: {}", fileName);
-        } catch (Exception e) {
-            log.error("로그 업로드 실패: {}", fileName, e);
+        // 패키지 전체를 순회하면서 조건(mopl-날짜.log)에 맞는 모든 일반 파일(isRegularFile)
+        try (Stream<Path> stream = Files.list(baseDir)) {
+            List<Path> targets = stream
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().startsWith(prefix))
+                    .filter(path -> path.getFileName().toString().endsWith(".log"))
+                    .toList();
+
+            if (targets.isEmpty()) {
+                log.warn("업로드할 로그 파일 없음: {}*.log", prefix);
+                return;
+            }
+
+            // 모든 파일의 이름으로 업로드
+            for (Path target : targets) {
+                try {
+                    s3Client.putObject(
+                            PutObjectRequest.builder()
+                                    .bucket(bucket)
+                                    .key("logs/" + target.getFileName())
+                                    .build(),
+                            target
+                    );
+                    log.info("로그 업로드 완료: {}", target.getFileName());
+                } catch (Exception e) {
+                    log.error("로그 업로드 실패: {}", target.getFileName(), e);
+                }
+            }
         }
     }
 }

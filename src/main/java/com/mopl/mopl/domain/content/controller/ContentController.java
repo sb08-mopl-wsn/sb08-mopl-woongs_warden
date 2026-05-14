@@ -31,7 +31,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/contents")
-public class ContentController
+public class ContentController implements ContentApi
 {
     private final ContentService contentService;
     private final WatchingSessionService watchingSessionService;

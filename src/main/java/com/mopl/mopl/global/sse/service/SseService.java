@@ -1,5 +1,7 @@
 package com.mopl.mopl.global.sse.service;
 
+import com.mopl.mopl.global.exception.BusinessException;
+import com.mopl.mopl.global.exception.GlobalErrorCode;
 import com.mopl.mopl.global.exception.SseConnectionException;
 import com.mopl.mopl.global.sse.repository.SseEmitterRepository;
 import java.io.IOException;
@@ -86,6 +88,10 @@ public class SseService {
    */
   public void sendCustomNotification(UUID userId, String eventName, Object data) {
     Objects.requireNonNull(userId, "userId는 null일 수 없습니다.");
+    Objects.requireNonNull(eventName, "eventName은 null일 수 없습니다.");
+    if (eventName.isBlank()) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "eventName은 빈 문자열일 수 없습니다.");
+    }
     Objects.requireNonNull(data, "data는 null일 수 없습니다.");
 
     List<SseEmitter> emitters = emitterRepository.findAllByUserId(userId);

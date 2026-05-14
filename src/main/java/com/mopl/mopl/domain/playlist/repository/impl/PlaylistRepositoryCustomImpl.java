@@ -6,6 +6,7 @@ import static com.mopl.mopl.domain.user.entity.QUser.user;
 
 import com.mopl.mopl.domain.playlist.dto.request.PlaylistSearchRequest;
 import com.mopl.mopl.domain.playlist.entity.Playlist;
+import com.mopl.mopl.domain.playlist.exception.PlaylistCursorException;
 import com.mopl.mopl.domain.playlist.repository.PlaylistRepositoryCustom;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -13,6 +14,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -77,15 +79,24 @@ public class PlaylistRepositoryCustomImpl implements PlaylistRepositoryCustom {
   }
 
   private BooleanExpression cursorCondition(PlaylistSearchRequest request) {
-    if (request.cursor() == null) {
+    if (request.cursor() == null || request.cursor().isBlank()) {
       return null;
+    }
+
+    if (request.idAfter() == null) {
+      throw new PlaylistCursorException();
     }
 
     String sortBy = request.sortBy() != null ? request.sortBy().toLowerCase() : "updatedat";
     boolean isAsc = "asc".equalsIgnoreCase(request.sortDirection());
 
     if ("subscribercount".equals(sortBy)) {
-      Long cursorValue = Long.parseLong(request.cursor());
+      final Long cursorValue;
+      try {
+        cursorValue = Long.parseLong(request.cursor());
+      } catch (NumberFormatException e) {
+        throw new PlaylistCursorException();
+      }
       UUID idAfter = request.idAfter();
       if (isAsc) {
         return playlist.subscriberCount.gt(cursorValue)
@@ -96,7 +107,12 @@ public class PlaylistRepositoryCustomImpl implements PlaylistRepositoryCustom {
       }
     }
 
-    Instant cursorValue = Instant.parse(request.cursor());
+    final Instant cursorValue;
+    try {
+      cursorValue = Instant.parse(request.cursor());
+    } catch (DateTimeParseException e) {
+      throw new PlaylistCursorException();
+    }
     UUID idAfter = request.idAfter();
     if (isAsc) {
       return playlist.updatedAt.gt(cursorValue)

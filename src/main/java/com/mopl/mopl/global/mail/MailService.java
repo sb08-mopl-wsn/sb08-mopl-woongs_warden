@@ -57,7 +57,7 @@ public class MailService {
     // 초기화된 비밀번호 이메일로 전송
     public void userLockedUpdate(String to, boolean lock, String name) {
         try {
-            String html = loadMailTemplate("templates/mail/init-password.html");
+            String html = loadMailTemplate("templates/mail/AccountLock.html");
 
             String meg = null;
             if (lock) {

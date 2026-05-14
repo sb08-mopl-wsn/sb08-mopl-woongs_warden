@@ -9,6 +9,7 @@ import com.mopl.mopl.infrastructure.external.tmdb.dto.TmdbTv;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbMovieListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbTvListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,12 +38,13 @@ class TmdbCollectTaskletTest
     @Mock private ContentRepository contentRepository;
     @Mock private StepContribution contribution;
     @Mock private ChunkContext chunkContext;
+    @Mock private EntityManager entityManager;
 
     private TmdbCollectTasklet tasklet;
 
     @BeforeEach
     void setUp() {
-        tasklet = new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, 1);
+        tasklet = new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, 1);
     }
 
     @Test
@@ -66,7 +68,7 @@ class TmdbCollectTaskletTest
 
         // then
         assertThat(status).isEqualTo(RepeatStatus.FINISHED);
-        verify(contentRepository, times(2)).save(any(Content.class));
+        verify(contentRepository, times(2)).saveAndFlush(any(Content.class));
     }
 
     @Test
@@ -81,7 +83,7 @@ class TmdbCollectTaskletTest
         Content movieContent = Content.builder().title("영화").externalId("1").contentType(ContentType.movie).build();
 
         when(tmdbContentMapper.movieToContent(movie)).thenReturn(movieContent);
-        when(contentRepository.save(any(Content.class)))
+        when(contentRepository.saveAndFlush(any(Content.class)))
                 .thenThrow(new DataIntegrityViolationException("중복"));
 
         // when
@@ -108,6 +110,6 @@ class TmdbCollectTaskletTest
 
         // then
         assertThat(status).isEqualTo(RepeatStatus.FINISHED);
-        verify(contentRepository, times(1)).save(any(Content.class));
+        verify(contentRepository, times(1)).saveAndFlush(any(Content.class));
     }
 }

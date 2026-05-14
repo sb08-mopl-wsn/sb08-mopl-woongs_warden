@@ -167,6 +167,7 @@ public class DirectMessageServiceImpl implements DirectMessageService{
     validateConversationAccess(conversation, currentUserId);
 
     // 방의 읽음 상태(hasUnread)를 false로 업데이트
+    // TODO: 현재 방 전체의 상태만 관리하지만, 추후 카카오톡처럼 각 메시지별 읽음/안읽음 기능 확장 예정 (messageId 기반으로 Read-Watermark 커서 로직)
     conversation.updateUnreadStatus(false);
   }
 

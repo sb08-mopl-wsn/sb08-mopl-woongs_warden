@@ -23,6 +23,8 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 @RequiredArgsConstructor
 public class DirectMessageStompEventListener implements RoomPresenceManager {
 
+  private static final String DM_DESTINATION_PATTERN = "/sub/conversations/{conversationId}/direct-messages";
+
   private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
   // 세션 연결 해제 시 정보를 찾기 위한 맵
@@ -45,7 +47,7 @@ public class DirectMessageStompEventListener implements RoomPresenceManager {
     StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
     String destination = accessor.getDestination();
 
-    if (destination == null || !destination.matches("/sub/conversations/.+/direct-messages")) return;
+    if (destination == null || !pathMatcher.match(DM_DESTINATION_PATTERN, destination)) return;
 
     try {
       UUID conversationId = extractConversationId(destination);
@@ -88,9 +90,8 @@ public class DirectMessageStompEventListener implements RoomPresenceManager {
   }
 
   private UUID extractConversationId(String destination) {
-    String pattern = "/sub/conversation/{conversationId}/direct-messages";
     try {
-      Map<String, String> variables = pathMatcher.extractUriTemplateVariables(pattern, destination);
+      Map<String, String> variables = pathMatcher.extractUriTemplateVariables(DM_DESTINATION_PATTERN, destination);
       return UUID.fromString(variables.get("conversationId"));
     } catch (Exception e) {
       throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "잘못된 웹소켓 경로입니다.");

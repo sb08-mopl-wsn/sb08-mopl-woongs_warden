@@ -43,8 +43,7 @@ public class NotificationEventListener {
     log.debug("팔로우 이벤트 수신 - followerId: {}, followeeId: {}", event.followerId(), event.followeeId());
 
     // 알림 수신자(Followee) 엔티티 조회
-    User receiver = userRepository.findById(event.followeeId()).orElse(null);
-    if (receiver == null) return;
+    User receiver = userRepository.getReferenceById(event.followeeId());
 
     // 알림 메시지 생성
     String title = "새로운 팔로워";
@@ -62,7 +61,7 @@ public class NotificationEventListener {
 
     // SSE 푸시 전송
     NotificationDto dto = notificationMapper.toDto(saved);
-    sseService.sendNotification(receiver.getId(), content);
+    sseService.sendNotification(receiver.getId(), dto);
   }
 
   @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
@@ -71,14 +70,16 @@ public class NotificationEventListener {
 
     log.debug("DM 수신 알림 DB 저장 이벤트 수신 - receiverId: {}", event.receiverId());
 
-    User receiver = userRepository.findById(event.receiverId()).orElse(null);
-    if (receiver == null) return;
+    User receiver = userRepository.getReferenceById(event.receiverId());
 
     // 보낸 사람 이름 추출
     String senderName = event.messageDto().sender().name() != null ? event.messageDto().sender().name() : "누군가";
+    // 메시지 내용 (최대 50자 제한)
+    String messagePreview = truncateMessage(event.messageDto().content(), 50);
+
     String title = "새로운 메시지";
     // 알림 리스트에서 보여줄 메시지 미리보기
-    String content = senderName + "님: " + event.messageDto().content();
+    String content = senderName + "님: " + messagePreview;
 
     Notification notification = Notification.builder()
         .user(receiver)
@@ -94,5 +95,13 @@ public class NotificationEventListener {
     if (!isInRoom) {
       sseService.sendNotification(receiver.getId(), dto);
     }
+  }
+
+  private String truncateMessage(String message, int maxLength) {
+    if (message == null || message.length() <= maxLength) {
+      return message;
+    }
+
+    return message.substring(0, maxLength) + "...";
   }
 }

@@ -67,68 +67,23 @@ public class SseService {
     return emitter;
   }
 
-  // 공통 발송 로직 : 단일 Emitter에 데이터를 전송
-
-  /**
-   * 공통 발송 로직
-   * 단일 Emitter에 데이터 전송
-   * @param emitter Emitter 객체
-   * @param userId 연결을 요청한 유저 ID
-   * @param data 전송할 데이터
-   * @return 전송 성공 여부
-   */
-  private boolean sendToClient(SseEmitter emitter, UUID userId, Object data) {
-
-    try {
-
-      // notifications 이벤트로 데이터 전송
-      emitter.send(SseEmitter.event()
-          .id(UUID.randomUUID().toString())
-          .name("notifications")
-          .data(data));
-      return true; // 전송 성공
-    } catch (IOException e) {
-
-      // 운영 환경 모니터링 지표 수집을 위해서 info로 격상은 하지만, 에러 스택은 출력하지 않음
-      log.info("SSE 연결이 이미 끊어졌거나 전송 실패 - userId: {}", userId);
-      emitterRepository.delete(userId, emitter);
-      return false; // 전송 실패
-    }
-  }
-
   /**
    * 특정 사용자(모든 기기)에게 알림 객체를 전송
    * 이후 알림 도메인에서 호출.
-   * @param userId
-   * @param notificationData
+   * @param userId 알림을 받을 사용자 ID
+   * @param notificationData 알림 데이터 객체
    */
   public void sendNotification(UUID userId, Object notificationData) {
 
-    // null 검증 추가
-    Objects.requireNonNull(userId, "userId는 null일 수 없습니다.");
-    Objects.requireNonNull(notificationData, "notificationData는 null일 수 없습니다.");
-
-    // 단일 서버 환경 -> 내 메모리에서 해당 유저의 모든 다중 기기 Emitter를 찾아서 전송
-    List<SseEmitter> emitters = emitterRepository.findAllByUserId(userId);
-
-    // 연결된 기기가 아예 없으면 종료
-    if (emitters.isEmpty()) {
-      log.debug("알림 전송 스킵 - 연결된 SSE Emitter가 없습니다. userId: {}", userId);
-      return;
-    }
-
-    // 성공 횟수 집계
-    long successCount = emitters.stream()
-            .filter(emitter -> sendToClient(emitter, userId, notificationData))
-                .count();
-
-    // 다중 기기 중 일부라도 실패하거나 전체 성공 현황 info 기록
-    log.info("알림 전송 완료 - userId: {}, 성공: {}/{}", userId, successCount, emitters.size());
-
-    // TODO: 분산 환경 전환 시 위 단일 서버 환경 로직 대신 Redis Pub/Sub 구조 도입 후 메시지 발행하도록 수정
+    sendCustomNotification(userId, "notifications", notificationData);
   }
 
-  // 외부에서 호출 가능한 범용 알림 메서드
+  /**
+   * 외부에서 호출 가능한 범용 알림 메서드
+   * @param userId 알림을 받을 사용자 ID
+   * @param eventName 이벤트 이름
+   * @param data 전송할 데이터
+   */
   public void sendCustomNotification(UUID userId, String eventName, Object data) {
     Objects.requireNonNull(userId, "userId는 null일 수 없습니다.");
     Objects.requireNonNull(data, "data는 null일 수 없습니다.");
@@ -136,20 +91,36 @@ public class SseService {
     List<SseEmitter> emitters = emitterRepository.findAllByUserId(userId);
     if (emitters.isEmpty()) return;
 
-    emitters.forEach(emitter -> sendToClientWithEventName(emitter, userId, eventName, data));
+    // 성공 횟수 집계
+    long successCount = emitters.stream()
+            .filter(emitter -> sendToClient(emitter, userId, eventName, data))
+            .count();
+
+    // 다중 기기 중 일부라도 실패하거나 전체 성공 현황 info 기록
+    log.info("SSE 알림 전송 완료 - userId: {}, eventName: {}, 성공: {}/{}", userId, eventName, successCount, emitters.size());
+
+    // TODO: 분산 환경 전환 시 위 단일 서버 환경 로직 대신 Redis Pub/Sub 구조 도입 후 메시지 발행하도록 수정
   }
 
-  private boolean sendToClientWithEventName(SseEmitter emitter, UUID userId, String eventName, Object data) {
+  /**
+   * 공통 발송 로직
+   * @param emitter Emitter 객체
+   * @param userId 연결을 요청한 유저 ID
+   * @param eventName 이벤트 이름
+   * @param data 전송할 데이터
+   * @return 전송 성공 여부
+   */
+  private boolean sendToClient(SseEmitter emitter, UUID userId, String eventName, Object data) {
     try {
+      // TODO: Redis 도입 시 프론트엔드 재연결(Last-Event-ID) 처리를 위한 순차적 ID(timestamp+sequence) 저장소와 함께 .id() 구현 예정
       emitter.send(SseEmitter.event()
-          .id(UUID.randomUUID().toString())
           .name(eventName)
           .data(data));
-      return true;
+      return true; // 전송 성공
     } catch (IOException e) {
       log.info("SSE 연결이 이미 끊어졌거나 전송 실패 - userId: {}", userId);
       emitterRepository.delete(userId, emitter);
-      return false;
+      return false; // 전송 실패
     }
   }
 }

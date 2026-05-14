@@ -1,17 +1,21 @@
 package com.mopl.mopl.domain.playlist.controller;
 
 import com.mopl.mopl.domain.playlist.dto.request.PlaylistCreateRequest;
+import com.mopl.mopl.domain.playlist.dto.request.PlaylistSearchRequest;
 import com.mopl.mopl.domain.playlist.dto.request.PlaylistUpdateRequest;
+import com.mopl.mopl.domain.playlist.dto.response.CursorResponsePlaylistDto;
 import com.mopl.mopl.domain.playlist.dto.response.PlaylistDto;
 import com.mopl.mopl.domain.playlist.service.PlaylistService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,6 +38,26 @@ public class PlaylistController {
     UUID userId = userDetails.getUserDto().id();
     PlaylistDto responseDto = playlistService.createPlaylist(request, userId);
     return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
+  }
+
+  @GetMapping("/{playlistId}")
+  public ResponseEntity<PlaylistDto> findPlaylistById(
+      @PathVariable UUID playlistId,
+      @AuthenticationPrincipal MoplUserDetails userDetails
+  ) {
+    UUID currentUserId = (userDetails != null) ? userDetails.getUserDto().id() : null;
+
+    PlaylistDto responseDto = playlistService.findPlaylistById(playlistId, currentUserId);
+
+    return ResponseEntity.ok(responseDto);
+  }
+
+  @GetMapping
+  public ResponseEntity<CursorResponsePlaylistDto> findPlaylists(
+      @Valid @ParameterObject PlaylistSearchRequest request
+  ) {
+    CursorResponsePlaylistDto responseDto = playlistService.findPlaylists(request);
+    return ResponseEntity.ok(responseDto);
   }
 
   @PatchMapping("/{playlistId}")

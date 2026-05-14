@@ -13,9 +13,9 @@
 
     <!-- file appender -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_DIR}/deokhugam.log</file>
+        <file>${LOG_DIR}/mopl.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_DIR}/deokhugam-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <fileNamePattern>${LOG_DIR}/mopl-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
             <maxFileSize>10MB</maxFileSize>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
@@ -27,7 +27,7 @@
     <!-- local 환경: DEBUG -->
     <springProfile name="local">
         <logger name="org.hibernate.SQL" level="DEBUG" />
-        <logger name="com.redhorse.deokhugam" level="DEBUG"/>
+        <logger name="com.mopl.mopl" level="DEBUG"/>
         <root level="DEBUG">
             <appender-ref ref="CONSOLE" />
             <appender-ref ref="FILE" />
@@ -38,7 +38,7 @@
     <springProfile name="prod">
         <logger name="org.hibernate.SQL" level="WARN"/>
         <logger name="org.hibernate" level="WARN"/>
-        <logger name="com.redhorse.deokhugam" level="INFO"/>
+        <logger name="com.mopl.mopl" level="INFO"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE" />
             <appender-ref ref="FILE" />

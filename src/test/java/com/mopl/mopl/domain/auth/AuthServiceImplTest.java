@@ -17,10 +17,7 @@ import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
 import com.mopl.mopl.global.event.user.UserPasswordInitEvent;
-import com.mopl.mopl.global.exception.mail.MailFailedSendException;
 import com.nimbusds.jose.JOSEException;
-import jakarta.mail.Session;
-import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,11 +31,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.mail.javamail.JavaMailSender;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,9 +61,6 @@ class AuthServiceImplTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
-
-    @Mock
-    private JavaMailSender mailSender;
 
     @Mock
     private HttpServletResponse response;
@@ -388,7 +380,7 @@ class AuthServiceImplTest {
             assertThatThrownBy(() -> authService.initUserPassword(email))
                     .isInstanceOf(UserNotFoundException.class);
 
-            verifyNoInteractions(passwordEncoder, mailSender);
+            verifyNoInteractions(passwordEncoder, eventPublisher);
         }
     }
 }

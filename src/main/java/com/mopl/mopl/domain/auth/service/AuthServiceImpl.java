@@ -140,14 +140,7 @@ public class AuthServiceImpl implements AuthService {
         // 임시 비번 적용 및 원본 비번 저장
         target.updateTemporaryPassword(encodedPassword, originPassword, expiredAt);
 
-        eventPublisher.publishEvent(
-                new UserPasswordInitEvent(
-                        target.getName(),
-                        target.getId(),
-                        target.getEmail(),
-                        rawPassword,
-                        expiredAt
-                ));
+        eventPublisher.publishEvent(UserPasswordInitEvent.of(target,expiredAt));
     }
 
     /**

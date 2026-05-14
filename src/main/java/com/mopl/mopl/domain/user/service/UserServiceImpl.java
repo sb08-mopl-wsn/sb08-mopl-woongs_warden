@@ -50,7 +50,7 @@ public class UserServiceImpl implements UserService {
         User user = new User(request.name(), request.email(), password, null, null);
 
         UserDto userDto = userMapper.toDto(userRepository.save(user));
-        eventPublisher.publishEvent(new UserEvent(userDto.id(), userDto.name()));
+        eventPublisher.publishEvent(UserEvent.of(user));
         return userDto;
     }
 
@@ -117,7 +117,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
         target.updateRole(request.role());
-        eventPublisher.publishEvent(new UserUpdateRoleEvent(userId, target.getName(), request.role()));
+        eventPublisher.publishEvent(UserUpdateRoleEvent.of(target));
         return userMapper.toDto(target);
     }
 
@@ -149,13 +149,7 @@ public class UserServiceImpl implements UserService {
             target.unlock();
         }
 
-        eventPublisher.publishEvent(
-                new UserUpdateLockEvent(
-                        userId,
-                        target.getName(),
-                        target.isLocked(),
-                        target.getEmail()
-                ));
+        eventPublisher.publishEvent(UserUpdateLockEvent.of(target));
         return userMapper.toDto(target);
     }
 
@@ -193,7 +187,7 @@ public class UserServiceImpl implements UserService {
             user.updateName(request.name());
         }
 
-        eventPublisher.publishEvent(new UserEvent(userId, user.getName()));
+        eventPublisher.publishEvent(UserEvent.of(user));
         return userMapper.toDto(user);
     }
 }

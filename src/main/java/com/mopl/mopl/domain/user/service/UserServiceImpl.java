@@ -10,16 +10,22 @@ import com.mopl.mopl.domain.user.exception.UserDuplicateException;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import static org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +34,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtRegistry jwtRegistry;  //todo 분산에서는 다른걸로
+    private final S3ImageStorage s3ImageStorage;
 
     @Override
     @Transactional
@@ -142,4 +149,41 @@ public class UserServiceImpl implements UserService {
         return userMapper.toDto(target);
     }
 
+    @Override
+    @Transactional
+    @PreAuthorize("principal.userDto.id == #userId")
+    public UserDto updateProfile(
+            UUID userId, UserUpdateRequest request,
+            MultipartFile profile
+    ) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        String key = null;
+
+        if (profile != null && !profile.isEmpty()) {
+            key = s3ImageStorage.upload(profile, "profile");
+
+            String uploadedKey = key;
+
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            if (status == STATUS_ROLLED_BACK) {
+                                s3ImageStorage.delete(uploadedKey);
+                            }
+                        }
+                    }
+            );
+
+            user.updateProfileImage(key);
+        }
+
+        if (request.name() != null && !request.name().isBlank()) {
+            user.updateName(request.name());
+        }
+
+        return userMapper.toDto(user);
+    }
 }

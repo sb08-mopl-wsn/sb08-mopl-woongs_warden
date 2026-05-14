@@ -8,6 +8,7 @@ import com.mopl.mopl.domain.user.dto.request.CursorUserRequest;
 import com.mopl.mopl.domain.user.dto.request.UserCreateRequest;
 import com.mopl.mopl.domain.user.dto.request.UserLockUpdateRequest;
 import com.mopl.mopl.domain.user.dto.request.UserRoleUpdateRequest;
+import com.mopl.mopl.domain.user.dto.request.UserUpdateRequest;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.SortBy;
 import com.mopl.mopl.domain.user.entity.SortDirection;
@@ -16,6 +17,8 @@ import com.mopl.mopl.domain.user.exception.UserDuplicateException;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,8 +27,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
+import static org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
@@ -54,6 +61,9 @@ class UserServiceImplTest {
     @Mock
     private JwtRegistry jwtRegistry;
 
+    @Mock
+    private S3ImageStorage s3ImageStorage;
+
     private UserServiceImpl userService;
 
     @BeforeEach
@@ -62,8 +72,16 @@ class UserServiceImplTest {
                 userRepository,
                 userMapper,
                 passwordEncoder,
-                jwtRegistry
+                jwtRegistry,
+                s3ImageStorage
         );
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test
@@ -469,6 +487,226 @@ class UserServiceImplTest {
                 .isInstanceOf(UserNotFoundException.class);
 
         verifyNoInteractions(jwtRegistry, userMapper);
+    }
+
+    @Test
+    @DisplayName("프로필 수정 시 이름과 프로필 이미지를 함께 수정한다")
+    void updateProfile_nameAndProfile_success() {
+        initTransactionSynchronization();
+
+        UUID userId = UUID.randomUUID();
+        User user = createUser();
+        UserUpdateRequest request = new UserUpdateRequest("변경된이름");
+
+        MockMultipartFile profile = new MockMultipartFile(
+                "profile",
+                "profile.png",
+                "image/png",
+                "image-content".getBytes()
+        );
+
+        String uploadedKey = "profile/test-profile.png";
+
+        UserDto expected = new UserDto(
+                userId,
+                Instant.now(),
+                user.getEmail(),
+                "변경된이름",
+                "https://cdn.example.com/profile/test-profile.png",
+                user.getRole(),
+                false
+        );
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(s3ImageStorage.upload(profile, "profile")).willReturn(uploadedKey);
+        given(userMapper.toDto(user)).willReturn(expected);
+
+        UserDto result = userService.updateProfile(userId, request, profile);
+
+        assertThat(result).isEqualTo(expected);
+        assertThat(user.getName()).isEqualTo("변경된이름");
+        assertThat(user.getProfileImageKey()).isEqualTo(uploadedKey);
+        assertThat(TransactionSynchronizationManager.getSynchronizations()).hasSize(1);
+
+        verify(s3ImageStorage).upload(profile, "profile");
+        verify(userMapper).toDto(user);
+    }
+
+    @Test
+    @DisplayName("프로필 수정 중 트랜잭션이 롤백되면 업로드된 S3 이미지를 삭제한다")
+    void updateProfile_rollback_deleteUploadedS3Object_success() {
+        initTransactionSynchronization();
+
+        UUID userId = UUID.randomUUID();
+        User user = createUser();
+        UserUpdateRequest request = new UserUpdateRequest("변경된이름");
+
+        MockMultipartFile profile = new MockMultipartFile(
+                "profile",
+                "profile.png",
+                "image/png",
+                "image-content".getBytes()
+        );
+
+        String uploadedKey = "profile/test-profile.png";
+
+        UserDto expected = new UserDto(
+                userId,
+                Instant.now(),
+                user.getEmail(),
+                "변경된이름",
+                "https://cdn.example.com/profile/test-profile.png",
+                user.getRole(),
+                false
+        );
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(s3ImageStorage.upload(profile, "profile")).willReturn(uploadedKey);
+        given(userMapper.toDto(user)).willReturn(expected);
+
+        userService.updateProfile(userId, request, profile);
+
+        List<TransactionSynchronization> synchronizations =
+                TransactionSynchronizationManager.getSynchronizations();
+
+        assertThat(synchronizations).hasSize(1);
+
+        synchronizations.forEach(
+                synchronization -> synchronization.afterCompletion(STATUS_ROLLED_BACK)
+        );
+
+        verify(s3ImageStorage).upload(profile, "profile");
+        verify(s3ImageStorage).delete(uploadedKey);
+    }
+
+    @Test
+    @DisplayName("프로필 수정 시 이름만 전달되면 이름만 수정하고 S3 업로드는 호출하지 않는다")
+    void updateProfile_onlyName_success() {
+        UUID userId = UUID.randomUUID();
+        User user = createUser();
+        UserUpdateRequest request = new UserUpdateRequest("이름만수정");
+
+        UserDto expected = new UserDto(
+                userId,
+                Instant.now(),
+                user.getEmail(),
+                "이름만수정",
+                null,
+                user.getRole(),
+                false
+        );
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(userMapper.toDto(user)).willReturn(expected);
+
+        UserDto result = userService.updateProfile(userId, request, null);
+
+        assertThat(result).isEqualTo(expected);
+        assertThat(user.getName()).isEqualTo("이름만수정");
+        assertThat(user.getProfileImageKey()).isNull();
+
+        verifyNoInteractions(s3ImageStorage);
+        verify(userMapper).toDto(user);
+    }
+
+    @Test
+    @DisplayName("프로필 수정 시 이미지만 전달되면 이미지만 수정하고 이름은 유지한다")
+    void updateProfile_onlyProfile_success() {
+        initTransactionSynchronization();
+
+        UUID userId = UUID.randomUUID();
+        User user = createUser();
+        UserUpdateRequest request = new UserUpdateRequest("");
+
+        MockMultipartFile profile = new MockMultipartFile(
+                "profile",
+                "profile.jpg",
+                "image/jpeg",
+                "image-content".getBytes()
+        );
+
+        String uploadedKey = "profile/test-profile.jpg";
+
+        UserDto expected = new UserDto(
+                userId,
+                Instant.now(),
+                user.getEmail(),
+                user.getName(),
+                "https://cdn.example.com/profile/test-profile.jpg",
+                user.getRole(),
+                false
+        );
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(s3ImageStorage.upload(profile, "profile")).willReturn(uploadedKey);
+        given(userMapper.toDto(user)).willReturn(expected);
+
+        UserDto result = userService.updateProfile(userId, request, profile);
+
+        assertThat(result).isEqualTo(expected);
+        assertThat(user.getName()).isEqualTo("사용자");
+        assertThat(user.getProfileImageKey()).isEqualTo(uploadedKey);
+        assertThat(TransactionSynchronizationManager.getSynchronizations()).hasSize(1);
+
+        verify(s3ImageStorage).upload(profile, "profile");
+        verify(userMapper).toDto(user);
+    }
+
+    @Test
+    @DisplayName("프로필 수정 시 빈 파일이면 S3 업로드를 호출하지 않는다")
+    void updateProfile_emptyProfile_skipS3Upload_success() {
+        UUID userId = UUID.randomUUID();
+        User user = createUser();
+        UserUpdateRequest request = new UserUpdateRequest("변경된이름");
+
+        MockMultipartFile emptyProfile = new MockMultipartFile(
+                "profile",
+                "empty.png",
+                "image/png",
+                new byte[0]
+        );
+
+        UserDto expected = new UserDto(
+                userId,
+                Instant.now(),
+                user.getEmail(),
+                "변경된이름",
+                null,
+                user.getRole(),
+                false
+        );
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(userMapper.toDto(user)).willReturn(expected);
+
+        UserDto result = userService.updateProfile(userId, request, emptyProfile);
+
+        assertThat(result).isEqualTo(expected);
+        assertThat(user.getName()).isEqualTo("변경된이름");
+        assertThat(user.getProfileImageKey()).isNull();
+
+        verifyNoInteractions(s3ImageStorage);
+        verify(userMapper).toDto(user);
+    }
+
+    @Test
+    @DisplayName("프로필 수정 시 사용자가 없으면 UserNotFoundException이 발생한다")
+    void updateProfile_notFound_throwUserNotFoundException() {
+        UUID userId = UUID.randomUUID();
+        UserUpdateRequest request = new UserUpdateRequest("변경된이름");
+
+        given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updateProfile(userId, request, null))
+                .isInstanceOf(UserNotFoundException.class);
+
+        verifyNoInteractions(s3ImageStorage, userMapper);
+    }
+
+    private void initTransactionSynchronization() {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.initSynchronization();
+        }
     }
 
     private User createUser() {

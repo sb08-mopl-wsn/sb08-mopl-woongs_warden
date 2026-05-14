@@ -8,9 +8,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -68,5 +72,21 @@ public class UserController {
     ) {
         UserDto userDto = userService.updateUserLocked(userId, request);
         return ResponseEntity.status(HttpStatus.OK).body(userDto);
+    }
+
+    @PatchMapping(
+            path = "{userId}",
+            consumes = {MediaType.MULTIPART_FORM_DATA_VALUE}
+    )
+    public ResponseEntity<UserDto> updateProfile(
+            @PathVariable("userId") UUID userId,
+            @RequestPart("request") @Valid UserUpdateRequest userUpdateRequest,
+            @RequestPart(value = "image", required = false) MultipartFile profile
+    ) {
+        UserDto updatedUser = userService.updateProfile(userId, userUpdateRequest, profile);
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(updatedUser);
     }
 }

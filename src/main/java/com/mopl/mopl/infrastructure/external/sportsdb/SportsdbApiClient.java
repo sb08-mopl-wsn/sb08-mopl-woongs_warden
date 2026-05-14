@@ -27,13 +27,13 @@ public class SportsdbApiClient
      * @param leagueId  조회할 리그의 고유 ID
      * @return 해당 리그 및 시즌의 대한 정보 목록
      */
-    public List<SportsdbEvent> fetchSeasonEvents(int leagueId) {
-        String season = currentSeason();
+    public List<SportsdbEvent> fetchDayEvents(int leagueId) {
+        String today = LocalDate.now().toString();
 
         SportsdbEventResponse response;
         try {
             response = restClient.get()
-                    .uri(ExternalApiConstants.EVENTS_SEASON_PATH, leagueId, season)
+                    .uri(ExternalApiConstants.EVENTS_DAY_PATH, today, leagueId)
                     .retrieve()
                     .body(SportsdbEventResponse.class);
         } catch (RestClientException ex) {
@@ -43,11 +43,5 @@ public class SportsdbApiClient
         return response != null && response.events() != null
                 ? response.events()
                 : List.of();
-    }
-
-    private String currentSeason() {
-        LocalDate now = LocalDate.now();
-        int startYear = now.getMonthValue() >= 8 ? now.getYear() : now.getYear() - 1;
-        return startYear + "-" + (startYear + 1);
     }
 }

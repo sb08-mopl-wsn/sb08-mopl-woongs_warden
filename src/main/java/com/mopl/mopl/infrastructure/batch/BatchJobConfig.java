@@ -44,19 +44,11 @@ public class BatchJobConfig
 
     /* Job */
     @Bean
-    public Job tmdbCollectJob() {
-        return new JobBuilder("tmdbCollectJob", jobRepository)
+    public Job contentCollectJob() {
+        return new JobBuilder("contentCollectJob", jobRepository)
                 .listener(jobExecutionListener())
                 .start(tmdbCollectStep())
-                .preventRestart()
-                .build();
-    }
-
-    @Bean
-    public Job sportsdbCollectJob() {
-        return new JobBuilder("sportsdbCollectJob", jobRepository)
-                .listener(jobExecutionListener())
-                .start(sportsdbCollectStep())
+                .next(sportsdbCollectStep())
                 .preventRestart()
                 .build();
     }

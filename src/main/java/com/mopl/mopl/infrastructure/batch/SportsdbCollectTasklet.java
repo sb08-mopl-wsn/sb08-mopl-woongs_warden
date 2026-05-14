@@ -14,7 +14,6 @@ import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 
@@ -33,20 +32,16 @@ public class SportsdbCollectTasklet implements Tasklet
 
         for (int leagueId: ExternalApiConstants.LEAGUE_IDS) {
             try {
-                List<SportsdbEvent> events = sportsdbApiClient.fetchSeasonEvents(leagueId);
+                List<SportsdbEvent> events = sportsdbApiClient.fetchDayEvents(leagueId);
 
                 for (SportsdbEvent event : events) {
                     Content content = sportsdbContentMapper.sportToContent(event);
-                    boolean exists = contentRepository.existsByExternalIdAndContentType(content.getExternalId(), content.getContentType());
-
-                    if (!exists) {
-                        try {
-                            contentRepository.save(content);
-                            saved++;
-                        } catch (DataIntegrityViolationException e) {
-                            log.debug("중복 콘텐츠 건너뜀: externalId={}, type={}", content.getExternalId(), content.getContentType());
-                        }
+                    if (contentRepository.existsByExternalIdAndContentType(
+                            content.getExternalId(), content.getContentType())) {
+                        continue;
                     }
+                    contentRepository.save(content);
+                    saved++;
                 }
             } catch (Exception e) {
                 failed++;

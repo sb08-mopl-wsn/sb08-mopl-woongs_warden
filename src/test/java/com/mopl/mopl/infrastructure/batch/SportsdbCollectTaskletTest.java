@@ -62,7 +62,7 @@ class SportsdbCollectTaskletTest
                 .contentType(ContentType.sport)
                 .build();
 
-        when(sportsdbApiClient.fetchSeasonEvents(anyInt())).thenReturn(List.of(event));
+        when(sportsdbApiClient.fetchDayEvents(anyInt())).thenReturn(List.of(event));
         when(sportsdbContentMapper.sportToContent(event)).thenReturn(content);
         when(contentRepository.existsByExternalIdAndContentType(anyString(), any())).thenReturn(false);
 
@@ -90,7 +90,7 @@ class SportsdbCollectTaskletTest
                 .contentType(ContentType.sport)
                 .build();
 
-        when(sportsdbApiClient.fetchSeasonEvents(anyInt())).thenReturn(List.of(event));
+        when(sportsdbApiClient.fetchDayEvents(anyInt())).thenReturn(List.of(event));
         when(sportsdbContentMapper.sportToContent(event)).thenReturn(content);
         when(contentRepository.existsByExternalIdAndContentType("123", ContentType.sport)).thenReturn(true);
 
@@ -119,11 +119,11 @@ class SportsdbCollectTaskletTest
                 .build();
 
         // 프리미어 리그 실패
-        when(sportsdbApiClient.fetchSeasonEvents(ExternalApiConstants.PREMIER_LEAGUE_ID))
+        when(sportsdbApiClient.fetchDayEvents(ExternalApiConstants.PREMIER_LEAGUE_ID))
                 .thenThrow(new ApiEmptyResponseException());
 
         // 라리가 성공
-        when(sportsdbApiClient.fetchSeasonEvents(ExternalApiConstants.LA_LIGA_ID))
+        when(sportsdbApiClient.fetchDayEvents(ExternalApiConstants.LA_LIGA_ID))
                 .thenReturn(List.of(event));
         when(sportsdbContentMapper.sportToContent(event)).thenReturn(content);
         when(contentRepository.existsByExternalIdAndContentType(anyString(), any())).thenReturn(false);

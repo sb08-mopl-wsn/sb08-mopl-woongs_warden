@@ -63,7 +63,6 @@ services:
     container_name: prometheus
     restart: unless-stopped
     profiles:
-      - local
       - develop
     ports:
       - "9090:9090"
@@ -83,7 +82,6 @@ services:
     container_name: grafana
     restart: unless-stopped
     profiles:
-      - local
       - develop
     ports:
       - "3000:3000"
@@ -105,7 +103,6 @@ services:
     user: "0"
     restart: unless-stopped
     profiles:
-      - local
       - develop
     ports:
       - "3100:3100"
@@ -121,11 +118,9 @@ services:
     container_name: promtail
     restart: unless-stopped
     profiles:
-      - local
       - develop
     volumes:
       - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml
-      - ./.logs:/app-logs/local:ro
       - app_logs:/app-logs/develop:ro
       - /var/run/docker.sock:/var/run/docker.sock
     command: -config.file=/etc/promtail/promtail-config.yaml

@@ -6,7 +6,6 @@ import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapp
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tags;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -105,11 +104,13 @@ public class BatchJobConfig
                     log.debug("Job 종료: {} - 상태: {} (시간 정보 없음)",
                             jobName,
                             jobExecution.getStatus());
+
+                    return;
                 }
 
-                long duration = Duration.between(startTime, endTime).getSeconds();
+                Duration duration = Duration.between(startTime, endTime);
 
-                meterRegistry.gauge("mopl.batch.job.duration", Tags.of("job", jobName), duration);
+                meterRegistry.timer("mopl.batch.job.duration", "job", jobName).record(duration);
 
                 if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
                     meterRegistry.counter("mopl.batch.job.success", "job", jobName).increment();

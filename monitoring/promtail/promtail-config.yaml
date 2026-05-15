@@ -16,7 +16,7 @@ scrape_configs:
         labels:
           job: mopl-app
           env: develop
-          __path__: /app-logs/**/*.log
+          __path__: /app-logs/*.log
 
   - job_name: 'mopl-containers'
     docker_sd_configs:

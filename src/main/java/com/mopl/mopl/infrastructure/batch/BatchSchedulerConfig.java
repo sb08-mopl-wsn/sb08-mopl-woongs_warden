@@ -19,7 +19,7 @@ public class BatchSchedulerConfig
     private final JobLauncher jobLauncher;
     private final Job contentCollectJob;
 
-    @Scheduled(cron = "0 0/1 * * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
     public void runContentCollectJob() {
         try {
             JobParameters jobParameters = new JobParametersBuilder()

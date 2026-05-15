@@ -8,5 +8,4 @@ scrape_configs:
     honor_labels: true
     static_configs:
       - targets:
-          - 'mopl-app:8080'             # develop
-          - 'host.docker.internal:8080' # local
+          - 'mopl-app:8080'

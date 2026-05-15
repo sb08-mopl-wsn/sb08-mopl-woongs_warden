@@ -122,6 +122,10 @@ public class WatchingSessionStompEventListener {
 
         try {
             Set<UUID> contentIds = sessionContentMap.remove(sessionId);
+
+            subscriptionContentMap.keySet()
+                    .removeIf(key -> key.startsWith(sessionId + ":"));
+
             if (contentIds == null || contentIds.isEmpty()) return;
 
             UUID userId = extractUserId(accessor);

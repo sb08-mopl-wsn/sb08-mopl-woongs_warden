@@ -11,7 +11,7 @@ public enum ContentType {
         try {
             return ContentType.valueOf(value);
         } catch (IllegalArgumentException e) {
-            throw new ContentInvalidTypeException(value.toLowerCase());
+            throw new ContentInvalidTypeException(value);
         }
     }
 }

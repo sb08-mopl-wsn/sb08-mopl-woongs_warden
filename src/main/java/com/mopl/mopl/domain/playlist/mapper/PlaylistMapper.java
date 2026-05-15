@@ -17,6 +17,6 @@ public interface PlaylistMapper {
   PlaylistDto toDto(Playlist playlist, Boolean isSubscribed, List<ContentSummary> contents);
 
   @Mapping(source = "user", target = "owner")
-  @Mapping(target = "subscribedByMe", constant = "true")
+  @Mapping(target = "subscribedByMe", constant = "false")
   PlaylistDto toDto(Playlist playlist);
 }

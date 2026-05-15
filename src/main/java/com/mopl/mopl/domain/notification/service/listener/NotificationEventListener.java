@@ -17,6 +17,8 @@ import com.mopl.mopl.global.event.ReviewCreatedEvent;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -35,6 +37,7 @@ public class NotificationEventListener {
   private final SseService sseService;
   private final NotificationMapper notificationMapper;
   private final RoomPresenceManager roomPresenceManager;
+  private final Executor notificationExecutor;
 
   /**
    * 팔로우 이벤트 리스너
@@ -138,15 +141,18 @@ public class NotificationEventListener {
     log.debug("리뷰 작성 알림 이벤트 수신 - writerId: {}", event.writerId());
 
     // 작성자를 팔로우하는 모든 팔로워 목록 조회
-    List<Follow> follows = followRepository.findAllByFolloweeId(event.writerId());
+    List<Follow> follows = followRepository.findAllByFolloweeIdWithFollower(event.writerId());
 
     // 팔로워가 아무도 없으면 리턴
-    if (follows.isEmpty()) return;
+    if (follows.isEmpty()) {
+      log.debug("팔로워가 없어 알림을 발송하지 않습니다 - writerId: {}", event.writerId());
+      return;
+    }
 
     String title = "새로운 활동";
     String content = event.writerName() + "님이 새로운 리뷰를 작성했습니다.";
 
-    // 팔로워 수 만큼 Notification 엔티티 생성 (JPA 지연로딩)
+    // 팔로워 수 만큼 Notification 엔티티 생성
     List<Notification> notifications = follows.stream()
         .map(follow -> Notification.builder()
             .user(follow.getFollower())
@@ -159,11 +165,15 @@ public class NotificationEventListener {
     // saveAll로 저장
     List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
 
-    // 저장된 알림들 DTO로 변환해서 SSE 알림 발송
-    savedNotifications.forEach(saved -> {
-      NotificationDto dto = notificationMapper.toDto(saved);
-      sseService.sendNotification(saved.getUser().getId(), dto);
-    });
+    // 병렬 발송 처리
+    List<CompletableFuture<Void>> futures = savedNotifications.stream()
+        .map(saved -> CompletableFuture.runAsync(() -> {
+          NotificationDto dto = notificationMapper.toDto(saved);
+          sseService.sendNotification(saved.getUser().getId(), dto);
+        }, notificationExecutor))
+            .toList();
+
+    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
     log.info("리뷰 작성 알림 브로드캐스팅 완료 - 발송 건수: {}", savedNotifications.size());
   }

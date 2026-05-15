@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface FollowRepository extends JpaRepository<Follow, UUID> {
 
@@ -19,5 +21,6 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
   long countByFolloweeId(UUID followeeId);
 
   // 특정 유저를 팔로우하는 모든 팔로우 관계 찾기
-  List<Follow> findAllByFolloweeId(UUID followeeId);
+  @Query("SELECT f FROM Follow f JOIN FETCH f.follower WHERE f.followee.id = :followeeId")
+  List<Follow> findAllByFolloweeIdWithFollower(@Param("followeeId") UUID followeeId);
 }

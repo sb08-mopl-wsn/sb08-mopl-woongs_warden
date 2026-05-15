@@ -113,7 +113,7 @@ class NotificationServiceImplTest {
     }
 
     given(notificationRepository.findNotificationsByCursor(
-        eq(userId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class)
+        eq(userId), eq(false), eq(null), eq(null), any(PageRequest.class)
     )).willReturn(mockNotifications);
 
     given(notificationRepository.countByUserId(userId)).willReturn(10L);
@@ -139,7 +139,7 @@ class NotificationServiceImplTest {
     CursorPaginationRequest request = new CursorPaginationRequest(cursor, null, 10, "DESCENDING", "createdAt");
 
     given(notificationRepository.findNotificationsByCursor(
-        eq(userId), eq("createdAt"), eq(false), any(Instant.class), eq(null), any(PageRequest.class)
+        eq(userId), eq(false), any(Instant.class), eq(null), any(PageRequest.class)
     )).willReturn(new ArrayList<>());
 
     // when
@@ -166,7 +166,7 @@ class NotificationServiceImplTest {
     }
 
     given(notificationRepository.findNotificationsByCursor(
-        eq(userId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class)
+        eq(userId), eq(false), eq(null), eq(null), any(PageRequest.class)
     )).willReturn(mockNotifications);
 
     given(notificationRepository.countByUserId(userId)).willReturn(2L);
@@ -189,7 +189,7 @@ class NotificationServiceImplTest {
     // given
     CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "ASCENDING", "createdAt");
 
-    given(notificationRepository.findNotificationsByCursor(eq(userId), eq("createdAt"), eq(true), eq(null), eq(null), any(
+    given(notificationRepository.findNotificationsByCursor(eq(userId), eq(true), eq(null), eq(null), any(
         PageRequest.class))).willReturn(new ArrayList<>());
     given(notificationRepository.countByUserId(userId)).willReturn(0L);
 
@@ -197,7 +197,7 @@ class NotificationServiceImplTest {
     notificationService.getNotifications(userId, request);
 
     // then
-    verify(notificationRepository).findNotificationsByCursor(eq(userId), eq("createdAt"), eq(true), eq(null), eq(null), any(
+    verify(notificationRepository).findNotificationsByCursor(eq(userId), eq(true), eq(null), eq(null), any(
         PageRequest.class));
   }
 

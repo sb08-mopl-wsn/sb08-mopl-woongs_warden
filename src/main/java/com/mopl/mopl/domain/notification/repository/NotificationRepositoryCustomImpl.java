@@ -19,7 +19,7 @@ public class NotificationRepositoryCustomImpl implements NotificationRepositoryC
   private final JPAQueryFactory queryFactory;
 
   @Override
-  public List<Notification> findNotificationsByCursor(UUID userId, String sortBy, boolean isAsc,
+  public List<Notification> findNotificationsByCursor(UUID userId, boolean isAsc,
       Instant cursor, UUID idAfter, Pageable pageable) {
     return queryFactory
         .selectFrom(notification)

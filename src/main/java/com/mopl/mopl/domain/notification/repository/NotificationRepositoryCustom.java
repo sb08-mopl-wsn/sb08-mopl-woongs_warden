@@ -9,6 +9,6 @@ import org.springframework.data.domain.Pageable;
 public interface NotificationRepositoryCustom {
 
   List<Notification> findNotificationsByCursor(
-      UUID userId, String sortBy, boolean isAsc, Instant cursor, UUID idAfter, Pageable pageable
+      UUID userId, boolean isAsc, Instant cursor, UUID idAfter, Pageable pageable
   );
 }

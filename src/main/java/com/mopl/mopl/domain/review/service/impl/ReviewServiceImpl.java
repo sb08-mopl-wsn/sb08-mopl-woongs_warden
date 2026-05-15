@@ -18,9 +18,11 @@ import com.mopl.mopl.domain.review.service.ReviewService;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.event.ReviewCreatedEvent;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class ReviewServiceImpl implements ReviewService {
   private final ContentRepository contentRepository;
   private final UserRepository userRepository;
   private final ReviewMapper reviewMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   @Transactional
@@ -49,6 +52,10 @@ public class ReviewServiceImpl implements ReviewService {
 
     try {
       Review savedReview = reviewRepository.saveAndFlush(review);
+
+      eventPublisher.publishEvent(new ReviewCreatedEvent(
+          savedReview.getId(), user.getId(), user.getName()
+      ));
       return reviewMapper.toDto(savedReview);
     } catch (DataIntegrityViolationException e) {
       throw new ReviewException(ReviewErrorCode.DUPLICATE_REVIEW);

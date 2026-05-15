@@ -80,7 +80,15 @@ public class PlaylistServiceImpl implements PlaylistService {
     Slice<Playlist> slice = playlistRepository.findPlaylists(request);
 
     List<PlaylistDto> data = slice.getContent().stream()
-        .map(playlist -> playlistMapper.toDto(playlist, false, Collections.emptyList()))
+        .map(playlist -> {
+          List<PlaylistContent> playlistContents = playlistContentRepository.findAllByPlaylistId(playlist.getId());
+
+          List<ContentSummary> contents = playlistContents.stream()
+              .map(pc -> contentMapper.toContentSummary(pc.getContent()))
+              .toList();
+
+          return playlistMapper.toDto(playlist, false, contents);
+        })
         .toList();
 
     String nextCursor = null;

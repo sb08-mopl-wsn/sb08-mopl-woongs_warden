@@ -7,6 +7,7 @@ import com.mopl.mopl.domain.playlist.dto.response.CursorResponsePlaylistDto;
 import com.mopl.mopl.domain.playlist.dto.response.PlaylistDto;
 import com.mopl.mopl.domain.playlist.service.PlaylistContentService;
 import com.mopl.mopl.domain.playlist.service.PlaylistService;
+import com.mopl.mopl.domain.playlist.service.PlaylistSubscriptionService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -31,6 +32,7 @@ public class PlaylistController {
 
   private final PlaylistService playlistService;
   private final PlaylistContentService playlistContentService;
+  private final PlaylistSubscriptionService playlistSubscriptionService;
 
 
   @PostMapping
@@ -103,6 +105,26 @@ public class PlaylistController {
   ) {
     UUID userId = userDetails.getUserDto().id();
     playlistContentService.removeContentFromPlaylist(playlistId, contentId, userId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/{playlistId}/subscription")
+  public ResponseEntity<Void> subscribeToPlaylist(
+      @PathVariable UUID playlistId,
+      @AuthenticationPrincipal MoplUserDetails userDetails
+  ) {
+    UUID userId = userDetails.getUserDto().id();
+    playlistSubscriptionService.subscribeToPlaylist(playlistId, userId);
+    return ResponseEntity.status(HttpStatus.CREATED).build();
+  }
+
+  @DeleteMapping("/{playlistId}/subscription")
+  public ResponseEntity<Void> unsubscribeFromPlaylist(
+      @PathVariable UUID playlistId,
+      @AuthenticationPrincipal MoplUserDetails userDetails
+  ) {
+    UUID userId = userDetails.getUserDto().id();
+    playlistSubscriptionService.unsubscribeFromPlaylist(playlistId, userId);
     return ResponseEntity.noContent().build();
   }
 }

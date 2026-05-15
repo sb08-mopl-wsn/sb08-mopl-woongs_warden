@@ -18,7 +18,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Service // 👈 스프링이 "아! 이게 그 구현체구나!" 하고 알 수 있게 해주는 어노테이션
+@Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PlaylistContentServiceImpl implements PlaylistContentService {

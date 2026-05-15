@@ -36,7 +36,7 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
     User user = userRepository.findById(userId)
         .orElseThrow(UserNotFoundException::new);
 
-    if (playlist.getUser().getId().equals(userId)) {
+    if (playlist.getUser().equals(user)) {
       throw new PlaylistSelfSubscriptionException();
     }
 

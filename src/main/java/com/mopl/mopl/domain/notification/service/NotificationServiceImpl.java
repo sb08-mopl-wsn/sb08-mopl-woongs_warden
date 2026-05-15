@@ -74,13 +74,11 @@ public class NotificationServiceImpl implements NotificationService {
 
     // DB 조회 (Limit보다 1개 더 많이 가져와서 다음 페이지 존재여부 확인)
     PageRequest pageRequest = PageRequest.of(0, request.limit() + 1);
-    List<Notification> notifications;
 
-    if ("ASCENDING".equalsIgnoreCase(request.sortDirection())) {
-      notifications = notificationRepository.findNotificationsByCursorAsc(userId, cursorTime, request.idAfter(), pageRequest);
-    } else {
-      notifications = notificationRepository.findNotificationsByCursorDesc(userId, cursorTime, request.idAfter(), pageRequest);
-    }
+    boolean isAsc = "ASCENDING".equalsIgnoreCase(request.sortDirection());
+    List<Notification> notifications = notificationRepository.findNotificationsByCursor(
+        userId, sortBy, isAsc, cursorTime, request.idAfter(), pageRequest
+    );
 
     // 다음 페이지 존재 확인
     boolean hasNext = notifications.size() > request.limit();

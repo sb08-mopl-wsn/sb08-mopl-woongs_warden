@@ -14,6 +14,7 @@ import com.mopl.mopl.domain.playlist.repository.PlaylistRepository;
 import com.mopl.mopl.domain.playlist.service.PlaylistContentService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,15 +34,13 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
     Content content = contentRepository.findById(contentId)
         .orElseThrow(ContentNotFoundException::new);
 
-    boolean alreadyExists = playlistContentRepository
-        .findByPlaylistAndContentId(playlist, contentId).isPresent();
-    if (alreadyExists) {
+    try {
+      PlaylistContent playlistContent = new PlaylistContent(playlist, content);
+      playlistContentRepository.save(playlistContent);
+    } catch (DataIntegrityViolationException e) {
       throw new ContentAlreadyInPlaylistException();
     }
-
-    PlaylistContent playlistContent = new PlaylistContent(playlist, content);
-    playlistContentRepository.save(playlistContent);
-    playlist.increaseContentCount();
+    playlistRepository.increaseContentCount(playlistId);
   }
 
   @Override
@@ -53,7 +52,7 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
         .orElseThrow(ContentNotFoundInPlaylistException::new);
 
     playlistContentRepository.delete(playlistContent);
-    playlist.decreaseContentCount();
+    playlistRepository.decreaseContentCount(playlistId);;
   }
 
   private Playlist findPlaylistAndCheckOwner(UUID playlistId, UUID userId) {

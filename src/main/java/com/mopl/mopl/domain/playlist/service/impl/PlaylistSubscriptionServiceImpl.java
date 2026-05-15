@@ -14,6 +14,7 @@ import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,20 +35,18 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
     User user = userRepository.findById(userId)
         .orElseThrow(UserNotFoundException::new);
 
-    boolean alreadySubscribed = playlistSubscriptionRepository
-        .findByUserAndPlaylist(user, playlist).isPresent();
-    if (alreadySubscribed) {
-      throw new PlaylistDuplicateSubscriptionException();
-    }
-
     if (playlist.getUser().getId().equals(userId)) {
       throw new PlaylistSelfSubscriptionException();
     }
 
-    PlaylistSubscription subscription = new PlaylistSubscription(user, playlist);
-    playlistSubscriptionRepository.save(subscription);
+    try {
+      PlaylistSubscription subscription = new PlaylistSubscription(user, playlist);
+      playlistSubscriptionRepository.save(subscription);
+    } catch (DataIntegrityViolationException e) {
+      throw new PlaylistDuplicateSubscriptionException();
+    }
 
-    playlist.increaseSubscriberCount();
+    playlistRepository.increaseSubscriberCount(playlistId);
   }
 
   @Override
@@ -64,6 +63,6 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
 
     playlistSubscriptionRepository.delete(subscription);
 
-    playlist.decreaseSubscriberCount();
+    playlistRepository.decreaseSubscriberCount(playlistId);
   }
 }

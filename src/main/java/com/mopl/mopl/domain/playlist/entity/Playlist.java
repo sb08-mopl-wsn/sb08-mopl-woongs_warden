@@ -56,25 +56,4 @@ public class Playlist extends BaseUpdatableEntity {
         }
     }
 
-    //컨텐츠 추가,삭제
-    public void increaseContentCount() {
-        this.contentCount++;
-    }
-
-    public void decreaseContentCount() {
-        if (this.contentCount > 0) {
-            this.contentCount--;
-        }
-    }
-
-    //구독 추가,삭제
-    public void increaseSubscriberCount() {
-        this.subscriberCount++;
-    }
-
-    public void decreaseSubscriberCount() {
-        if (this.subscriberCount > 0) {
-            this.subscriberCount--;
-        }
-    }
 }

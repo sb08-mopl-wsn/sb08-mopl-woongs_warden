@@ -21,7 +21,9 @@ import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -79,16 +81,23 @@ public class PlaylistServiceImpl implements PlaylistService {
   public CursorResponsePlaylistDto findPlaylists(PlaylistSearchRequest request) {
     Slice<Playlist> slice = playlistRepository.findPlaylists(request);
 
+    List<UUID> playlistIds = slice.getContent().stream()
+        .map(Playlist::getId)
+        .toList();
+
+    Map<UUID, List<ContentSummary>> contentsByPlaylistId = playlistContentRepository
+        .findAllByPlaylistIdIn(playlistIds).stream()
+        .collect(Collectors.groupingBy(
+            pc -> pc.getPlaylist().getId(),
+            Collectors.mapping(pc -> contentMapper.toContentSummary(pc.getContent()), Collectors.toList())
+        ));
+
     List<PlaylistDto> data = slice.getContent().stream()
-        .map(playlist -> {
-          List<PlaylistContent> playlistContents = playlistContentRepository.findAllByPlaylistId(playlist.getId());
-
-          List<ContentSummary> contents = playlistContents.stream()
-              .map(pc -> contentMapper.toContentSummary(pc.getContent()))
-              .toList();
-
-          return playlistMapper.toDto(playlist, false, contents);
-        })
+        .map(playlist -> playlistMapper.toDto(
+            playlist,
+            false,
+            contentsByPlaylistId.getOrDefault(playlist.getId(), Collections.emptyList())
+        ))
         .toList();
 
     String nextCursor = null;

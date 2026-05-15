@@ -6,6 +6,7 @@ import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.dto.SportsdbEvent;
 import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class SportsdbCollectTasklet implements Tasklet
     private final SportsdbContentMapper sportsdbContentMapper;
     private final ContentRepository contentRepository;
     private final EntityManager entityManager;
+    private final MeterRegistry meterRegistry;
 
     @Override
     public @Nullable RepeatStatus execute(@NonNull StepContribution contribution, @NonNull ChunkContext chunkContext) throws Exception {
@@ -41,6 +43,7 @@ public class SportsdbCollectTasklet implements Tasklet
                     Content content = sportsdbContentMapper.sportToContent(event);
                     if (contentRepository.existsByExternalIdAndContentType(
                             content.getExternalId(), content.getContentType())) {
+                        meterRegistry.counter("mopl.batch.sportsdb.skipped").increment();
                         continue;
                     }
                     try {
@@ -48,6 +51,7 @@ public class SportsdbCollectTasklet implements Tasklet
                         saved++;
                     } catch (DataIntegrityViolationException e) {
                         log.debug("중복 콘텐츠 경합으로 저장 스킵: externalId={}", content.getExternalId());
+                        meterRegistry.counter("mopl.batch.sportsdb.skipped").increment();
                         entityManager.clear();
                     }
                 }
@@ -56,6 +60,9 @@ public class SportsdbCollectTasklet implements Tasklet
                 log.warn("Sportsdb 리그 {} 수집 실패", leagueId);
             }
         }
+
+        meterRegistry.counter("mopl.batch.sportsdb.saved").increment(saved);
+        meterRegistry.counter("mopl.batch.sportsdb.failed").increment(failed);
 
         log.info("Sportsdb 수집 완료 - 저장 {}건, 실패 {}건", saved, failed);
         return RepeatStatus.FINISHED;

@@ -8,6 +8,8 @@ import com.mopl.mopl.infrastructure.external.exception.ApiEmptyResponseException
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.dto.SportsdbEvent;
 import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,12 +42,14 @@ class SportsdbCollectTaskletTest
     @Mock private StepContribution contribution;
     @Mock private ChunkContext chunkContext;
     @Mock private EntityManager entityManager;
+    @Mock private MeterRegistry meterRegistry;
+    @Mock private Counter counter;
 
     private SportsdbCollectTasklet tasklet;
 
     @BeforeEach
     void setUp() {
-        tasklet = new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager);
+        tasklet = new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager, meterRegistry);
     }
 
     @Test
@@ -67,6 +71,7 @@ class SportsdbCollectTaskletTest
         when(sportsdbApiClient.fetchDayEvents(anyInt())).thenReturn(List.of(event));
         when(sportsdbContentMapper.sportToContent(event)).thenReturn(content);
         when(contentRepository.existsByExternalIdAndContentType(anyString(), any())).thenReturn(false);
+        when(meterRegistry.counter(anyString())).thenReturn(counter);
 
         // when
         RepeatStatus status = tasklet.execute(contribution, chunkContext);
@@ -96,6 +101,7 @@ class SportsdbCollectTaskletTest
         when(sportsdbApiClient.fetchDayEvents(anyInt())).thenReturn(List.of(event));
         when(sportsdbContentMapper.sportToContent(event)).thenReturn(content);
         when(contentRepository.existsByExternalIdAndContentType("123", ContentType.sport)).thenReturn(true);
+        when(meterRegistry.counter(anyString())).thenReturn(counter);
 
         // when
         RepeatStatus status = tasklet.execute(contribution, chunkContext);
@@ -130,6 +136,7 @@ class SportsdbCollectTaskletTest
                 .thenReturn(List.of(event));
         when(sportsdbContentMapper.sportToContent(event)).thenReturn(content);
         when(contentRepository.existsByExternalIdAndContentType(anyString(), any())).thenReturn(false);
+        when(meterRegistry.counter(anyString())).thenReturn(counter);
 
         // when
         RepeatStatus status = tasklet.execute(contribution, chunkContext);

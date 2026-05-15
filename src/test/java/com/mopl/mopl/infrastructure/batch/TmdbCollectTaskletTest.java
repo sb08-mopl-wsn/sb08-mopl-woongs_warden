@@ -9,6 +9,8 @@ import com.mopl.mopl.infrastructure.external.tmdb.dto.TmdbTv;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbMovieListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.response.TmdbTvListResponse;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +27,7 @@ import java.util.List;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,12 +42,14 @@ class TmdbCollectTaskletTest
     @Mock private StepContribution contribution;
     @Mock private ChunkContext chunkContext;
     @Mock private EntityManager entityManager;
+    @Mock private MeterRegistry meterRegistry;
+    @Mock private Counter counter;
 
     private TmdbCollectTasklet tasklet;
 
     @BeforeEach
     void setUp() {
-        tasklet = new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, 1);
+        tasklet = new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, meterRegistry,  1);
     }
 
     @Test
@@ -62,6 +67,7 @@ class TmdbCollectTaskletTest
 
         when(tmdbContentMapper.movieToContent(movie)).thenReturn(movieContent);
         when(tmdbContentMapper.tvToContent(tv)).thenReturn(tvContent);
+        when(meterRegistry.counter(anyString())).thenReturn(counter);
 
         // when
         RepeatStatus status = tasklet.execute(contribution, chunkContext);
@@ -85,6 +91,7 @@ class TmdbCollectTaskletTest
         when(tmdbContentMapper.movieToContent(movie)).thenReturn(movieContent);
         when(contentRepository.saveAndFlush(any(Content.class)))
                 .thenThrow(new DataIntegrityViolationException("중복"));
+        when(meterRegistry.counter(anyString())).thenReturn(counter);
 
         // when
         RepeatStatus status = tasklet.execute(contribution, chunkContext);
@@ -104,6 +111,7 @@ class TmdbCollectTaskletTest
 
         Content tvContent = Content.builder().title("TV").externalId("2").contentType(ContentType.tvSeries).build();
         when(tmdbContentMapper.tvToContent(tv)).thenReturn(tvContent);
+        when(meterRegistry.counter(anyString())).thenReturn(counter);
 
         // when
         RepeatStatus status = tasklet.execute(contribution, chunkContext);

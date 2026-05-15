@@ -9,9 +9,9 @@ public enum ContentType {
 
     public static ContentType from(String value) {
         try {
-            return ContentType.valueOf(value.toLowerCase());
+            return ContentType.valueOf(value);
         } catch (IllegalArgumentException e) {
-            throw new ContentInvalidTypeException(value.toLowerCase());
+            throw new ContentInvalidTypeException(value);
         }
     }
 }

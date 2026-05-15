@@ -75,7 +75,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, loggers
+        include: health, info, loggers, caches, metrics
   endpoint:
     health:
       show-details: always

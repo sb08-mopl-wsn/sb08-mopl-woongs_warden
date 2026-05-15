@@ -4,16 +4,19 @@ import com.mopl.mopl.domain.user.dto.CursorResponseUserDto;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.dto.request.*;
 import com.mopl.mopl.domain.user.service.UserService;
+import com.mopl.mopl.domain.watchingSession.dto.response.WatchingSessionDto;
+import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,6 +26,7 @@ import java.util.UUID;
 @Slf4j
 public class UserController {
     private final UserService userService;
+    private final WatchingSessionService watchingSessionService;
 
     @PostMapping
     public ResponseEntity<UserDto> createUser(
@@ -34,7 +38,7 @@ public class UserController {
 
     @GetMapping
     public ResponseEntity<CursorResponseUserDto> getAllUsers(
-            @Valid @ModelAttribute  CursorUserRequest request
+            @Valid @ModelAttribute CursorUserRequest request
     ) {
         CursorResponseUserDto response = userService.getAllUsers(request);
         return ResponseEntity.status(HttpStatus.OK).body(response);
@@ -88,5 +92,17 @@ public class UserController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(updatedUser);
+    }
+
+    @GetMapping("/{watcherId}/watching-sessions")
+    public ResponseEntity<WatchingSessionDto> findCurrentWatchingSession(
+            @PathVariable UUID watcherId,
+            @AuthenticationPrincipal MoplUserDetails userDetails
+    ) {
+        UUID currentUserId = userDetails.getUserDto().id();
+
+        Optional<WatchingSessionDto> sessionDto = watchingSessionService.findCurrentWatchingSessionByUserId(watcherId, currentUserId);
+
+        return ResponseEntity.ok(sessionDto.orElse(null));
     }
 }

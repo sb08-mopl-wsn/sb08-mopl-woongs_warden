@@ -16,6 +16,7 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,7 +34,7 @@ public class WatchingSessionStompEventListener {
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     // 연결 종료 이벤트 처리 용도
-    private final Map<String, UUID> sessionContentMap = new ConcurrentHashMap<>();
+    private final Map<String, Set<UUID>> sessionContentMap = new ConcurrentHashMap<>();
     // 구독 취소 이벤트 처리 용도
     private final Map<String, UUID> subscriptionContentMap = new ConcurrentHashMap<>();
 
@@ -57,7 +58,10 @@ public class WatchingSessionStompEventListener {
             UUID contentId = extractContentId(destination);
             UUID userId = extractUserId(accessor);
 
-            sessionContentMap.put(sessionId, contentId);
+            sessionContentMap
+                    .computeIfAbsent(sessionId, k -> ConcurrentHashMap.newKeySet())
+                    .add(contentId);
+
             subscriptionContentMap.put(sessionId + ":" + subscriptionId, contentId);
 
             watchingSessionService.join(contentId, userId);
@@ -87,8 +91,14 @@ public class WatchingSessionStompEventListener {
             UUID contentId = subscriptionContentMap.remove(key);
             if (contentId == null) return;
 
-            sessionContentMap.remove(sessionId);
+            Set<UUID> contentIds = sessionContentMap.get(sessionId);
+            if (contentIds != null) {
+                contentIds.remove(contentId);
+                if (contentIds.isEmpty()) sessionContentMap.remove(sessionId);
+            }
+
             UUID userId = extractUserId(accessor);
+
             watchingSessionService.leave(contentId, userId);
         } catch (BusinessException e) {
             log.warn("[Unsubscribe FAIL] sessionId={}, code={}, message={}",
@@ -111,11 +121,22 @@ public class WatchingSessionStompEventListener {
         String sessionId = accessor.getSessionId();
 
         try {
-            UUID contentId = sessionContentMap.remove(sessionId);
-            if (contentId == null) return;
+            Set<UUID> contentIds = sessionContentMap.remove(sessionId);
+
+            subscriptionContentMap.keySet()
+                    .removeIf(key -> key.startsWith(sessionId + ":"));
+
+            if (contentIds == null || contentIds.isEmpty()) return;
 
             UUID userId = extractUserId(accessor);
-            watchingSessionService.leave(contentId, userId);
+
+            for (UUID contentId : contentIds) {
+                try {
+                    watchingSessionService.leave(contentId, userId);
+                } catch (Exception e) {
+                    log.error("[Disconnect ERROR] sessionId={}, contentId={}", sessionId, contentId, e);
+                }
+            }
         } catch (Exception e) {
             // 단순 로깅
             // 연결 종료 시점이라 사용자에게 전달 불가하다.

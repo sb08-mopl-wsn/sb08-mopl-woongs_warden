@@ -75,13 +75,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, loggers, caches, metrics
+        include: health, info, loggers, caches, metrics, prometheus
   endpoint:
     health:
       show-details: always
   info:
     env:
       enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 # 커스텀 프로퍼티 추가
 # jwt사용을 위해 임시로 만들었습니다. 추후 삭제나 변경이 필요합니다

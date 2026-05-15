@@ -4,6 +4,7 @@ import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,8 @@ public class TmdbCollectTasklet implements Tasklet
     private final TmdbContentMapper tmdbContentMapper;
     private final ContentRepository contentRepository;
     private final EntityManager entityManager;
+    private final MeterRegistry meterRegistry;
+
     private final int totalPages;
 
     @Override
@@ -48,6 +51,9 @@ public class TmdbCollectTasklet implements Tasklet
                 log.warn("TMDB TV {}페이지 수집 실패", page, e);
             }
         }
+
+        meterRegistry.counter("mopl.batch.tmdb.saved").increment(saved);
+        meterRegistry.counter("mopl.batch.tmdb.failed").increment(failed);
 
         log.info("TMDB 수집 완료 - 저장: {}건, 실패: {}건", saved, failed);
         return RepeatStatus.FINISHED;
@@ -74,6 +80,7 @@ public class TmdbCollectTasklet implements Tasklet
             if (contentRepository.existsByExternalIdAndContentType(
                     content.getExternalId(), content.getContentType())) {
                 log.debug("중복 콘텐츠 스킵: externalId={}", content.getExternalId());
+                meterRegistry.counter("mopl.batch.tmdb.skipped").increment();
                 continue;
             }
             try {
@@ -81,6 +88,7 @@ public class TmdbCollectTasklet implements Tasklet
                 saved++;
             } catch (DataIntegrityViolationException e) {
                 log.debug("중복 콘텐츠 경합으로 저장 스킵: externalId={}", content.getExternalId());
+                meterRegistry.counter("mopl.batch.tmdb.skipped").increment();
                 entityManager.clear();
             }
         }

@@ -3,6 +3,7 @@ package com.mopl.mopl.domain.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -111,8 +112,8 @@ class NotificationServiceImplTest {
       mockNotifications.add(noti);
     }
 
-    given(notificationRepository.findNotificationsByCursorDesc(
-        eq(userId), eq(null), eq(null), any(PageRequest.class)
+    given(notificationRepository.findNotificationsByCursor(
+        eq(userId), eq(false), eq(null), eq(null), any(PageRequest.class)
     )).willReturn(mockNotifications);
 
     given(notificationRepository.countByUserId(userId)).willReturn(10L);
@@ -135,10 +136,11 @@ class NotificationServiceImplTest {
   void getNotifications_WithCursor_DoesNotCount() {
     // given
     String cursor = Instant.now().toString(); // 커서 값 존재
-    CursorPaginationRequest request = new CursorPaginationRequest(cursor, null, 10, "DESCENDING", "createdAt");
+    UUID idAfter = UUID.randomUUID();
+    CursorPaginationRequest request = new CursorPaginationRequest(cursor, idAfter, 10, "DESCENDING", "createdAt");
 
-    given(notificationRepository.findNotificationsByCursorDesc(
-        eq(userId), any(Instant.class), eq(null), any(PageRequest.class)
+    given(notificationRepository.findNotificationsByCursor(
+        any(UUID.class), anyBoolean(), any(Instant.class), any(UUID.class), any(PageRequest.class)
     )).willReturn(new ArrayList<>());
 
     // when
@@ -164,8 +166,8 @@ class NotificationServiceImplTest {
       mockNotifications.add(noti);
     }
 
-    given(notificationRepository.findNotificationsByCursorDesc(
-        eq(userId), eq(null), eq(null), any(PageRequest.class)
+    given(notificationRepository.findNotificationsByCursor(
+        eq(userId), eq(false), eq(null), eq(null), any(PageRequest.class)
     )).willReturn(mockNotifications);
 
     given(notificationRepository.countByUserId(userId)).willReturn(2L);
@@ -183,12 +185,12 @@ class NotificationServiceImplTest {
   }
 
   @Test
-  @DisplayName("알림 목록 조회 - ASCENDING 정렬 시 repository의 Asc 메서드를 호출한다.")
-  void getNotifications_Ascending_CallsRepositoryAsc() {
+  @DisplayName("알림 목록 조회 - ASCENDING 정렬 시 파라미터에 true가 전달된다.")
+  void getNotifications_Ascending_Success() {
     // given
     CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "ASCENDING", "createdAt");
 
-    given(notificationRepository.findNotificationsByCursorAsc(eq(userId), eq(null), eq(null), any(
+    given(notificationRepository.findNotificationsByCursor(eq(userId), eq(true), eq(null), eq(null), any(
         PageRequest.class))).willReturn(new ArrayList<>());
     given(notificationRepository.countByUserId(userId)).willReturn(0L);
 
@@ -196,8 +198,8 @@ class NotificationServiceImplTest {
     notificationService.getNotifications(userId, request);
 
     // then
-    verify(notificationRepository).findNotificationsByCursorAsc(eq(userId), eq(null), eq(null), any(PageRequest.class));
-    verify(notificationRepository, never()).findNotificationsByCursorDesc(any(), any(), any(), any());
+    verify(notificationRepository).findNotificationsByCursor(eq(userId), eq(true), eq(null), eq(null), any(
+        PageRequest.class));
   }
 
   @Test
@@ -205,7 +207,8 @@ class NotificationServiceImplTest {
   void getNotifications_InvalidCursor_ThrowsExceptions() {
     // given
     String invalidCursor = "2026-invalid-date-format";
-    CursorPaginationRequest request = new CursorPaginationRequest(invalidCursor, null, 10, "DESCENDING", "createdAt");
+    UUID idAfter = UUID.randomUUID();
+    CursorPaginationRequest request = new CursorPaginationRequest(invalidCursor, idAfter, 10, "DESCENDING", "createdAt");
 
     // when & then
     assertThatThrownBy(() ->

@@ -136,10 +136,11 @@ class NotificationServiceImplTest {
   void getNotifications_WithCursor_DoesNotCount() {
     // given
     String cursor = Instant.now().toString(); // 커서 값 존재
-    CursorPaginationRequest request = new CursorPaginationRequest(cursor, null, 10, "DESCENDING", "createdAt");
+    UUID idAfter = UUID.randomUUID();
+    CursorPaginationRequest request = new CursorPaginationRequest(cursor, idAfter, 10, "DESCENDING", "createdAt");
 
     given(notificationRepository.findNotificationsByCursor(
-        eq(userId), eq(false), any(Instant.class), eq(null), any(PageRequest.class)
+        any(UUID.class), anyBoolean(), any(Instant.class), any(UUID.class), any(PageRequest.class)
     )).willReturn(new ArrayList<>());
 
     // when
@@ -206,7 +207,8 @@ class NotificationServiceImplTest {
   void getNotifications_InvalidCursor_ThrowsExceptions() {
     // given
     String invalidCursor = "2026-invalid-date-format";
-    CursorPaginationRequest request = new CursorPaginationRequest(invalidCursor, null, 10, "DESCENDING", "createdAt");
+    UUID idAfter = UUID.randomUUID();
+    CursorPaginationRequest request = new CursorPaginationRequest(invalidCursor, idAfter, 10, "DESCENDING", "createdAt");
 
     // when & then
     assertThatThrownBy(() ->

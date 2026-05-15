@@ -16,17 +16,17 @@ public interface PlaylistRepository extends JpaRepository<Playlist, UUID>, Playl
 
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Playlist p SET p.contentCount = p.contentCount + 1 WHERE p.id = :id")
-  void increaseContentCount(@Param("id") UUID id);
+  int increaseContentCount(@Param("id") UUID id);
 
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Playlist p SET p.contentCount = p.contentCount - 1 WHERE p.id = :id AND p.contentCount > 0")
-  void decreaseContentCount(@Param("id") UUID id);
+  int decreaseContentCount(@Param("id") UUID id);
 
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Playlist p SET p.subscriberCount = p.subscriberCount + 1 WHERE p.id = :id")
-  void increaseSubscriberCount(@Param("id") UUID id);
+  int increaseSubscriberCount(@Param("id") UUID id);
 
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Playlist p SET p.subscriberCount = p.subscriberCount - 1 WHERE p.id = :id AND p.subscriberCount > 0")
-  void decreaseSubscriberCount(@Param("id") UUID id);
+  int decreaseSubscriberCount(@Param("id") UUID id);
 }

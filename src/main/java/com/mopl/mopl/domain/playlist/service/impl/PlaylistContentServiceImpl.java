@@ -9,6 +9,7 @@ import com.mopl.mopl.domain.playlist.exception.ContentAlreadyInPlaylistException
 import com.mopl.mopl.domain.playlist.exception.ContentNotFoundInPlaylistException;
 import com.mopl.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.mopl.mopl.domain.playlist.exception.PlaylistNotFoundException;
+import com.mopl.mopl.domain.playlist.exception.PlaylistUpdateFailedException;
 import com.mopl.mopl.domain.playlist.repository.PlaylistContentRepository;
 import com.mopl.mopl.domain.playlist.repository.PlaylistRepository;
 import com.mopl.mopl.domain.playlist.service.PlaylistContentService;
@@ -40,7 +41,10 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
     } catch (DataIntegrityViolationException e) {
       throw new ContentAlreadyInPlaylistException();
     }
-    playlistRepository.increaseContentCount(playlistId);
+    int updatedRows = playlistRepository.increaseContentCount(playlistId);
+    if (updatedRows == 0) {
+      throw new PlaylistUpdateFailedException();
+    }
   }
 
   @Override
@@ -52,7 +56,11 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
         .orElseThrow(ContentNotFoundInPlaylistException::new);
 
     playlistContentRepository.delete(playlistContent);
-    playlistRepository.decreaseContentCount(playlistId);;
+
+    int updatedRows = playlistRepository.decreaseContentCount(playlistId);
+    if (updatedRows == 0) {
+      throw new PlaylistUpdateFailedException();
+    }
   }
 
   private Playlist findPlaylistAndCheckOwner(UUID playlistId, UUID userId) {
@@ -63,6 +71,4 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
     }
     return playlist;
   }
-
-
 }

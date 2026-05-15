@@ -6,6 +6,7 @@ import com.mopl.mopl.domain.playlist.exception.PlaylistDuplicateSubscriptionExce
 import com.mopl.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.mopl.mopl.domain.playlist.exception.PlaylistSelfSubscriptionException;
 import com.mopl.mopl.domain.playlist.exception.PlaylistSubscriptionNotFoundException;
+import com.mopl.mopl.domain.playlist.exception.PlaylistUpdateFailedException;
 import com.mopl.mopl.domain.playlist.repository.PlaylistRepository;
 import com.mopl.mopl.domain.playlist.repository.PlaylistSubscriptionRepository;
 import com.mopl.mopl.domain.playlist.service.PlaylistSubscriptionService;
@@ -46,7 +47,10 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
       throw new PlaylistDuplicateSubscriptionException();
     }
 
-    playlistRepository.increaseSubscriberCount(playlistId);
+    int updatedRows = playlistRepository.increaseSubscriberCount(playlistId);
+    if (updatedRows == 0) {
+      throw new PlaylistUpdateFailedException();
+    }
   }
 
   @Override
@@ -63,6 +67,9 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
 
     playlistSubscriptionRepository.delete(subscription);
 
-    playlistRepository.decreaseSubscriberCount(playlistId);
+    int updatedRows = playlistRepository.decreaseSubscriberCount(playlistId);
+    if (updatedRows == 0) {
+      throw new PlaylistUpdateFailedException();
+    }
   }
 }

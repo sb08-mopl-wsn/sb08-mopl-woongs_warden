@@ -126,15 +126,10 @@ public class ContentRepositoryCustomImpl implements ContentRepositoryCustom
 
         try {
             switch (sortBy == null ? "createdAt" : sortBy) {
-                case "avgRating" -> {
+                case "rate" -> {
                     BigDecimal value = new BigDecimal(cursor);
                     primaryEq = content.avgRating.eq(value);
                     primaryGtLt = isAsc ? content.avgRating.gt(value) : content.avgRating.lt(value);
-                }
-                case "reviewCount" -> {
-                    int value = Integer.parseInt(cursor);
-                    primaryEq = content.reviewCount.eq(value);
-                    primaryGtLt = isAsc ? content.reviewCount.gt(value) : content.reviewCount.lt(value);
                 }
                 case "watcherCount" -> {
                     int value = Integer.parseInt(cursor);
@@ -167,10 +162,9 @@ public class ContentRepositoryCustomImpl implements ContentRepositoryCustom
      */
     private OrderSpecifier<?> orderByCondition(String sortBy, boolean isAsc) {
         return switch (sortBy == null ? "watcherCount" : sortBy) {
-            case "avgRating" -> isAsc ? content.avgRating.asc() : content.avgRating.desc();
-            case "reviewCount" -> isAsc ? content.reviewCount.asc() : content.reviewCount.desc();
-            case "createdAt" -> isAsc ? content.createdAt.asc() : content.createdAt.desc();
-            default -> isAsc ? content.watcherCount.asc() : content.watcherCount.desc();
+            case "rate" -> isAsc ? content.avgRating.asc() : content.avgRating.desc();
+            case "watcherCount" -> isAsc ? content.watcherCount.asc() : content.watcherCount.desc();
+            default -> isAsc ? content.createdAt.asc() : content.createdAt.desc();
         };
     }
 }

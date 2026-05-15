@@ -57,7 +57,7 @@ public class SseService {
     try {
 
       emitter.send(SseEmitter.event()
-          .name("notifications")
+          .name("connect")
           .data("연결 성공. Event Stream Created"));
     } catch (IOException e) {
 

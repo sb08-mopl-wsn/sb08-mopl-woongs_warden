@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -178,7 +179,7 @@ class ConversationServiceImplTest {
     ReflectionTestUtils.setField(conv, "updatedAt", Instant.now());
     mockConvs.add(conv);
 
-    given(conversationRepository.findMyConversationsByCursorDesc(eq(currentUserId), eq(null), eq(null), any(
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(false), eq(null), eq(null), any(
         PageRequest.class))).willReturn(mockConvs);
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(3L);
     given(conversationRepository.countByReceiverId(currentUserId)).willReturn(2L);
@@ -205,7 +206,7 @@ class ConversationServiceImplTest {
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("지원합니다.");
 
-    verify(conversationRepository, never()).findMyConversationsByCursorDesc(any(), any(), any(), any());
+    verify(conversationRepository, never()).findMyConversationsByCursor(any(), any(), anyBoolean(), any(), any(), any());
   }
 
   @Test
@@ -218,7 +219,7 @@ class ConversationServiceImplTest {
 
     CursorPaginationRequest request = new CursorPaginationRequest(cursor, idAfter, 10, "DESCENDING", "updatedAt");
 
-    given(conversationRepository.findMyConversationsByCursorDesc(any(UUID.class), any(Instant.class), any(UUID.class), any(PageRequest.class)))
+    given(conversationRepository.findMyConversationsByCursor(any(UUID.class), any(), anyBoolean(), any(Instant.class), any(UUID.class), any(PageRequest.class)))
         .willReturn(new ArrayList<>());
 
     // when
@@ -250,7 +251,7 @@ class ConversationServiceImplTest {
     String expectedNextCursor = mockConvs.get(1).getUpdatedAt().toString();
     UUID expectedNextIdAfter = mockConvs.get(1).getId();
 
-    given(conversationRepository.findMyConversationsByCursorDesc(eq(currentUserId), eq(null), eq(null), any(PageRequest.class)))
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
         .willReturn(mockConvs);
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(6L);
     given(conversationRepository.countByReceiverId(currentUserId)).willReturn(4L);
@@ -310,7 +311,7 @@ class ConversationServiceImplTest {
 
     // given
     CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "createdAt");
-    given(conversationRepository.findMyConversationsByCreatedAtCursorDesc(eq(currentUserId), eq(null), eq(null), any(PageRequest.class)))
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
         .willReturn(new ArrayList<>());
 
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(0L);
@@ -321,7 +322,7 @@ class ConversationServiceImplTest {
 
     // then
     assertThat(result).isNotNull();
-    verify(conversationRepository).findMyConversationsByCreatedAtCursorDesc(eq(currentUserId), eq(null), eq(null), any(PageRequest.class));
+    verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class));
     verify(conversationRepository).countBySenderId(currentUserId);
     verify(conversationRepository).countByReceiverId(currentUserId);
   }

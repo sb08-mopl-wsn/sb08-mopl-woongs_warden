@@ -119,20 +119,13 @@ public class ConversationServiceImpl implements ConversationService{
 
     // DB 조회
     PageRequest pageRequest = PageRequest.of(0, request.limit() + 1);
-    List<Conversation> conversations;
 
     boolean isAsc = "ASCENDING".equalsIgnoreCase(request.sortDirection());
     boolean byCreatedAt = "createdAt".equals(sortBy);
 
-    if (isAsc && byCreatedAt) {
-      conversations = conversationRepository.findMyConversationsByCreatedAtCursorAsc(currentUserId, cursorTime, request.idAfter(), pageRequest);
-    } else if (isAsc) { // 기본값 updatedAt ASC
-      conversations = conversationRepository.findMyConversationsByCursorAsc(currentUserId, cursorTime, request.idAfter(), pageRequest);
-    } else if (byCreatedAt) {
-      conversations = conversationRepository.findMyConversationsByCreatedAtCursorDesc(currentUserId, cursorTime, request.idAfter(), pageRequest);
-    } else { // 기본값 updatedAt DESC
-      conversations = conversationRepository.findMyConversationsByCursorDesc(currentUserId, cursorTime, request.idAfter(), pageRequest);
-    }
+    List<Conversation> conversations = conversationRepository.findMyConversationsByCursor(
+        currentUserId, sortBy, isAsc, cursorTime, request.idAfter(), pageRequest
+    );
 
     // 다음 페이지 존재 확인
     boolean hasNext = conversations.size() > request.limit();

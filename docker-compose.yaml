@@ -58,9 +58,88 @@ services:
     networks:
       - mopl-network
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    profiles:
+      - local
+      - develop
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    networks:
+      - mopl-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    profiles:
+      - local
+      - develop
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      TZ: "Asia/Seoul"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - mopl-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    user: "0"
+    restart: unless-stopped
+    profiles:
+      - local
+      - develop
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml
+      - loki-data:/tmp/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    networks:
+      - mopl-network
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    profiles:
+      - local
+      - develop
+    volumes:
+      - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml
+      - ./.logs:/app-logs/local:ro
+      - app_logs:/app-logs/develop:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      - loki
+    networks:
+      - mopl-network
+
 volumes:
   mopl-db-data:
   app_logs:
+  prometheus-data:
+  grafana-data:
+  loki-data:
 
 networks:
   mopl-network:

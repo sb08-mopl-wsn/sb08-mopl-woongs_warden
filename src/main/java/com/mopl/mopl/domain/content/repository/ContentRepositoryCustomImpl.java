@@ -161,7 +161,7 @@ public class ContentRepositoryCustomImpl implements ContentRepositoryCustom
      * @return 정렬 조건
      */
     private OrderSpecifier<?> orderByCondition(String sortBy, boolean isAsc) {
-        return switch (sortBy == null ? "watcherCount" : sortBy) {
+        return switch (sortBy == null ? "createdAt" : sortBy) {
             case "rate" -> isAsc ? content.avgRating.asc() : content.avgRating.desc();
             case "watcherCount" -> isAsc ? content.watcherCount.asc() : content.watcherCount.desc();
             default -> isAsc ? content.createdAt.asc() : content.createdAt.desc();

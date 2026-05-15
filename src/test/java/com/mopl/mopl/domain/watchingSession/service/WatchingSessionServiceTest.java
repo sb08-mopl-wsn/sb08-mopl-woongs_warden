@@ -156,7 +156,7 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("Content가 없으면 ContentNotFound을 던진다.")
+        @DisplayName("Content가 없으면 ContentNotFoundException을 던진다.")
         void contentNotFound_throwsException() {
             // given
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
@@ -283,7 +283,7 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("삭제 전 세선 정보로 LEAVE 이벤트를 발행한다.")
+        @DisplayName("삭제 전 세션 정보로 LEAVE 이벤트를 발행한다.")
         void leave_publishesEventWithDeletionSessionData() {
             // given
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
@@ -549,7 +549,7 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("totalCount는 항상 countByConetntId의 반환값을 사용한다.")
+        @DisplayName("totalCount는 항상 countByContentId의 반환값을 사용한다.")
         void totalCount_usesCountByContentId() {
             WatchingSessionPageRequest request = buildRequest(10);
 

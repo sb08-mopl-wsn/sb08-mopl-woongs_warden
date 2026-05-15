@@ -13,6 +13,8 @@ import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Slice;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,7 @@ public class ContentServiceImpl implements ContentService
      * @param thumbnailImage        썸네일 이미지
      * @return 등록된 콘텐츠 정보
      */
+    @CacheEvict(value = "contents", allEntries = true)
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     @Override
@@ -71,6 +74,7 @@ public class ContentServiceImpl implements ContentService
      * @return 콘텐츠 정보
      * @throws ContentNotFoundException 콘텐츠가 존재하지 않을 때
      */
+    @Cacheable(key = "#contentId", value = "content")
     @Override
     public ContentDto getContent(UUID contentId) {
         Content content = contentRepository.findById(contentId)
@@ -85,6 +89,8 @@ public class ContentServiceImpl implements ContentService
      * @param contentSearchRequest 검색 정보
      * @return 콘텐츠 목록과 다음 페이지 존재 여부
      */
+    @Cacheable(key = "#contentSearchRequest", value = "contents",
+            condition = "#contentSearchRequest.cursor() == null && #contentSearchRequest.idAfter() == null")
     @Override
     public CursorResponseContentDto getContents(ContentSearchRequest contentSearchRequest) {
         Slice<Content> slice = contentRepository.getContents(contentSearchRequest);
@@ -121,6 +127,7 @@ public class ContentServiceImpl implements ContentService
      * @return 수정된 콘텐츠 정보
      * @throws ContentNotFoundException 콘텐츠가 존재하지 않을 때
      */
+    @CacheEvict(value = {"content", "contents"}, allEntries = true)
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     @Override
@@ -150,6 +157,7 @@ public class ContentServiceImpl implements ContentService
      * @param contentId 삭제할 콘텐츠 ID
      * @throws ContentNotFoundException 콘텐츠가 존재하지 않을 때
      */
+    @CacheEvict(value = {"content", "contents"}, allEntries = true)
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     @Override

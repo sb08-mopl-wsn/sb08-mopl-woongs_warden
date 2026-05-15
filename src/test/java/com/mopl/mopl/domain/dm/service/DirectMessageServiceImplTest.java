@@ -119,7 +119,8 @@ class DirectMessageServiceImplTest {
 
     DirectMessageCreatedEvent publishedEvent = eventCaptor.getValue();
     assertThat(publishedEvent.receiverId()).isEqualTo(receiverUserId);
-    assertThat(publishedEvent.content()).isEqualTo("안녕하세요~~");
+    assertThat(publishedEvent.conversationId()).isEqualTo(conversationId);
+    assertThat(publishedEvent.messageDto().content()).isEqualTo("안녕하세요~~");
   }
 
   @Test

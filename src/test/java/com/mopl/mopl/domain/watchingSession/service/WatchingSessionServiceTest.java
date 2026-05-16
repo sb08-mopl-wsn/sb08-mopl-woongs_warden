@@ -247,17 +247,17 @@ public class WatchingSessionServiceTest {
     class Leave {
 
         @Test
-        @DisplayName("시청 세션이 없으면 WatchingSessionNotFoundException을 던진다.")
-        void sessionNotFound_throwsException() {
+        @DisplayName("시청 세션이 없으면 아무것도 실행하지 않는다.")
+        void sessionNotFound_doesNothing() {
             // given
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> watchingSessionService.leave(contentId, userId))
-                    .isInstanceOf(WatchingSessionNotFoundException.class);
+            watchingSessionService.leave(contentId, userId);
 
             verify(watchingSessionRepository, never()).delete(any());
+            verify(watchingSessionRepository, never()).flush();
             verifyNoInteractions(eventPublisher);
         }
 

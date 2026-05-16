@@ -1,4 +1,4 @@
-package com.mopl.mopl.infrastructure.external.config;
+package com.mopl.mopl.infrastructure.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

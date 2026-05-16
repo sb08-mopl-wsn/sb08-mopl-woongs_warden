@@ -42,6 +42,14 @@ spring:
           writetimeout: 5000
           starttls:
             enable: true
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          options:
+            model: gemini-3.1-flash-lite
+            temperature: 0.7
 
 logging:
   level:

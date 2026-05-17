@@ -24,6 +24,7 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Slice;
@@ -41,6 +42,7 @@ public class ReviewServiceImpl implements ReviewService {
   private final ReviewMapper reviewMapper;
   private final ApplicationEventPublisher eventPublisher;
 
+  @CacheEvict(value = {"content", "contents"}, allEntries = true)
   @Override
   @Transactional
   public ReviewDto createReview(ReviewCreateRequest request, UUID userId) {
@@ -103,6 +105,7 @@ public class ReviewServiceImpl implements ReviewService {
     );
   }
 
+  @CacheEvict(value = {"content", "contents"}, allEntries = true)
   @Override
   @Transactional
   public ReviewDto updateReview(UUID reviewId, ReviewUpdateRequest request, UUID userId) {
@@ -117,6 +120,7 @@ public class ReviewServiceImpl implements ReviewService {
     return reviewMapper.toDto(reviewToUpdate);
   }
 
+  @CacheEvict(value = {"content", "contents"}, allEntries = true)
   @Override
   @Transactional
   public void deleteReview(UUID reviewId, UUID userId) {

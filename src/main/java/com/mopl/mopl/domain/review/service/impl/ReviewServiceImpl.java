@@ -19,6 +19,8 @@ import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.event.ReviewCreatedEvent;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
@@ -41,6 +43,7 @@ public class ReviewServiceImpl implements ReviewService {
   private final UserRepository userRepository;
   private final ReviewMapper reviewMapper;
   private final ApplicationEventPublisher eventPublisher;
+  private final EntityManager entityManager;
 
   @CacheEvict(value = {"content", "contents"}, allEntries = true)
   @Override
@@ -138,6 +141,10 @@ public class ReviewServiceImpl implements ReviewService {
   }
 
   private void updateContentReviewStats(Content content) {
+
+    // 비관적 락
+    entityManager.lock(content, LockModeType.PESSIMISTIC_WRITE);
+
     // 리뷰 변경사항을 DB에 즉시 반영
     reviewRepository.flush();
 

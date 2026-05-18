@@ -1,5 +1,6 @@
 package com.mopl.mopl.global.event;
 
+import com.mopl.mopl.domain.user.entity.User;
 import java.util.UUID;
 
 /**
@@ -15,7 +16,7 @@ public record FollowEvent(
 ) {
 
   // 팩토리 메서드
-  public static FollowEvent of(UUID followerId, String followerName, UUID followeeId) {
-    return new FollowEvent(followerId, followerName, followeeId);
+  public static FollowEvent of(User follower, User followee) {
+    return new FollowEvent(follower.getId(), follower.getName(), followee.getId());
   }
 }

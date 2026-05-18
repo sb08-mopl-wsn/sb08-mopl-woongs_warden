@@ -60,7 +60,7 @@ public class ReviewServiceImpl implements ReviewService {
 
       updateContentReviewStats(content.getId());
 
-      eventPublisher.publishEvent(new ReviewCreatedEvent(
+      eventPublisher.publishEvent(ReviewCreatedEvent.of(
           savedReview.getId(), user.getId(), user.getName()
       ));
       return reviewMapper.toDto(savedReview);

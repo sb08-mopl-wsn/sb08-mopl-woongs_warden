@@ -66,7 +66,7 @@ public class FollowServiceImpl implements FollowService {
       Follow savedFollow = followRepository.save(follow);
 
       // 팔로우 완료 후 이벤트 발행
-      eventPublisher.publishEvent(new FollowEvent(
+      eventPublisher.publishEvent(FollowEvent.of(
           follower.getId(),
           follower.getName(),
           followee.getId()

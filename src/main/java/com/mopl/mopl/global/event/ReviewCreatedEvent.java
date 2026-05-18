@@ -14,4 +14,9 @@ public record ReviewCreatedEvent(
     String writerName
 ) {
 
+  // 팩토리 메서드
+  public static ReviewCreatedEvent of(UUID reviewId, UUID writerId, String writerName) {
+    return new ReviewCreatedEvent(reviewId, writerId, writerName);
+  }
+
 }

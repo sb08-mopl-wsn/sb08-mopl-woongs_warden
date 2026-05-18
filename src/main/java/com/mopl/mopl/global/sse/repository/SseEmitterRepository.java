@@ -59,4 +59,9 @@ public class SseEmitterRepository {
       }
     }
   }
+
+  // keep-Alive를 위한 현재 접속중인 모든 파이프 맵 반환
+  public Map<UUID, List<SseEmitter>> findAllEmitters() {
+    return emitters;
+  }
 }

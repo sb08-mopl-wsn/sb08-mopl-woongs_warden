@@ -5,12 +5,17 @@ import java.util.List;
 public class ExternalApiConstants
 {
     /* sports */
-    // batch에서 사용
     public static final String EVENTS_SEASON_PATH = "/eventsseason.php?id={id}&s={season}";
 
     public static final int PREMIER_LEAGUE_ID = 4328;
     public static final int LA_LIGA_ID = 4335;
-    public static List<Integer> LEAGUE_IDS = List.of(PREMIER_LEAGUE_ID, LA_LIGA_ID);
+    public static final int BUNDES_LIGA = 4331;
+    public static final int LEIGUE_UN = 4334;
+    public static final int SERIE_A = 4332;
+    public static final int K_LEAGUE_ID = 4689;
+    public static final int LCK_ID = 4529;
+
+    public static List<Integer> LEAGUE_IDS = List.of(PREMIER_LEAGUE_ID, LA_LIGA_ID, K_LEAGUE_ID, LCK_ID, BUNDES_LIGA, LEIGUE_UN, SERIE_A);
 
     /* tmdb */
     public static final String IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";

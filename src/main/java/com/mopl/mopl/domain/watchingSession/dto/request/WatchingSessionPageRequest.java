@@ -21,7 +21,6 @@ public record WatchingSessionPageRequest(
         SortDirection sortDirection,
 
         @NotNull(message = "정렬 기준은 필수 값입니다.")
-
         // 정렬 기준은 "createdAt"만 지원하기 때문에 다른 값이 들어올 경우 에러 발생
         @Pattern(regexp = "createdAt", message = "정렬 기준은 `createdAt' 만 지원합니다.")
         String sortBy

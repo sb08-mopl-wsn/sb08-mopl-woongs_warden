@@ -13,17 +13,21 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service
 public class ContentRecommendService
 {
+    private static final int MAX_RECOMMENDATIONS = 5;
+
     private final ChatClient chatClient;
     private final ContentRepository contentRepository;
     private final ImageUrlConverter imageUrlConverter;
@@ -38,6 +42,18 @@ public class ContentRecommendService
             콘텐츠와 관련 없는 질문에는 빈 배열 []로 응답해.
             """;
 
+    /**
+     * 사용자의 자연어 질문을 기반으로 AI가 콘텐츠를 추천한다.
+     * <p>
+     * DB에서 전체 콘텐츠를 조회한 뒤 Gemini API에 프롬프트와 함께 전달하고,
+     * AI 응답을 파싱하여 최대 5건의 추천 결과를 반환한다.
+     *
+     * @param request 사용자의 추천 요청 (자연어 프롬프트)
+     * @return 추천 콘텐츠 목록
+     * @throws ResourceAccessException Gemini 응답 시간 초과
+     * @throws NonTransientAiException Gemini 서비스 불가
+     * @throws ConversionFailedException Gemini 응답 파싱 실패
+     */
     public List<ContentRecommendResponse> recommend(ContentRecommendRequest request) {
         List<Content> contents = contentRepository.findAll();
         String contentContext = buildContentContext(contents);
@@ -53,16 +69,20 @@ public class ContentRecommendService
             throw new AiTimeoutExcpetion();
         } catch (NonTransientAiException e) {
             throw new AiUnavailableException();
-        } catch (Exception e) {
+        } catch (ConversionFailedException e) {
             throw new AiParseFailedException();
         }
 
-        return recommendations.stream()
+        List<AiRecommendation> safeRecommendations = recommendations == null ? List.of() : recommendations;
+
+        Map<UUID, Content> contentMap = contents.stream()
+                .collect(Collectors.toMap(Content::getId, content -> content));
+
+        return safeRecommendations.stream()
+                .limit(MAX_RECOMMENDATIONS)
+                .filter(rec -> contentMap.containsKey(rec.id()))
                 .map(rec -> {
-                    Content content = contentRepository.findById(rec.id()).orElse(null);
-
-                    if (content == null) return null;
-
+                    Content content = contentMap.get(rec.id());
                     return new ContentRecommendResponse(
                             content.getId(),
                             content.getTitle(),
@@ -72,7 +92,6 @@ public class ContentRecommendService
                             rec.reason()
                     );
                 })
-                .filter(Objects::nonNull)
                 .toList();
     }
 

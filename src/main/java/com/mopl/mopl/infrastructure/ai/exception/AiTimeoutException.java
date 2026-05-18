@@ -1,8 +1,8 @@
 package com.mopl.mopl.infrastructure.ai.exception;
 
-public class AiTimeoutExcpetion extends AiException
+public class AiTimeoutException extends AiException
 {
-    public AiTimeoutExcpetion() {
+    public AiTimeoutException() {
         super(AiErrorCode.AI_TIMEOUT);
     }
 }

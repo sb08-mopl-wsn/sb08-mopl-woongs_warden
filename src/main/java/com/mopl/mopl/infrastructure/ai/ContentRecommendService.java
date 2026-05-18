@@ -6,7 +6,7 @@ import com.mopl.mopl.infrastructure.ai.dto.AiRecommendation;
 import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendRequest;
 import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendResponse;
 import com.mopl.mopl.infrastructure.ai.exception.AiParseFailedException;
-import com.mopl.mopl.infrastructure.ai.exception.AiTimeoutExcpetion;
+import com.mopl.mopl.infrastructure.ai.exception.AiTimeoutException;
 import com.mopl.mopl.infrastructure.ai.exception.AiUnavailableException;
 import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import lombok.RequiredArgsConstructor;
@@ -66,7 +66,7 @@ public class ContentRecommendService
                     .call()
                     .entity(new ParameterizedTypeReference<>() {});
         } catch (ResourceAccessException e) {
-            throw new AiTimeoutExcpetion();
+            throw new AiTimeoutException();
         } catch (NonTransientAiException e) {
             throw new AiUnavailableException();
         } catch (ConversionFailedException e) {

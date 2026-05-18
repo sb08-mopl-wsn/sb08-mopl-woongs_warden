@@ -5,9 +5,12 @@ import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapper;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobExecutionListener;
@@ -39,24 +42,20 @@ public class BatchJobConfig
 
     private final ContentRepository contentRepository;
 
+    private final EntityManager entityManager;
+
+    private final MeterRegistry meterRegistry;
+
     @Value("${external.tmdb.collect-pages:5}")
     private int collectPages;
 
     /* Job */
     @Bean
-    public Job tmdbCollectJob() {
-        return new JobBuilder("tmdbCollectJob", jobRepository)
+    public Job contentCollectJob() {
+        return new JobBuilder("contentCollectJob", jobRepository)
                 .listener(jobExecutionListener())
                 .start(tmdbCollectStep())
-                .preventRestart()
-                .build();
-    }
-
-    @Bean
-    public Job sportsdbCollectJob() {
-        return new JobBuilder("sportsdbCollectJob", jobRepository)
-                .listener(jobExecutionListener())
-                .start(sportsdbCollectStep())
+                .next(sportsdbCollectStep())
                 .preventRestart()
                 .build();
     }
@@ -79,12 +78,12 @@ public class BatchJobConfig
     /* Tasklet */
     @Bean
     public TmdbCollectTasklet tmdbCollectTasklet() {
-        return new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, collectPages);
+        return new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, meterRegistry, collectPages);
     }
 
     @Bean
     public SportsdbCollectTasklet sportsdbCollectTasklet() {
-        return new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository);
+        return new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager, meterRegistry);
     }
 
     @Bean
@@ -99,19 +98,27 @@ public class BatchJobConfig
             public void afterJob(@NonNull JobExecution jobExecution) {
                 LocalDateTime startTime = jobExecution.getStartTime();
                 LocalDateTime endTime = jobExecution.getEndTime();
+                String jobName = jobExecution.getJobInstance().getJobName();
 
                 if (startTime == null || endTime == null) {
                     log.debug("Job 종료: {} - 상태: {} (시간 정보 없음)",
-                            jobExecution.getJobInstance().getJobName(),
+                            jobName,
                             jobExecution.getStatus());
+
+                    return;
                 }
 
-                long duration = Duration.between(startTime, endTime).getSeconds();
+                Duration duration = Duration.between(startTime, endTime);
 
-                log.debug("Job 종료: {} - 상태: {}, 소요시간: {}s",
-                        jobExecution.getJobInstance().getJobName(),
-                        jobExecution.getStatus(),
-                        duration);
+                meterRegistry.timer("mopl.batch.job.duration", "job", jobName).record(duration);
+
+                if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
+                    meterRegistry.counter("mopl.batch.job.success", "job", jobName).increment();
+                } else {
+                    meterRegistry.counter("mopl.batch.job.failure", "job", jobName).increment();
+                }
+
+                log.debug("Job 종료: {} - 상태: {}, 소요시간: {}s", jobName, jobExecution.getStatus(), duration);
             }
         };
     }

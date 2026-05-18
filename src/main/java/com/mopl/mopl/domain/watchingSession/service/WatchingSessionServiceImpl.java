@@ -3,23 +3,30 @@ package com.mopl.mopl.domain.watchingSession.service;
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
-import com.mopl.mopl.domain.watchingSession.dto.WatchingSessionChange;
-import com.mopl.mopl.domain.watchingSession.dto.WatchingSessionDto;
+import com.mopl.mopl.domain.watchingSession.dto.request.ContentChatSendRequest;
+import com.mopl.mopl.domain.watchingSession.dto.request.WatchingSessionPageRequest;
+import com.mopl.mopl.domain.watchingSession.dto.response.*;
 import com.mopl.mopl.domain.watchingSession.entity.ChangeType;
 import com.mopl.mopl.domain.watchingSession.entity.WatchingSession;
 import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionNotFoundException;
 import com.mopl.mopl.domain.watchingSession.mapper.WatchingSessionMapper;
 import com.mopl.mopl.domain.watchingSession.repository.WatchingSessionRepository;
+import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -39,6 +46,12 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
     // Event
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * 콘텐츠 실시간 웹소켓 접속을 위한 로직
+     *
+     * @param contentId 콘텐츠 시청 세션 참여를 위한 콘텐츠 ID
+     * @param userId    콘텐츠 시청 세션 참여를 위한 유저 ID
+     */
     @Override
     @Transactional
     public void join(UUID contentId, UUID userId) {
@@ -62,6 +75,13 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
         publishSessionEvent(contentId, ChangeType.JOIN, sessionDto);
     }
 
+    /**
+     * 콘텐츠 실시간 웹소켓 접속 해제를 위한 로직
+     *
+     * @param contentId 콘텐츠 시청 세션 퇴장을 위한 콘텐츠 ID
+     * @param userId    콘텐츠 시청 세션 퇴장을 위한 유저 ID
+     * @throws WatchingSessionNotFoundException 시청 세션이 존재하지 않을 경우 발생
+     */
     @Override
     @Transactional
     public void leave(UUID contentId, UUID userId) {
@@ -84,7 +104,128 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
         publishSessionEvent(contentId, ChangeType.LEAVE, sessionDto);
     }
 
+    /**
+     * 실시간 채팅 메시지를 수신하여 검증한 후, 채팅 이벤트를 발행한다.
+     *
+     * @param contentId 채팅이 발생한 콘텐츠 ID
+     * @param senderId  메시지를 보낸 사용자의 ID
+     * @param request   메시지 내용이 담긴 DTO
+     * @throws UserNotFoundException    사용자가 존재하지 않을 경우 발생
+     * @throws ContentNotFoundException 콘텐츠가 존재하지 않을 경우 발생
+     */
+    @Override
+    public void receiveMessage(UUID contentId, UUID senderId, ContentChatSendRequest request) {
+
+        User user = userRepository.findById(senderId)
+                .orElseThrow(() -> new UserNotFoundException(senderId));
+
+        if (!contentRepository.existsById(contentId)) {
+            throw new ContentNotFoundException(contentId);
+        }
+
+        // 채팅 송신자에 대한 시청 세션 참여 검증
+        // 해당 콘텐츠를 시청 중이지 않은 사용자도 임의의 콘텐츠 채팅에 메시지를 보낼 수 있어 권한 경계가 무너질 수 있음.
+        if (watchingSessionRepository.findByContentIdAndUserId(contentId, senderId).isEmpty()) {
+            throw new WatchingSessionNotFoundException(contentId, senderId);
+        }
+
+        UserSummary sender = new UserSummary(
+                user.getId(),
+                user.getName(),
+                user.getProfileImageKey()
+        );
+
+        ContentChatDto chatDto = sessionMapper.toChatDto(sender, request.content());
+
+        eventPublisher.publishEvent(new LiveChatEvent(contentId, chatDto));
+    }
+
+    /**
+     * 특정 콘텐츠의 시청 세션 목록을 커서 기반 페이징으로 조회한다.
+     * 성능 최적화를 위해 No-Offset(Slice) 방식과 QueryDsl를 사용한다.
+     *
+     * @param contentId 시청 세션을 조회할 콘텐츠 ID
+     * @param request   커서, 유저 이름, 페이지 크기, 정렬 기준, 정렬 방향이 담긴 DTO
+     * @return 다음 커서 정보와 시청자 목록, 전체 카운트를 포함한 CursorResponseWatchingSessionDto
+     */
+    @Override
+    public CursorResponseWatchingSessionDto findByContentInWatchingSession(UUID contentId, WatchingSessionPageRequest request) {
+
+        int limit = request.limit();
+        Pageable pageable = PageRequest.of(0, limit + 1);
+
+        WatchingSessionSearchCondition condition = new WatchingSessionSearchCondition(
+                contentId,
+                request.cursor(),
+                request.watcherNameLike(),
+                request.idAfter(),
+                request.sortDirection()
+        );
+
+        List<WatchingSession> watchingSessionList = watchingSessionRepository.findAllByCursor(
+                condition,
+                pageable
+        );
+
+        // Slice
+        boolean hasNext = false;
+        if (watchingSessionList.size() > limit) {
+            hasNext = true;
+            watchingSessionList.remove(watchingSessionList.size() - 1);
+        }
+
+        String nextCursor = null;
+        UUID nextIdAfter = null;
+        if (!watchingSessionList.isEmpty()) {
+            WatchingSession lastSession = watchingSessionList.get(watchingSessionList.size() - 1);
+            nextCursor = lastSession.getCreatedAt().toString();
+            nextIdAfter = lastSession.getId();
+        }
+
+        List<WatchingSessionDto> data = watchingSessionList.stream()
+                .map(sessionMapper::toDto)
+                .toList();
+
+        // TODO: 잦은 조회로 성능 문제 발생하므로 캐싱 처리하겠습니다.
+        long totalCount = watchingSessionRepository.countByContentId(contentId);
+
+        return new CursorResponseWatchingSessionDto(
+                data,
+                nextCursor,
+                nextIdAfter,
+                hasNext,
+                totalCount,
+                request.sortBy(),
+                request.sortDirection()
+        );
+    }
+
+    /**
+     * 특정 유저가 현재 시청 중인 세션을 조회합니다.
+     *
+     * @param userId 조회할 유저 ID
+     * @return 시청 세션 정보 (시청 중이 아니면 Empty)
+     */
+    @Override
+    public Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID userId, UUID currentUserId) {
+
+        // 실시간 같이 보기에서 자신의 프로필을 누른 경우 API가 STOMP보다 빨리 실행되어 자신의 시청 세션이 삭제되지 않음.
+        if (userId.equals(currentUserId)) {
+            return Optional.empty();
+        }
+
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
+        }
+
+        // 시청 세션 조회: 없으면 null 반환 (Swagger 명세 준수)
+        return watchingSessionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+                .map(sessionMapper::toDto);
+    }
+
+    // 시청 세션 이벤트 발행
     private void publishSessionEvent(UUID contentId, ChangeType type, WatchingSessionDto sessionDto) {
+
         long watcherCount = watchingSessionRepository.countByContentId(contentId);
 
         WatchingSessionChange change = new WatchingSessionChange(

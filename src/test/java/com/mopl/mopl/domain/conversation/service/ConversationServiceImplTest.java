@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -17,6 +18,8 @@ import com.mopl.mopl.domain.conversation.entity.Conversation;
 import com.mopl.mopl.domain.conversation.exception.ConversationAccessDeniedException;
 import com.mopl.mopl.domain.conversation.mapper.ConversationMapper;
 import com.mopl.mopl.domain.conversation.repository.ConversationRepository;
+import com.mopl.mopl.domain.dm.mapper.DirectMessageMapper;
+import com.mopl.mopl.domain.dm.repository.DirectMessageRepository;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
@@ -53,6 +56,12 @@ class ConversationServiceImplTest {
   @Mock
   private ConversationMapper conversationMapper;
 
+  @Mock
+  private DirectMessageRepository directMessageRepository;
+
+  @Mock
+  private DirectMessageMapper directMessageMapper;
+
   private User sender;
   private User receiver;
   private UUID currentUserId;
@@ -85,7 +94,8 @@ class ConversationServiceImplTest {
     String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
     given(conversationRepository.findByParticipantPairKey(pairKey)).willReturn(Optional.empty());
     given(conversationRepository.save(any(Conversation.class))).willReturn(newConv);
-    given(conversationMapper.toDto(newConv, currentUserId)).willReturn(expectedDto);
+    given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
+    given(conversationMapper.toDto(newConv, currentUserId, null)).willReturn(expectedDto);
 
     // when
     ConversationDto result = conversationService.createConversation(currentUserId, request);
@@ -109,7 +119,8 @@ class ConversationServiceImplTest {
     // 기존 방이 존재한다고 설정
     String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
     given(conversationRepository.findByParticipantPairKey(pairKey)).willReturn(Optional.of(existingConv));
-    given(conversationMapper.toDto(existingConv, currentUserId)).willReturn(expectedDto);
+    given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
+    given(conversationMapper.toDto(existingConv, currentUserId, null)).willReturn(expectedDto);
 
     // when
     ConversationDto result = conversationService.createConversation(currentUserId, request);
@@ -168,7 +179,7 @@ class ConversationServiceImplTest {
     ReflectionTestUtils.setField(conv, "updatedAt", Instant.now());
     mockConvs.add(conv);
 
-    given(conversationRepository.findMyConversationsByCursorDesc(eq(currentUserId), eq(null), eq(null), any(
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(false), eq(null), eq(null), any(
         PageRequest.class))).willReturn(mockConvs);
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(3L);
     given(conversationRepository.countByReceiverId(currentUserId)).willReturn(2L);
@@ -183,19 +194,19 @@ class ConversationServiceImplTest {
   }
 
   @Test
-  @DisplayName("목록 조회 - sortBy 파라미터가 updatedAt이 아닌 다른 값이면 400 에러 발생")
+  @DisplayName("목록 조회 - sortBy 파라미터가 updatedAt 또는 createdAt이 아닌 다른 값이면 400 에러 발생")
   void getMyConversations_InvalidSortBy_ThrowsException() {
 
     // given
     // 클라이언트가 지원하지 않는 createdAt이나 invalidSort를 보낸 상황
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "createdAt");
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "invalidSort");
 
     // when & then
     assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
         .isInstanceOf(BusinessException.class)
-        .hasMessageContaining("'updatedAt'만 지원합니다.");
+        .hasMessageContaining("지원합니다.");
 
-    verify(conversationRepository, never()).findMyConversationsByCursorDesc(any(), any(), any(), any());
+    verify(conversationRepository, never()).findMyConversationsByCursor(any(), any(), anyBoolean(), any(), any(), any());
   }
 
   @Test
@@ -204,9 +215,11 @@ class ConversationServiceImplTest {
 
     // given
     String cursor = Instant.now().toString();
-    CursorPaginationRequest request = new CursorPaginationRequest(cursor, null, 10, "DESCENDING", "updatedAt");
+    UUID idAfter = UUID.randomUUID();
 
-    given(conversationRepository.findMyConversationsByCursorDesc(eq(currentUserId), any(Instant.class), eq(null), any(PageRequest.class)))
+    CursorPaginationRequest request = new CursorPaginationRequest(cursor, idAfter, 10, "DESCENDING", "updatedAt");
+
+    given(conversationRepository.findMyConversationsByCursor(any(UUID.class), any(), anyBoolean(), any(Instant.class), any(UUID.class), any(PageRequest.class)))
         .willReturn(new ArrayList<>());
 
     // when
@@ -238,12 +251,13 @@ class ConversationServiceImplTest {
     String expectedNextCursor = mockConvs.get(1).getUpdatedAt().toString();
     UUID expectedNextIdAfter = mockConvs.get(1).getId();
 
-    given(conversationRepository.findMyConversationsByCursorDesc(eq(currentUserId), eq(null), eq(null), any(PageRequest.class)))
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
         .willReturn(mockConvs);
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(6L);
     given(conversationRepository.countByReceiverId(currentUserId)).willReturn(4L);
+    given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
 
-    given(conversationMapper.toDto(any(), any())).willReturn(
+    given(conversationMapper.toDto(any(), any(), any())).willReturn(
         new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false)
     );
 
@@ -280,7 +294,8 @@ class ConversationServiceImplTest {
     given(conversationRepository.save(any(Conversation.class)))
         .willThrow(new DataIntegrityViolationException("Unique constraint violation"));
 
-    given(conversationMapper.toDto(concurrentConv, currentUserId)).willReturn(expectedDto);
+    given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
+    given(conversationMapper.toDto(concurrentConv, currentUserId, null)).willReturn(expectedDto);
 
     // when
     ConversationDto result = conversationService.createConversation(currentUserId, request);
@@ -288,5 +303,27 @@ class ConversationServiceImplTest {
     // then
     assertThat(result).isNotNull();
     verify(conversationRepository, times(2)).findByParticipantPairKey(pairKey);
+  }
+
+  @Test
+  @DisplayName("목록 조회 - sortBy가 createdAt이면 정상 조회된다.")
+  void getMyConversations_SortByCreatedAt_Success() {
+
+    // given
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "createdAt");
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
+        .willReturn(new ArrayList<>());
+
+    given(conversationRepository.countBySenderId(currentUserId)).willReturn(0L);
+    given(conversationRepository.countByReceiverId(currentUserId)).willReturn(0L);
+
+    // when
+    CursorResponseConversationDto result = conversationService.getMyConversations(currentUserId, request);
+
+    // then
+    assertThat(result).isNotNull();
+    verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class));
+    verify(conversationRepository).countBySenderId(currentUserId);
+    verify(conversationRepository).countByReceiverId(currentUserId);
   }
 }

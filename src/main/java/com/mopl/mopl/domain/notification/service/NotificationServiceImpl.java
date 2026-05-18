@@ -9,6 +9,8 @@ import com.mopl.mopl.domain.notification.exception.InvalidSortParameterException
 import com.mopl.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
 import com.mopl.mopl.domain.notification.repository.NotificationRepository;
+import com.mopl.mopl.global.exception.BusinessException;
+import com.mopl.mopl.global.exception.GlobalErrorCode;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -50,6 +52,12 @@ public class NotificationServiceImpl implements NotificationService {
   @Override
   public CursorResponseNotificationDto getNotifications(UUID userId, CursorPaginationRequest request) {
 
+    boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();
+    boolean hasIdAfter = request.idAfter() != null;
+    if (hasCursor != hasIdAfter) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "cursor와 idAfter는 항상 함께 전달되어야 합니다.");
+    }
+
     // 파라미터가 비어있으면 기본값 createdAt으로 덮어씌움
     String sortBy = (request.sortBy() == null || request.sortBy().isBlank()) ? "createdAt" : request.sortBy();
 
@@ -74,13 +82,11 @@ public class NotificationServiceImpl implements NotificationService {
 
     // DB 조회 (Limit보다 1개 더 많이 가져와서 다음 페이지 존재여부 확인)
     PageRequest pageRequest = PageRequest.of(0, request.limit() + 1);
-    List<Notification> notifications;
 
-    if ("ASCENDING".equalsIgnoreCase(request.sortDirection())) {
-      notifications = notificationRepository.findNotificationsByCursorAsc(userId, cursorTime, request.idAfter(), pageRequest);
-    } else {
-      notifications = notificationRepository.findNotificationsByCursorDesc(userId, cursorTime, request.idAfter(), pageRequest);
-    }
+    boolean isAsc = "ASCENDING".equalsIgnoreCase(request.sortDirection());
+    List<Notification> notifications = notificationRepository.findNotificationsByCursor(
+        userId, isAsc, cursorTime, request.idAfter(), pageRequest
+    );
 
     // 다음 페이지 존재 확인
     boolean hasNext = notifications.size() > request.limit();

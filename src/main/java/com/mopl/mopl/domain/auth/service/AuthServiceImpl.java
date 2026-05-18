@@ -14,29 +14,20 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
-import com.mopl.mopl.global.exception.mail.MailFailedLoadException;
-import com.mopl.mopl.global.exception.mail.MailFailedSendException;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import com.mopl.mopl.global.event.user.UserPasswordInitEvent;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,8 +42,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final MoplUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
-
-    private final JavaMailSender mailSender;
+    private final ApplicationEventPublisher eventPublisher;
 
     // admin이 유저를 초기화할 경우 쓸 비밀번호
     @Value("${password.policy.upper}")
@@ -150,13 +140,11 @@ public class AuthServiceImpl implements AuthService {
         // 임시 비번 적용 및 원본 비번 저장
         target.updateTemporaryPassword(encodedPassword, originPassword, expiredAt);
 
-        // 메일 전송 //TODO 나중에 이벤트로 처리해야됨
-        sendInitPassword(target.getEmail(), rawPassword, expiredAt);
+        eventPublisher.publishEvent(UserPasswordInitEvent.of(target,expiredAt));
     }
 
     /**
      * 임시 비밀번호 생성
-     *
      */
     private String generateInitPassword() {
         StringBuilder password = new StringBuilder();
@@ -182,52 +170,5 @@ public class AuthServiceImpl implements AuthService {
         chars.forEach(shuffled::append);
 
         return shuffled.toString();
-    }
-
-    /**
-     * 임시 비밀번호를 이메일로 전송
-     */
-    private void sendInitPassword(String to, String rawPassword, Instant expiredAt) {
-        try {
-            String html = loadMailTemplate("templates/mail/init-password.html");
-
-            String expiredAtText = DateTimeFormatter
-                    .ofPattern("yyyy-MM-dd HH:mm:ss")
-                    .withZone(ZoneId.of("Asia/Seoul"))
-                    .format(expiredAt);
-
-            html = html.replace("{{TEMP_PASSWORD}}", rawPassword);
-            html = html.replace("{{EXPIRED_AT}}", expiredAtText);
-
-            MimeMessage message = mailSender.createMimeMessage();
-
-            MimeMessageHelper helper = new MimeMessageHelper(
-                    message,
-                    false,
-                    "UTF-8"
-            );
-
-            helper.setTo(to);
-            helper.setSubject("[MOPL] 임시 비밀번호 안내");
-            helper.setText(html, true);
-
-            mailSender.send(message);
-
-        } catch (MessagingException e) {
-            throw new MailFailedSendException(e.getMessage());
-        }
-    }
-
-    // 이메일 템플릿 불러오기
-    private String loadMailTemplate(String path) {
-        try {
-            ClassPathResource resource = new ClassPathResource(path);
-            try (var in = resource.getInputStream()) {
-                byte[] bytes = in.readAllBytes();
-                return new String(bytes, StandardCharsets.UTF_8);
-            }
-        } catch (IOException e) {
-            throw new MailFailedLoadException(e.getMessage());
-        }
     }
 }

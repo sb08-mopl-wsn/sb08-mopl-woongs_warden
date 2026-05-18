@@ -35,13 +35,13 @@ public class FollowController {
     return ResponseEntity.status(201).body(response);
   }
 
-  @DeleteMapping("/{followId}")
+  @DeleteMapping("/{followeeId}")
   public ResponseEntity<Void> unfollow(
       @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
-      @PathVariable("followId") UUID followId
+      @PathVariable("followeeId") UUID followeeId
   ) {
     UUID followerId = userDetails.getUserDto().id();
-    followService.unfollow(followerId, followId);
+    followService.unfollow(followerId, followeeId);
     return ResponseEntity.noContent().build();
   }
 

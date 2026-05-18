@@ -2,6 +2,7 @@ package com.mopl.mopl.domain.conversation.mapper;
 
 import com.mopl.mopl.domain.conversation.dto.response.ConversationDto;
 import com.mopl.mopl.domain.conversation.entity.Conversation;
+import com.mopl.mopl.domain.dm.dto.DirectMessageDto;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import java.util.UUID;
@@ -17,7 +18,7 @@ public interface ConversationMapper {
    * @param currentUserId 이 데이터를 조회하는 현재 로그인 유저 ID (상대방을 가려내기 위해)
    * @return 변환된 Dto 객체
    */
-  default ConversationDto toDto(Conversation conversation, UUID currentUserId) {
+  default ConversationDto toDto(Conversation conversation, UUID currentUserId, DirectMessageDto lastestMessage) {
 
     if (conversation == null || currentUserId == null) return null;
 
@@ -32,7 +33,7 @@ public interface ConversationMapper {
     return new ConversationDto(
         conversation.getId(),
         withUserSummary,
-        null,
+        lastestMessage,
         conversation.isHasUnread()
     );
   }

@@ -17,31 +17,18 @@ import org.springframework.scheduling.annotation.Scheduled;
 public class BatchSchedulerConfig
 {
     private final JobLauncher jobLauncher;
-    private final Job tmdbCollectJob;
-    private final Job sportsdbCollectJob;
+    private final Job contentCollectJob;
 
-    @Scheduled(cron = "0 0 3 * * *")
-    public void runTmdbCollectJob() {
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
+    public void runContentCollectJob() {
         try {
             JobParameters jobParameters = new JobParametersBuilder()
                     .addLong("timestamp", System.currentTimeMillis())
                     .toJobParameters();
 
-            jobLauncher.run(tmdbCollectJob, jobParameters);
+            jobLauncher.run(contentCollectJob, jobParameters);
         } catch (Exception e) {
-            log.error("TMDB 콘텐츠 수집 Job 실행 실패", e);
-        }
-    }
-
-    @Scheduled(cron = "0 30 3 * * *")
-    public void runSportsDbCollectJob() {
-        try {
-            JobParameters params = new JobParametersBuilder()
-                    .addLong("timestamp", System.currentTimeMillis())
-                    .toJobParameters();
-            jobLauncher.run(sportsdbCollectJob, params);
-        } catch (Exception e) {
-            log.error("Sportsdb 콘텐츠 수집 Job 실행 실패", e);
+            log.error("콘텐츠 수집 Job 실행 실패", e);
         }
     }
 }

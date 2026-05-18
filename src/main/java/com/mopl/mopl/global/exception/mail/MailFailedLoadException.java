@@ -5,10 +5,10 @@ import com.mopl.mopl.global.exception.GlobalErrorCode;
 
 public class MailFailedLoadException extends BusinessException {
     public MailFailedLoadException() {
-        super(GlobalErrorCode.INTERNAL_SERVER_ERROR);
+        super(GlobalErrorCode.MAIL_LOAD_FAILED);
     }
 
     public MailFailedLoadException(String message) {
-        super(GlobalErrorCode.INTERNAL_SERVER_ERROR,"메일 생성에 실패했습니다. "+ message);
+        super(GlobalErrorCode.MAIL_LOAD_FAILED,message);
     }
 }

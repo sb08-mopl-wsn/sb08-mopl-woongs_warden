@@ -55,4 +55,5 @@ public class Playlist extends BaseUpdatableEntity {
             this.description = description;
         }
     }
+
 }

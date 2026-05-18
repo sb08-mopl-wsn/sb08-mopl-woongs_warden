@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 @Table(
     name = "playlist_subscriptions",
     uniqueConstraints = @UniqueConstraint(
-        name = "uk_playlist_subscriptions_user_playlist",
+        name = "uk_playlist_subscriptions",
         columnNames = {"user_id", "playlist_id"}
     )
 )

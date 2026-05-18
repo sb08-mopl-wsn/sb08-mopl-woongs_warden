@@ -62,6 +62,10 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
 
     playlistContentRepository.delete(playlistContent);
 
+    if (playlist.getContentCount() <= 0) {
+        return; 
+    }
+
     int updatedRows = playlistRepository.decreaseContentCount(playlistId);
     if (updatedRows == 0) {
       throw new PlaylistUpdateFailedException();

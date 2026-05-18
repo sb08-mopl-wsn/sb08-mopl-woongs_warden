@@ -8,6 +8,7 @@ import com.mopl.mopl.domain.review.dto.request.ReviewSearchRequest;
 import com.mopl.mopl.domain.review.dto.request.ReviewUpdateRequest;
 import com.mopl.mopl.domain.review.dto.response.CursorResponseReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewDto;
+import com.mopl.mopl.domain.review.dto.response.ReviewStatsDto;
 import com.mopl.mopl.domain.review.entity.Review;
 import com.mopl.mopl.domain.review.exception.ReviewErrorCode;
 import com.mopl.mopl.domain.review.exception.ReviewException;
@@ -43,9 +44,8 @@ public class ReviewServiceImpl implements ReviewService {
   private final UserRepository userRepository;
   private final ReviewMapper reviewMapper;
   private final ApplicationEventPublisher eventPublisher;
-  private final EntityManager entityManager;
 
-  @CacheEvict(value = {"content", "contents"}, allEntries = true)
+  @CacheEvict(value = "content", allEntries = true)
   @Override
   @Transactional
   public ReviewDto createReview(ReviewCreateRequest request, UUID userId) {
@@ -60,7 +60,7 @@ public class ReviewServiceImpl implements ReviewService {
     try {
       Review savedReview = reviewRepository.saveAndFlush(review);
 
-      updateContentReviewStats(content);
+      updateContentReviewStats(content.getId());
 
       eventPublisher.publishEvent(new ReviewCreatedEvent(
           savedReview.getId(), user.getId(), user.getName()
@@ -108,7 +108,7 @@ public class ReviewServiceImpl implements ReviewService {
     );
   }
 
-  @CacheEvict(value = {"content", "contents"}, allEntries = true)
+  @CacheEvict(value = "content", allEntries = true)
   @Override
   @Transactional
   public ReviewDto updateReview(UUID reviewId, ReviewUpdateRequest request, UUID userId) {
@@ -118,12 +118,13 @@ public class ReviewServiceImpl implements ReviewService {
     Review reviewToUpdate = getReviewAndCheckPermission(reviewId, user);
     reviewToUpdate.update(request.text(), request.rating());
 
-    updateContentReviewStats(reviewToUpdate.getContent());
+    reviewRepository.flush();
+    updateContentReviewStats(reviewToUpdate.getContent().getId());
 
     return reviewMapper.toDto(reviewToUpdate);
   }
 
-  @CacheEvict(value = {"content", "contents"}, allEntries = true)
+  @CacheEvict(value = "content", allEntries = true)
   @Override
   @Transactional
   public void deleteReview(UUID reviewId, UUID userId) {
@@ -131,32 +132,27 @@ public class ReviewServiceImpl implements ReviewService {
         .orElseThrow(UserNotFoundException::new);
 
     Review reviewToDelete = getReviewAndCheckPermission(reviewId, user);
-
     Content content = reviewToDelete.getContent();
 
     reviewRepository.delete(reviewToDelete);
 
-    updateContentReviewStats(content);
+    reviewRepository.flush();
+
+    updateContentReviewStats(content.getId());
 
   }
 
-  private void updateContentReviewStats(Content content) {
+  private void updateContentReviewStats(UUID contentId) {
 
-    // 비관적 락
-    entityManager.lock(content, LockModeType.PESSIMISTIC_WRITE);
+    Content content = contentRepository.findByIdForUpdate(contentId)
+        .orElseThrow(() -> new ContentNotFoundException(contentId));
 
-    // 리뷰 변경사항을 DB에 즉시 반영
-    reviewRepository.flush();
+    ReviewStatsDto stats = reviewRepository.getReviewStats(contentId);
 
-    // 쿼리를 호출해서 최신 통계 가져오기
-    ReviewRepository.ReviewStats stats = reviewRepository.getReviewStats(content.getId());
-
-    // 더블(Double)을 BigDecimal 소수점 첫째 자리로 반올림
-    BigDecimal newAvgRating = BigDecimal.valueOf(stats.getAverageRating())
+    BigDecimal newAvgRating = BigDecimal.valueOf(stats.averageRating())
         .setScale(1, RoundingMode.HALF_UP);
-    int newReviewCount = stats.getReviewCount().intValue();
+    int newReviewCount = stats.reviewCount().intValue();
 
-    // Content 엔티티에 새 점수 덮어쓰기
     content.updateReviewStats(newAvgRating, newReviewCount);
   }
 

@@ -1,7 +1,11 @@
 package com.mopl.mopl.global.config;
 
 import com.mopl.mopl.global.auth.JwtAuthenticationFilter;
+import com.mopl.mopl.global.auth.details.GoogleUserDetailsService;
 import com.mopl.mopl.global.auth.handler.*;
+import com.mopl.mopl.global.auth.handler.LoginFailureHandler;
+import com.mopl.mopl.global.auth.handler.OAuth2LoginFailureHandler;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -24,6 +28,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -43,15 +52,20 @@ public class SecurityConfig {
             LoginFailureHandler loginFailureHandler,
             DaoAuthenticationProvider authenticationProvider,
             CustomAccessDeniedHandler customAccessDeniedHandler,
-            CustomAuthenticationEntryPoint customAuthenticationEntryPoint
+            CustomAuthenticationEntryPoint customAuthenticationEntryPoint,
+            GoogleUserDetailsService googleUserDetailsService,
+            OAuth2LoginSuccessHandler oauth2LoginSuccessHandler,
+            OAuth2LoginFailureHandler oauth2LoginFailureHandler
     ) throws Exception {
         http
+//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))  // 분산환경에서 활성화
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                         .ignoringRequestMatchers("/api/auth/sign-in")
                 )
                 .authorizeHttpRequests(auth -> auth
+                                .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                                 // 문서 관련
                                 .requestMatchers("/", "/index.html").permitAll()
                                 .requestMatchers("/ws/**").permitAll()
@@ -69,9 +83,12 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.PATCH, "/api/users/*/locked").hasRole("ADMIN")
 
                                 // 인증 관련
-                                .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll() 
+                                .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
+
+                                // 소셜 로그인 관련
+                                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
                                 .requestMatchers("/api/**").authenticated()
                                 .anyRequest().authenticated()
@@ -81,6 +98,13 @@ public class SecurityConfig {
                         // .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session
+                        /* todo
+                         * OAuth2 Login은 인증 요청의 state 값을 저장해야 합니다.
+                         * 가장 단순한 구현은 IF_REQUIRED입니다.
+                         *
+                         * 완전한 stateless를 유지하려면
+                         * OAuth2AuthorizationRequestRepository를 쿠키 기반으로 직접 구현해야 합니다.
+                         */
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .formLogin(login -> login
@@ -88,6 +112,13 @@ public class SecurityConfig {
                         .successHandler(jwtLoginSuccessHandler)
                         .failureHandler(loginFailureHandler)
                         .permitAll()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(googleUserDetailsService)
+                        )
+                        .successHandler(oauth2LoginSuccessHandler)
+                        .failureHandler(oauth2LoginFailureHandler)
                 )
                 .httpBasic(basic -> basic.disable())
                 .logout(logout -> logout
@@ -121,7 +152,7 @@ public class SecurityConfig {
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
         return (web) -> web.ignoring()
-                .requestMatchers("/favicon.ico", "/error", "/assets/**")
+                .requestMatchers("/favicon.svg", "/error", "/assets/**")
                 .requestMatchers("/static/**", "/css/**", "/js/**", "/images/**", "/*.js", "/*.css");
     }
 
@@ -137,5 +168,52 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    // 분산 환경용 설정
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // CORS 요청을 허용할 주소
+        configuration.setAllowedOrigins(List.of(
+                // 여기는 예시입니다. 프론트 서버만 연결해보면 될것 같습니다.
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "https://mopl.site"
+        ));
+
+        // CORS 요청에서 허용할 HTTP 메서드
+        configuration.setAllowedMethods(List.of(
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"
+        ));
+
+        /// 클라이언트 요청에서 허용할 헤더
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "X-XSRF-TOKEN",
+                "X-Requested-With",
+                "Accept",
+                "Last-Event-ID"
+        ));
+
+        // 브라우저에서 접근 가능하도록 노출할 응답 헤더
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "Location"
+        ));
+
+        configuration.setAllowCredentials(true);  // 쿠키, 인증 헤더 등 자격 증명을 포함한 요청 허용
+        configuration.setMaxAge(3600L);   // preflight 요청 결과를 브라우저가 캐싱할 시간(초)
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

@@ -122,4 +122,10 @@ public class User  extends BaseEntity {
         this.temporaryPasswordExpiredAt = expiredAt;
         this.initPassword = true;
     }
+
+    public User updateSocialInfo(Social socialType, String socialId) {
+        this.socialType = socialType;
+        this.socialId = socialId;
+        return this;
+    }
 }

@@ -3,10 +3,13 @@ package com.mopl.mopl.domain.playlist.repository;
 import com.mopl.mopl.domain.playlist.entity.Playlist;
 import com.mopl.mopl.domain.playlist.entity.PlaylistSubscription;
 import com.mopl.mopl.domain.user.entity.User;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSubscription, UUID> {
 
@@ -17,4 +20,7 @@ public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSu
 
   //플리가 삭제될 때 구독자 정보 모두 삭제
   void deleteAllByPlaylistId(UUID playlistId);
+
+  @Query("SELECT ps FROM PlaylistSubscription ps JOIN FETCH ps.user WHERE ps.playlist.id = :playlistId")
+  List<PlaylistSubscription> findAllByPlaylistIdWithUser(@Param("playlistId") UUID playlistId);
 }

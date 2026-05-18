@@ -28,6 +28,9 @@ public class S3LogStorage
 
     private final S3Client s3Client;
 
+    /**
+     * 로그 파일을 S3에 업로드한다.
+     */
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void uploadDailyLog() {
         LocalDate yesterday = LocalDate.now().minusDays(1);

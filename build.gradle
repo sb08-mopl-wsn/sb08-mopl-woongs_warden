@@ -4,6 +4,9 @@ plugins {
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'jacoco'
 }
+ext {
+	springAiVersion = "1.1.6"
+}
 
 jacoco {
 	toolVersion = "0.8.14"
@@ -82,6 +85,9 @@ dependencies {
 	annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
 	annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
 
+	// ai
+	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+
 	// I/O
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'com.github.ben-manes.caffeine:caffeine'
@@ -124,4 +130,10 @@ tasks.named('test') {
 
 jar {
 	enabled = false
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.ai:spring-ai-bom:$springAiVersion"
+	}
 }

@@ -1,14 +1,14 @@
 package com.mopl.mopl.global.event;
 
-import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.playlist.entity.Playlist;
+import java.util.UUID;
 
 public record PlaylistContentAddedEvent(
-    Playlist playlist,
-    Content content
+    UUID playlistId,
+    String playlistTitle
 ) {
 
-  public static PlaylistContentAddedEvent of(Playlist playlist, Content content) {
-    return new PlaylistContentAddedEvent(playlist, content);
+  public static PlaylistContentAddedEvent of(Playlist playlist) {
+    return new PlaylistContentAddedEvent(playlist.getId(), playlist.getTitle());
   }
 }

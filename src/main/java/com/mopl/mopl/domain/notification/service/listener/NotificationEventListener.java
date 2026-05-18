@@ -41,7 +41,6 @@ public class NotificationEventListener {
   private final SseService sseService;
   private final NotificationMapper notificationMapper;
   private final RoomPresenceManager roomPresenceManager;
-  private final Executor notificationExecutor;
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
 
   /**
@@ -170,15 +169,10 @@ public class NotificationEventListener {
     // saveAll로 저장
     List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
 
-    // 병렬 발송 처리
-    List<CompletableFuture<Void>> futures = savedNotifications.stream()
-        .map(saved -> CompletableFuture.runAsync(() -> {
-          NotificationDto dto = notificationMapper.toDto(saved);
-          sseService.sendNotification(saved.getUser().getId(), dto);
-        }, notificationExecutor))
-            .toList();
-
-    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+    savedNotifications.forEach(saved -> {
+      NotificationDto dto = notificationMapper.toDto(saved);
+      sseService.sendNotification(saved.getUser().getId(), dto);
+    });
 
     log.info("리뷰 작성 알림 브로드캐스팅 완료 - 발송 건수: {}", savedNotifications.size());
   }
@@ -189,12 +183,12 @@ public class NotificationEventListener {
   public void handlePlaylistSubscribedEvent(PlaylistSubscribedEvent event) {
 
     // 플레이리스트 주인이 수신자
-    User receiver = event.playlist().getUser();
+    User receiver = userRepository.getReferenceById(event.playlistOwnerId());
 
     Notification notification = Notification.builder()
         .user(receiver)
         .title("새로운 구독자")
-        .content(event.subscriber().getName() + "님이 회원님의 [" + event.playlist().getTitle() + "] 플레이리스트를 구독했습니다.")
+        .content(event.subscriberName() + "님이 회원님의 [" + event.playlistTitle() + "] 플레이리스트를 구독했습니다.")
         .level(NotificationLevel.INFO)
         .build();
 
@@ -209,14 +203,14 @@ public class NotificationEventListener {
   public void handlePlaylistContentAddedEvent(PlaylistContentAddedEvent event) {
 
     // 구독자 가져오기
-    List<PlaylistSubscription> subscriptions = playlistSubscriptionRepository.findAllByPlaylistIdWithUser(event.playlist().getId());
+    List<PlaylistSubscription> subscriptions = playlistSubscriptionRepository.findAllByPlaylistIdWithUser(event.playlistId());
     if (subscriptions.isEmpty()) return;
 
     List<Notification> notifications = subscriptions.stream()
         .map(sub -> Notification.builder()
             .user(sub.getUser())
             .title("플레이리스트 업데이트")
-            .content("구독 중인 [" + event.playlist().getTitle() + "] 플레이리스트에 새로운 콘텐츠가 추가되었습니다.")
+            .content("구독 중인 [" + event.playlistTitle() + "] 플레이리스트에 새로운 콘텐츠가 추가되었습니다.")
             .level(NotificationLevel.INFO)
             .build())
         .toList();
@@ -225,14 +219,10 @@ public class NotificationEventListener {
     List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
 
     // 알림 전송
-    List<CompletableFuture<Void>> futures = savedNotifications.stream()
-        .map(saved -> CompletableFuture.runAsync(() -> {
-          NotificationDto dto = notificationMapper.toDto(saved);
-          sseService.sendNotification(saved.getUser().getId(), dto);
-        }, notificationExecutor))
-        .toList();
-
-    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+    savedNotifications.forEach(saved -> {
+      NotificationDto dto = notificationMapper.toDto(saved);
+      sseService.sendNotification(saved.getUser().getId(), dto);
+    });
 
     log.info("플레이리스트 업데이트 알림 브로드캐스팅 완료 - 발송 건수: {}", savedNotifications.size());
   }

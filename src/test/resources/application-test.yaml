@@ -2,20 +2,55 @@ spring:
   datasource:
     url: jdbc:tc:postgresql:17:///testdb
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+
   jpa:
     hibernate:
       ddl-auto: create-drop
+
   flyway:
     enabled: false
+
   batch:
     jdbc:
       initialize-schema: never
     job:
       enabled: false
+
   ai:
     google:
       genai:
         api-key: test-api-key
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: test@gmail.com
+    password: test-app-password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+          starttls:
+            enable: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+            scope:
+              - email
+              - profile
+
+app:
+  oauth2:
+    success-redirect-url: http://localhost:3000/oauth2/success
+    failure-redirect-url: http://localhost:3000/oauth2/failure
 
 logging:
   level:
@@ -25,6 +60,7 @@ jwt:
   access-token:
     secret: test-access-secret-test-access-secret-test-access-secret
     exp: 900000
+
   refresh-token:
     secret: test-refresh-secret-test-refresh-secret-test-refresh-secret
     exp: 3600000
@@ -59,9 +95,11 @@ external:
     api:
       token: external-tmdb-api-token
       base-url: http://localhost:8089
+
   sportsdb:
     api:
       base-url: http://localhost:8089
+
   timeout:
     connect-timeout: 5000
     read-timeout: 5000

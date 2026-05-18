@@ -60,9 +60,7 @@ public class ReviewServiceImpl implements ReviewService {
 
       updateContentReviewStats(content.getId());
 
-      eventPublisher.publishEvent(new ReviewCreatedEvent(
-          savedReview.getId(), user.getId(), user.getName()
-      ));
+      eventPublisher.publishEvent(ReviewCreatedEvent.of(savedReview));
       return reviewMapper.toDto(savedReview);
     } catch (DataIntegrityViolationException e) {
       throw new ReviewException(ReviewErrorCode.DUPLICATE_REVIEW);

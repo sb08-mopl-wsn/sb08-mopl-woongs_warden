@@ -42,6 +42,24 @@ spring:
           writetimeout: 5000
           starttls:
             enable: true
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          options:
+            model: gemini-3.1-flash-lite
+            temperature: 0.7
+        timeout:
+          connect-timeout: 5s
+          read-timeout: 30s
+    retry:
+      max-attempts: 3
+      on-http-codes: 429, 500, 503
+      backoff:
+        max-interval: 10000
+        multiplier: 2
+        initial-interval: 2000
 
 logging:
   level:

@@ -15,4 +15,8 @@ public record DirectMessageCreatedEvent(
     DirectMessageDto messageDto
 ) {
 
+  // 팩토리 메서드
+  public static DirectMessageCreatedEvent of(UUID conversationId, UUID receiverId, DirectMessageDto messageDto) {
+    return new DirectMessageCreatedEvent(conversationId, receiverId, messageDto);
+  }
 }

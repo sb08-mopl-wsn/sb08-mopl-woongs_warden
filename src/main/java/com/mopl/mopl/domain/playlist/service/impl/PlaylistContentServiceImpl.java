@@ -13,8 +13,10 @@ import com.mopl.mopl.domain.playlist.exception.PlaylistUpdateFailedException;
 import com.mopl.mopl.domain.playlist.repository.PlaylistContentRepository;
 import com.mopl.mopl.domain.playlist.repository.PlaylistRepository;
 import com.mopl.mopl.domain.playlist.service.PlaylistContentService;
+import com.mopl.mopl.global.event.PlaylistContentAddedEvent;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
   private final PlaylistRepository playlistRepository;
   private final ContentRepository contentRepository;
   private final PlaylistContentRepository playlistContentRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   @Transactional
@@ -45,6 +48,8 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
     if (updatedRows == 0) {
       throw new PlaylistUpdateFailedException();
     }
+
+    eventPublisher.publishEvent(PlaylistContentAddedEvent.of(playlist));
   }
 
   @Override

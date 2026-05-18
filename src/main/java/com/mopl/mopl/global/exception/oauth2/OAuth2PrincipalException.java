@@ -5,6 +5,6 @@ import com.mopl.mopl.global.exception.GlobalErrorCode;
 
 public class OAuth2PrincipalException extends BusinessException {
     public OAuth2PrincipalException() {
-        super(GlobalErrorCode.OAUTH2_PRINVCPAL_NOTMACTH);
+        super(GlobalErrorCode.OAUTH2_PRINCIPAL_NOT_MATCH);
     }
 }

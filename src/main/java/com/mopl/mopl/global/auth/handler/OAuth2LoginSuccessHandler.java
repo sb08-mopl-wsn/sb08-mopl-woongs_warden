@@ -58,7 +58,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             response.sendRedirect(successRedirectUrl);
 
         } catch (Exception e) {
-            throw new Oauth2FailedTokenException();
+            throw new Oauth2FailedTokenException(e.getMessage());
         }
     }
 }

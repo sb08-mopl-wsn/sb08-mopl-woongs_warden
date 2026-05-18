@@ -7,4 +7,9 @@ public class Oauth2FailedTokenException extends BusinessException {
     public Oauth2FailedTokenException() {
         super(GlobalErrorCode.OAUTH2_TOKEN_GENERATION_FAILED);
     }
+
+
+    public Oauth2FailedTokenException(String message) {
+        super(GlobalErrorCode.OAUTH2_TOKEN_GENERATION_FAILED,message);
+    }
 }

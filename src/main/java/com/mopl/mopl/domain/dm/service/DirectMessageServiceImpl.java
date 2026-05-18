@@ -69,14 +69,13 @@ public class DirectMessageServiceImpl implements DirectMessageService{
 
     DirectMessageDto messageDto = messageMapper.toDto(savedMessage);
 
-    // TODO: EventPublisher 형식으로 디커플링 가능
-    eventPublisher.publishEvent(new DirectMessageCreatedEvent(
+    eventPublisher.publishEvent(DirectMessageCreatedEvent.of(
         conversationId,
         receiverId,
         messageDto
     ));
 
-    eventPublisher.publishEvent(new DirectMessageSentEvent(
+    eventPublisher.publishEvent(DirectMessageSentEvent.of(
             conversationId,
             messageDto
     ));

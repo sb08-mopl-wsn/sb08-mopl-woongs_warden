@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.review.repository;
 
 import com.mopl.mopl.domain.review.dto.request.ReviewSearchRequest;
+import com.mopl.mopl.domain.review.dto.response.ReviewStatsDto;
 import com.mopl.mopl.domain.review.entity.Review;
 import org.springframework.data.domain.Slice;
 
@@ -12,4 +13,6 @@ public interface ReviewRepositoryCustom {
 
   //특정 콘텐츠에 달린 전체 리뷰 개수를 조회
   long countReviews(UUID contentId);
+
+  ReviewStatsDto getReviewStats(UUID contentId);
 }

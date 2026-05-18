@@ -19,6 +19,7 @@ import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -52,6 +54,7 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
      * @param contentId 콘텐츠 시청 세션 참여를 위한 콘텐츠 ID
      * @param userId    콘텐츠 시청 세션 참여를 위한 유저 ID
      */
+    @CacheEvict(value = "contents", allEntries = true)
     @Override
     @Transactional
     public void join(UUID contentId, UUID userId) {
@@ -61,9 +64,12 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
         Content content = contentRepository.findById(contentId)
                 .orElseThrow(() -> new ContentNotFoundException(contentId));
 
+        AtomicBoolean isNew = new AtomicBoolean(false);
+
         WatchingSession session = watchingSessionRepository
                 .findByContentIdAndUserId(contentId, userId)
                 .orElseGet(() -> {
+                    isNew.set(true);
                     WatchingSession newSession = WatchingSession.builder()
                             .content(content)
                             .user(user)
@@ -71,37 +77,50 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                     return watchingSessionRepository.saveAndFlush(newSession);
                 });
 
-        WatchingSessionDto sessionDto = sessionMapper.toDto(session.getId(), session.getCreatedAt(), content, user);
-        publishSessionEvent(contentId, ChangeType.JOIN, sessionDto);
+        if (isNew.get()) {
+            content.updateWatcherCount(content.getWatcherCount() + 1);
+        }
+
+        WatchingSessionDto sessionDto = sessionMapper.toDto(
+                session.getId(),
+                session.getCreatedAt(),
+                content,
+                user
+        );
+        publishSessionEvent(contentId, ChangeType.JOIN, sessionDto, content.getWatcherCount());
     }
 
     /**
      * 콘텐츠 실시간 웹소켓 접속 해제를 위한 로직
+     * 시청 세션이 존재하지 않을 경우 예외를 발생시키는 대신 무시하도록 변경하여, 중복 호출에도 안전하게 동작하도록 처리
      *
      * @param contentId 콘텐츠 시청 세션 퇴장을 위한 콘텐츠 ID
      * @param userId    콘텐츠 시청 세션 퇴장을 위한 유저 ID
-     * @throws WatchingSessionNotFoundException 시청 세션이 존재하지 않을 경우 발생
      */
+    @CacheEvict(value = "contents", allEntries = true)
     @Override
     @Transactional
     public void leave(UUID contentId, UUID userId) {
 
-        WatchingSession session = watchingSessionRepository.findByContentIdAndUserId(contentId, userId)
-                .orElseThrow(() -> new WatchingSessionNotFoundException(contentId, userId));
+        watchingSessionRepository.findByContentIdAndUserId(contentId, userId)
+                .ifPresent(session -> {
 
-        // 퇴장 처리를 위해 이전 세션을 저장해놓음.
-        WatchingSessionDto sessionDto = sessionMapper.toDto(
-                session.getId(),
-                session.getCreatedAt(),
-                session.getContent(),
-                session.getUser()
-        );
+                    WatchingSessionDto sessionDto = sessionMapper.toDto(
+                            session.getId(),
+                            session.getCreatedAt(),
+                            session.getContent(),
+                            session.getUser()
+                    );
 
-        watchingSessionRepository.delete(session);
-        // 쓰기 지연 방지 및 동기화
-        watchingSessionRepository.flush();
+                    watchingSessionRepository.delete(session);
+                    watchingSessionRepository.flush();
 
-        publishSessionEvent(contentId, ChangeType.LEAVE, sessionDto);
+                    Content content = session.getContent();
+                    // 음수 방지
+                    content.updateWatcherCount(Math.max(0, content.getWatcherCount() - 1));
+
+                    publishSessionEvent(contentId, ChangeType.LEAVE, sessionDto, content.getWatcherCount());
+                });
     }
 
     /**
@@ -224,9 +243,7 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
     }
 
     // 시청 세션 이벤트 발행
-    private void publishSessionEvent(UUID contentId, ChangeType type, WatchingSessionDto sessionDto) {
-
-        long watcherCount = watchingSessionRepository.countByContentId(contentId);
+    private void publishSessionEvent(UUID contentId, ChangeType type, WatchingSessionDto sessionDto, long watcherCount) {
 
         WatchingSessionChange change = new WatchingSessionChange(
                 type,

@@ -9,7 +9,15 @@ public class ExternalApiConstants
 
     public static final int PREMIER_LEAGUE_ID = 4328;
     public static final int LA_LIGA_ID = 4335;
-    public static List<Integer> LEAGUE_IDS = List.of(PREMIER_LEAGUE_ID, LA_LIGA_ID);
+    public static final int SERIE_A = 4332;
+    public static final int LEGUE_UN = 4334;
+    public static final int BUNDES_LIGA = 4331;
+    public static final int K_LEAGUE = 4689;
+    public static final int LCK = 4529;
+
+    public static final List<Integer> LEAGUE_IDS = List.of(
+            PREMIER_LEAGUE_ID, LA_LIGA_ID, SERIE_A, LEGUE_UN, BUNDES_LIGA, K_LEAGUE, LCK
+    );
 
     /* tmdb */
     public static final String IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";

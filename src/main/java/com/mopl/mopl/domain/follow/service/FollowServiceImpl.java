@@ -66,11 +66,7 @@ public class FollowServiceImpl implements FollowService {
       Follow savedFollow = followRepository.save(follow);
 
       // 팔로우 완료 후 이벤트 발행
-      eventPublisher.publishEvent(new FollowEvent(
-          follower.getId(),
-          follower.getName(),
-          followee.getId()
-      ));
+      eventPublisher.publishEvent(FollowEvent.of(follower, followee));
 
       return followMapper.toDto(savedFollow);
     } catch (DataIntegrityViolationException e) {

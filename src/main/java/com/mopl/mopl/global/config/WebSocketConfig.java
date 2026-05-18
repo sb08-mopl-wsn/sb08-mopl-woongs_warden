@@ -30,7 +30,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private AuthorizationChannelInterceptor authorizationChannelInterceptor() {
         return new AuthorizationChannelInterceptor(
                 MessageMatcherDelegatingAuthorizationManager.builder()
-                        .anyMessage().hasRole(Role.USER.name())
+                        .anyMessage().hasAnyRole(Role.USER.name(), Role.ADMIN.name())
                         .build()
         );
     }
@@ -41,7 +41,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         log.info("[WebSocket 설정] 메시지 브로커 설정 시작");
 
         // [구독] 클라이언트가 메시지를 받을 때 사용하는 경로
-        config.enableSimpleBroker("/sub", "/user");
+        config.enableSimpleBroker("/sub");
 
         // [발행] 클라이언트가 메시지를 보낼 때 사용하는 경로
         config.setApplicationDestinationPrefixes("/pub");

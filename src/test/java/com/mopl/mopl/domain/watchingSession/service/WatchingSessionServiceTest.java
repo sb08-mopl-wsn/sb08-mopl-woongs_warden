@@ -180,7 +180,6 @@ public class WatchingSessionServiceTest {
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(eq(sessionId), any(), eq(content), eq(user)))
                     .willReturn(sessionDto);
-            given(watchingSessionRepository.countByContentId(contentId)).willReturn(3L);
 
             // when
             watchingSessionService.join(contentId, userId);
@@ -208,7 +207,6 @@ public class WatchingSessionServiceTest {
             given(watchingSessionRepository.saveAndFlush(any())).willReturn(session);
             given(sessionMapper.toDto(eq(sessionId), any(), eq(content), eq(user)))
                     .willReturn(sessionDto);
-            given(watchingSessionRepository.countByContentId(contentId)).willReturn(1L);
 
             // when
             watchingSessionService.join(contentId, userId);
@@ -222,13 +220,13 @@ public class WatchingSessionServiceTest {
         @DisplayName("이벤트에 현재 시청자 수가 포함된다.")
         void event_containsCurrentWatcherCount() {
             // given
+            ReflectionTestUtils.setField(content, "watcherCount", 7);
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
             given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(eq(sessionId), any(), any(), any()))
                     .willReturn(sessionDto);
-            given(watchingSessionRepository.countByContentId(contentId)).willReturn(7L);
 
             // when
             watchingSessionService.join(contentId, userId);
@@ -242,22 +240,59 @@ public class WatchingSessionServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("기존 세션이 있으면 watcherCount를 증가시키지 않는다.")
+    void existingSession_doesNotIncrementWatcherCount() {
+        // given
+        ReflectionTestUtils.setField(content, "watcherCount", 3);
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+        given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                .willReturn(Optional.of(session));
+        given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
+
+        // when
+        watchingSessionService.join(contentId, userId);
+
+        //then
+        assertThat(content.getWatcherCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("신규 세션이면 watcherCount를 1 증가시킨다.")
+    void newSession_incrementsWatcherCount() {
+        // given
+        ReflectionTestUtils.setField(content, "watcherCount", 2);
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+        given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                .willReturn(Optional.empty());
+        given(watchingSessionRepository.saveAndFlush(any())).willReturn(session);
+        given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
+
+        // when
+        watchingSessionService.join(contentId, userId);
+
+        // then
+        assertThat(content.getWatcherCount()).isEqualTo(3);
+    }
+
     @Nested
     @DisplayName("leave()")
     class Leave {
 
         @Test
-        @DisplayName("시청 세션이 없으면 WatchingSessionNotFoundException을 던진다.")
-        void sessionNotFound_throwsException() {
+        @DisplayName("시청 세션이 없으면 아무것도 실행하지 않는다.")
+        void sessionNotFound_doesNothing() {
             // given
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> watchingSessionService.leave(contentId, userId))
-                    .isInstanceOf(WatchingSessionNotFoundException.class);
+            watchingSessionService.leave(contentId, userId);
 
             verify(watchingSessionRepository, never()).delete(any());
+            verify(watchingSessionRepository, never()).flush();
             verifyNoInteractions(eventPublisher);
         }
 
@@ -269,7 +304,6 @@ public class WatchingSessionServiceTest {
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(eq(sessionId), any(), eq(content), eq(user)))
                     .willReturn(sessionDto);
-            given(watchingSessionRepository.countByContentId(contentId)).willReturn(0L);
 
             // when
             watchingSessionService.leave(contentId, userId);
@@ -290,7 +324,6 @@ public class WatchingSessionServiceTest {
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(eq(sessionId), any(), eq(content), eq(user)))
                     .willReturn(sessionDto);
-            given(watchingSessionRepository.countByContentId(contentId)).willReturn(2L);
 
             // when
             watchingSessionService.leave(contentId, userId);
@@ -310,10 +343,10 @@ public class WatchingSessionServiceTest {
         @DisplayName("LEAVE 이벤트 삭제 후 시청자 수가 반영된다.")
         void leave_watcherCountReflectsAfterDeletion() {
             // given
+            ReflectionTestUtils.setField(content, "watcherCount", 1);
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
-            given(watchingSessionRepository.countByContentId(contentId)).willReturn(0L);
 
             // when
             watchingSessionService.leave(contentId, userId);
@@ -324,6 +357,38 @@ public class WatchingSessionServiceTest {
             verify(eventPublisher).publishEvent(captor.capture());
 
             assertThat(captor.getValue().change().watcherCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("세션 삭제 시 watcherCount를 1 감소시킨다.")
+        void leave_decrementsWatcherCount() {
+            // given
+            ReflectionTestUtils.setField(content, "watcherCount", 3);
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(session));
+            given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
+
+            // when
+            watchingSessionService.leave(contentId, userId);
+
+            // then
+            assertThat(content.getWatcherCount()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("watcherCount가 0일 때 leave() 호출 시 음수가 되지 않는다.")
+        void leave_watcherCountDoesNotGoBelowZero() {
+            // given
+            ReflectionTestUtils.setField(content, "watcherCount", 0);
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(session));
+            given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
+
+            // when
+            watchingSessionService.leave(contentId, userId);
+
+            // then
+            assertThat(content.getWatcherCount()).isEqualTo(0);
         }
     }
 

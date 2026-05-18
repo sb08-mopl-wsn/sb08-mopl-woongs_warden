@@ -40,7 +40,7 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
 
     try {
       PlaylistContent playlistContent = new PlaylistContent(playlist, content);
-      playlistContentRepository.save(playlistContent);
+      playlistContentRepository.saveAndFlush(playlistContent);
     } catch (DataIntegrityViolationException e) {
       throw new ContentAlreadyInPlaylistException();
     }

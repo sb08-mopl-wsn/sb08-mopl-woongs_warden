@@ -20,8 +20,6 @@ import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.event.ReviewCreatedEvent;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;

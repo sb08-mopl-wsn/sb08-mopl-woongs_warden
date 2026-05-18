@@ -3,10 +3,12 @@ package com.mopl.mopl.domain.review.repository.impl;
 import static com.mopl.mopl.domain.review.entity.QReview.review;
 
 import com.mopl.mopl.domain.review.dto.request.ReviewSearchRequest;
+import com.mopl.mopl.domain.review.dto.response.ReviewStatsDto;
 import com.mopl.mopl.domain.review.entity.Review;
 import com.mopl.mopl.domain.review.exception.ReviewCursorException;
 import com.mopl.mopl.domain.review.repository.ReviewRepositoryCustom;
 import com.querydsl.core.types.OrderSpecifier;
+import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.Instant;
@@ -91,6 +93,20 @@ public class ReviewRepositoryCustomImpl implements ReviewRepositoryCustom {
     }
   }
 
+  @Override
+  public ReviewStatsDto getReviewStats(UUID contentId) {
+    ReviewStatsDto stats = jpaQueryFactory
+        .select(Projections.constructor(ReviewStatsDto.class,
+            review.count(),
+            review.rating.avg().coalesce(0.0)
+        ))
+        .from(review)
+        .where(review.content.id.eq(contentId))
+        .fetchOne();
+
+    return stats != null ? stats : new ReviewStatsDto(0L, 0.0);
+  }
+
   private OrderSpecifier<?> orderByCondition(String sortBy, boolean isAsc) {
     if ("rating".equalsIgnoreCase(sortBy)) {
       return isAsc ? review.rating.asc() : review.rating.desc();
@@ -103,3 +119,5 @@ public class ReviewRepositoryCustomImpl implements ReviewRepositoryCustom {
     return limit == null ? 10 : limit;
   }
 }
+
+

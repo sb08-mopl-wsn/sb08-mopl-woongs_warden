@@ -49,7 +49,7 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
       throw new PlaylistUpdateFailedException();
     }
 
-    eventPublisher.publishEvent(PlaylistContentAddedEvent.of(playlist, content));
+    eventPublisher.publishEvent(PlaylistContentAddedEvent.of(playlist));
   }
 
   @Override

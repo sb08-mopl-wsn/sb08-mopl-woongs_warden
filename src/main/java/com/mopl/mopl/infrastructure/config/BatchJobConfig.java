@@ -1,6 +1,8 @@
-package com.mopl.mopl.infrastructure.batch;
+package com.mopl.mopl.infrastructure.config;
 
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.batch.SportsdbCollectTasklet;
+import com.mopl.mopl.infrastructure.batch.TmdbCollectTasklet;
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapper;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;

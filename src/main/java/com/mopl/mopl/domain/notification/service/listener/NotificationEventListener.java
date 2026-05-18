@@ -8,17 +8,19 @@ import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.notification.entity.NotificationLevel;
 import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
 import com.mopl.mopl.domain.notification.repository.NotificationRepository;
+import com.mopl.mopl.domain.playlist.entity.PlaylistSubscription;
+import com.mopl.mopl.domain.playlist.repository.PlaylistSubscriptionRepository;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.config.AsyncConfig;
 import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
 import com.mopl.mopl.global.event.FollowEvent;
+import com.mopl.mopl.global.event.PlaylistContentAddedEvent;
+import com.mopl.mopl.global.event.PlaylistSubscribedEvent;
 import com.mopl.mopl.global.event.ReviewCreatedEvent;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -37,7 +39,7 @@ public class NotificationEventListener {
   private final SseService sseService;
   private final NotificationMapper notificationMapper;
   private final RoomPresenceManager roomPresenceManager;
-  private final Executor notificationExecutor;
+  private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
 
   /**
    * 팔로우 이벤트 리스너
@@ -165,17 +167,62 @@ public class NotificationEventListener {
     // saveAll로 저장
     List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
 
-    // 병렬 발송 처리
-    List<CompletableFuture<Void>> futures = savedNotifications.stream()
-        .map(saved -> CompletableFuture.runAsync(() -> {
-          NotificationDto dto = notificationMapper.toDto(saved);
-          sseService.sendNotification(saved.getUser().getId(), dto);
-        }, notificationExecutor))
-            .toList();
-
-    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+    savedNotifications.forEach(saved -> {
+      NotificationDto dto = notificationMapper.toDto(saved);
+      sseService.sendNotification(saved.getUser().getId(), dto);
+    });
 
     log.info("리뷰 작성 알림 브로드캐스팅 완료 - 발송 건수: {}", savedNotifications.size());
+  }
+
+  // 내 플레이리스트를 누군가 구독했을 때 (단건 알림)
+  @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void handlePlaylistSubscribedEvent(PlaylistSubscribedEvent event) {
+
+    // 플레이리스트 주인이 수신자
+    User receiver = userRepository.getReferenceById(event.playlistOwnerId());
+
+    Notification notification = Notification.builder()
+        .user(receiver)
+        .title("새로운 구독자")
+        .content(event.subscriberName() + "님이 회원님의 [" + event.playlistTitle() + "] 플레이리스트를 구독했습니다.")
+        .level(NotificationLevel.INFO)
+        .build();
+
+    Notification saved = notificationRepository.save(notification);
+    NotificationDto dto = notificationMapper.toDto(saved);
+    sseService.sendNotification(receiver.getId(), dto);
+  }
+
+  // 내가 구독 중인 플레이리스트에 새로운 콘텐츠가 추가되었을 때 (다중 브로드캐스팅)
+  @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void handlePlaylistContentAddedEvent(PlaylistContentAddedEvent event) {
+
+    // 구독자 가져오기
+    List<PlaylistSubscription> subscriptions = playlistSubscriptionRepository.findAllByPlaylistIdWithUser(event.playlistId());
+    if (subscriptions.isEmpty()) return;
+
+    List<Notification> notifications = subscriptions.stream()
+        .map(sub -> Notification.builder()
+            .user(sub.getUser())
+            .title("플레이리스트 업데이트")
+            .content("구독 중인 [" + event.playlistTitle() + "] 플레이리스트에 새로운 콘텐츠가 추가되었습니다.")
+            .level(NotificationLevel.INFO)
+            .build())
+        .toList();
+
+    // 벌크 인서트
+    List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
+
+    // 알림 전송
+    savedNotifications.forEach(saved -> {
+      NotificationDto dto = notificationMapper.toDto(saved);
+      sseService.sendNotification(saved.getUser().getId(), dto);
+    });
+
+    log.info("플레이리스트 업데이트 알림 브로드캐스팅 완료 - 발송 건수: {}", savedNotifications.size());
   }
 
   private String truncateMessage(String message, int maxLength) {

@@ -1,10 +1,12 @@
 package com.mopl.mopl.global.auth.details;
 
+import com.mopl.mopl.domain.auth.exception.AuthAuthenticationFailedException;
 import com.mopl.mopl.domain.user.entity.Social;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -58,15 +60,24 @@ public class GoogleUserDetailsService extends DefaultOAuth2UserService {
     private User findOrCreateGoogleUser(String email, String name, String socialId) {
         return userRepository.findByEmail(email)
                 .map(existingUser -> linkGoogleAccount(existingUser, socialId))
-                .orElseGet(() -> userRepository.save(
-                        User.builder()
-                                .email(email)
-                                .name(name)
-                                .password(null)
-                                .socialType(Social.GOOGLE)
-                                .socialId(socialId)
-                                .build()
-                ));
+                .orElseGet(() -> {
+                    try {
+                        return userRepository.save(
+                                User.builder()
+                                        .email(email)
+                                        .name(name)
+                                        .password(null)
+                                        .socialType(Social.GOOGLE)
+                                        .socialId(socialId)
+                                        .build()
+                        );
+                    } catch (DataIntegrityViolationException e) {
+                        // 동시에 생성된 경우, 재조회하여 링크
+                        return userRepository.findByEmail(email)
+                                .map(user -> linkGoogleAccount(user, socialId))
+                                .orElseThrow(() -> new AuthAuthenticationFailedException());
+                    }
+                });
     }
 
     private User linkGoogleAccount(User existingUser, String socialId) {

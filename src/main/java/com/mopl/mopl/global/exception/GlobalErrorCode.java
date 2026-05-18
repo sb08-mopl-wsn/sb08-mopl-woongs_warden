@@ -16,6 +16,8 @@ public enum GlobalErrorCode implements ErrorCode {
     CDN_URL_NOT_FOUND(9006, "CDN_URL_NOT_FOUND", HttpStatus.NOT_FOUND, "CDN 경로가 없습니다."),
     MAIL_LOAD_FAILED(9007, "MAIL_LOAD_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "메일 생성에 실패했습니다."),
     MAIL_SEND_FAILED(9008, "MAIL_SEND_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "메일 발송에 실패했습니다."),
+    OAUTH2_PRINVCPAL_NOTMACTH(9009, "OAUTH2_PRINVCPAL_NOTMACTH", HttpStatus.INTERNAL_SERVER_ERROR, "유저 디테일이 일치하지 않습니다."),
+    OAUTH2_TOKEN_GENERATION_FAILED(9010, "OAUTH2_TOKEN_GENERATION_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "OAuth2 토큰 생성에 실패했습니다."),
     INTERNAL_SERVER_ERROR(9999, "SERVER_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
     private final int numeric;

@@ -43,6 +43,8 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    /* todo 분산환경시 OAuth2 state 저장소를 Redis로 옮기기 등 필요함*/
+
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
@@ -98,13 +100,6 @@ public class SecurityConfig {
                         // .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session
-                        /* todo
-                         * OAuth2 Login은 인증 요청의 state 값을 저장해야 합니다.
-                         * 가장 단순한 구현은 IF_REQUIRED입니다.
-                         *
-                         * 완전한 stateless를 유지하려면
-                         * OAuth2AuthorizationRequestRepository를 쿠키 기반으로 직접 구현해야 합니다.
-                         */
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .formLogin(login -> login
@@ -156,7 +151,6 @@ public class SecurityConfig {
                 .requestMatchers("/static/**", "/css/**", "/js/**", "/images/**", "/*.js", "/*.css");
     }
 
-    // todo 여기 지금 경고 나온다고 함
     @Bean
     public DaoAuthenticationProvider authenticationProvider(UserDetailsService userDetailsService) {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();

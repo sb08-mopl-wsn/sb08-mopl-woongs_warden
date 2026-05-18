@@ -1,11 +1,8 @@
 package com.mopl.mopl.domain.user.entity;
 
+import com.mopl.mopl.domain.user.exception.UserLoginFailedException;
 import com.mopl.mopl.global.base.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,7 +14,7 @@ import java.time.Instant;
 @Table(name = "users")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User  extends BaseEntity {
+public class User extends BaseEntity {
     @Column(length = 50, nullable = false)
     private String name;
 
@@ -57,7 +54,7 @@ public class User  extends BaseEntity {
             builderMethodName = "builder",
             builderClassName = "UserBuilder"
     )
-    public User(String name, String email, String password , Social socialType, String socialId) {
+    public User(String name, String email, String password, Social socialType, String socialId) {
         this.name = name;
         this.email = email;
         this.password = password;
@@ -65,7 +62,7 @@ public class User  extends BaseEntity {
         this.isLocked = false;
         this.profileImageKey = null;
         this.socialType = socialType != null ? socialType : null;
-        this.socialId = socialId != null ? socialId:null;
+        this.socialId = socialId != null ? socialId : null;
         this.initPassword = false;
     }
 
@@ -81,7 +78,7 @@ public class User  extends BaseEntity {
         this.role = Role.ADMIN;
         this.isLocked = false;
         this.profileImageKey = null;
-        this.socialType =   null;
+        this.socialType = null;
         this.socialId = null;
     }
 
@@ -116,7 +113,7 @@ public class User  extends BaseEntity {
         return this;
     }
 
-    public void updateTemporaryPassword(String initPassowrd,String originPassword, Instant expiredAt) {
+    public void updateTemporaryPassword(String initPassowrd, String originPassword, Instant expiredAt) {
         this.temporaryPassword = originPassword;
         this.password = initPassowrd;
         this.temporaryPasswordExpiredAt = expiredAt;
@@ -124,6 +121,10 @@ public class User  extends BaseEntity {
     }
 
     public User updateSocialInfo(Social socialType, String socialId) {
+        if ((socialType == null) != (socialId == null || socialId.isBlank())) {
+            throw new UserLoginFailedException();
+        }
+
         this.socialType = socialType;
         this.socialId = socialId;
         return this;

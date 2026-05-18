@@ -5,6 +5,8 @@ import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.exception.oauth2.OAuth2PrincipalException;
+import com.mopl.mopl.global.exception.oauth2.Oauth2FailedTokenException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,8 +36,12 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             HttpServletResponse response,
             Authentication authentication
     ) throws IOException, ServletException {
+
+        if (!(authentication.getPrincipal() instanceof MoplUserDetails userDetails)) {
+            throw new OAuth2PrincipalException();
+        }
+
         try {
-            MoplUserDetails userDetails = (MoplUserDetails) authentication.getPrincipal();
             String accessToken = jwtTokenProvider.generateAccessToken(userDetails);
             String refreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
 
@@ -49,23 +55,10 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
             jwtRegistry.registerJwtInformation(jwtInformation);
             jwtTokenProvider.addRefreshCookie(response, refreshToken);
-
-            /*
-             * 권장 방식:
-             * accessToken을 URL에 직접 싣지 않고,
-             * refreshToken 쿠키만 설정한 뒤 프론트로 이동합니다.
-             *
-             * 프론트는 /oauth2/redirect 진입 후
-             * POST /api/auth/refresh 를 호출해서 accessToken을 받으면 됩니다.
-             */
             response.sendRedirect(successRedirectUrl);
 
         } catch (Exception e) {
-            log.error("OAuth2 로그인 성공 처리 중 오류 발생", e);
-            response.sendError(
-                    HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "OAuth2 token generation failed"
-            );
+            throw new Oauth2FailedTokenException();
         }
     }
 }

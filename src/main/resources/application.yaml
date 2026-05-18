@@ -75,8 +75,8 @@ spring:
 
 app:
   oauth2:
-    success-redirect-url: ${OAUTH2_SUCCESS_REDIRECT_URL:http://localhost:5173/oauth2/redirect}
-    failure-redirect-url: ${OAUTH2_FAILURE_REDIRECT_URL:http://localhost:5173/sign-in?error=oauth2}
+    success-redirect-url: ${OAUTH2_SUCCESS_REDIRECT_URL}
+    failure-redirect-url: ${OAUTH2_FAILURE_REDIRECT_URL}
 
 logging:
   level:

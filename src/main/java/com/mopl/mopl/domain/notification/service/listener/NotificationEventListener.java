@@ -21,8 +21,6 @@ import com.mopl.mopl.global.event.ReviewCreatedEvent;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;

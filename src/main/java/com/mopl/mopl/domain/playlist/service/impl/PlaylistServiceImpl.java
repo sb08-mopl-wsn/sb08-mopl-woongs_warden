@@ -60,7 +60,7 @@ public class PlaylistServiceImpl implements PlaylistService {
 
   @Override
   public PlaylistDto findPlaylistById(UUID playlistId, UUID currentUserId) {
-    Playlist playlist = playlistRepository.findById(playlistId)
+    Playlist playlist = playlistRepository.findByIdWithUser(playlistId)
         .orElseThrow(() -> new PlaylistNotFoundException(playlistId));
 
     boolean isSubscribed = false;

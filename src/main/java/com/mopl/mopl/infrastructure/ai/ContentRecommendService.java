@@ -1,5 +1,8 @@
 package com.mopl.mopl.infrastructure.ai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.ai.dto.AiRecommendation;
@@ -11,8 +14,8 @@ import com.mopl.mopl.infrastructure.ai.exception.AiUnavailableException;
 import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.retry.NonTransientAiException;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -31,6 +34,8 @@ public class ContentRecommendService
     private final ChatClient chatClient;
     private final ContentRepository contentRepository;
     private final ImageUrlConverter imageUrlConverter;
+    private final ObjectMapper objectMapper;
+    private final AiPerformanceRecorder aiPerformanceRecorder;
 
     private static final String SYSTEM_PROMPT = """
             너는 MOLE 플랫폼의 콘텐츠 추천 어시스턴트야.
@@ -55,24 +60,45 @@ public class ContentRecommendService
      * @throws ConversionFailedException Gemini 응답 파싱 실패
      */
     public List<ContentRecommendResponse> recommend(ContentRecommendRequest request) {
-        List<Content> contents = contentRepository.findAll();
-        String contentContext = buildContentContext(contents);
+        // DB 조회
+        List<Content> contents = aiPerformanceRecorder.record("db-query", () -> contentRepository.findAll());
 
-        List<AiRecommendation> recommendations;
-        try {
-            recommendations = chatClient.prompt()
-                    .system(SYSTEM_PROMPT)
-                    .user("콘텐츠 목록:\n" + contentContext + "\n\n사용자 질문: " + request.prompt())
-                    .call()
-                    .entity(new ParameterizedTypeReference<>() {});
-        } catch (ResourceAccessException e) {
-            throw new AiTimeoutException();
-        } catch (NonTransientAiException e) {
-            throw new AiUnavailableException();
-        } catch (ConversionFailedException e) {
-            throw new AiParseFailedException();
-        }
+        // 프롬프트 조립
+        String userMessage = aiPerformanceRecorder.record("prompt-build", () -> {
+            String contentContext = buildContentContext(contents);
+            return "콘텐츠 목록:\n" + contentContext + "\n\n사용자 질문: " + request.prompt();
+        });
 
+        // LLM 호출
+        ChatResponse chatResponse = aiPerformanceRecorder.record("llm-call", () -> {
+            try {
+                return chatClient.prompt()
+                        .system(SYSTEM_PROMPT)
+                        .user(userMessage)
+                        .call()
+                        .chatResponse();
+            } catch (ResourceAccessException e) {
+                throw new AiTimeoutException();
+            } catch (NonTransientAiException e) {
+                throw new AiUnavailableException();
+            }
+        });
+
+        // 토큰 사용량 기록
+        aiPerformanceRecorder.recordTokenUsage(chatResponse.getMetadata().getUsage());
+
+        // 응답 파싱
+        List<AiRecommendation> recommendations = aiPerformanceRecorder.record("response-parse", () -> {
+            String rawResponse = chatResponse.getResult().getOutput().getText();
+
+            try {
+                return objectMapper.readValue(rawResponse, new TypeReference<>() {});
+            } catch (JsonProcessingException e) {
+                throw new AiParseFailedException();
+            }
+        });
+
+        // 매핑
         List<AiRecommendation> safeRecommendations = recommendations == null ? List.of() : recommendations;
 
         Map<UUID, Content> contentMap = contents.stream()

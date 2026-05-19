@@ -83,6 +83,12 @@ public class NotificationEventListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleDirectMessageEvent(DirectMessageCreatedEvent event) {
 
+    boolean isInRoom = roomPresenceManager.isUserInRoom(event.receiverId(), event.conversationId());
+    if (isInRoom) {
+      // 방에 있으면 DB 저장, SSE 발송 X : Early Return
+      log.debug("유저가 이미 채팅방 안에 있으므로 알림 저장/발송을 생략합니다.");
+      return;
+    }
     log.debug("DM 수신 알림 DB 저장 이벤트 수신 - receiverId: {}", event.receiverId());
 
     User receiver = userRepository.getReferenceById(event.receiverId());
@@ -106,10 +112,7 @@ public class NotificationEventListener {
     Notification saved = notificationRepository.save(notification);
     NotificationDto dto = notificationMapper.toDto(saved);
 
-    boolean isInRoom = roomPresenceManager.isUserInRoom(event.receiverId(), event.conversationId());
-    if (!isInRoom) {
-      sseService.sendNotification(receiver.getId(), dto);
-    }
+    sseService.sendNotification(receiver.getId(), dto);
   }
 
   /**

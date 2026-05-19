@@ -1,7 +1,7 @@
 package com.mopl.mopl.global.config;
 
 import com.mopl.mopl.global.auth.JwtAuthenticationFilter;
-import com.mopl.mopl.global.auth.details.GoogleUserDetailsService;
+import com.mopl.mopl.global.auth.details.OAuth2UserDetailsService;
 import com.mopl.mopl.global.auth.handler.CustomAccessDeniedHandler;
 import com.mopl.mopl.global.auth.handler.CustomAuthenticationEntryPoint;
 import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
@@ -59,7 +59,7 @@ public class SecurityConfig {
             DaoAuthenticationProvider authenticationProvider,
             CustomAccessDeniedHandler customAccessDeniedHandler,
             CustomAuthenticationEntryPoint customAuthenticationEntryPoint,
-            GoogleUserDetailsService googleUserDetailsService,
+            OAuth2UserDetailsService oAuth2UserDetailsService,
             OAuth2LoginSuccessHandler oauth2LoginSuccessHandler,
             OAuth2LoginFailureHandler oauth2LoginFailureHandler
     ) throws Exception {
@@ -113,7 +113,7 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
-                                .userService(googleUserDetailsService)
+                                .userService(oAuth2UserDetailsService)
                         )
                         .successHandler(oauth2LoginSuccessHandler)
                         .failureHandler(oauth2LoginFailureHandler)

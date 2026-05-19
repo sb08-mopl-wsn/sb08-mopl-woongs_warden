@@ -139,7 +139,7 @@ class ReviewServiceImplTest {
       given(reviewMapper.toEntity(request, user, content)).willReturn(review);
 
       given(reviewRepository.saveAndFlush(any(Review.class)))
-          .willThrow(DataIntegrityViolationException.class);
+          .willThrow(new DataIntegrityViolationException("duplicate review"));
 
       // when & then
       assertThatThrownBy(() -> reviewService.createReview(request, userId))

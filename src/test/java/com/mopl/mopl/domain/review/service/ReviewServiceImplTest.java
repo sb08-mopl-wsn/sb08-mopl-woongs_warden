@@ -149,7 +149,8 @@ class ReviewServiceImplTest {
   }
 
   @Nested
-  @DisplayName("리뷰 조회") class Read {
+  @DisplayName("리뷰 조회")
+  class Read {
     @Test
     @DisplayName("단건 조회: 존재하는 리뷰 ID로 조회하면 정상적으로 반환한다.")
     void givenExistingReviewId_whenFindById_thenSuccess() {

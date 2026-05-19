@@ -16,7 +16,7 @@ import java.util.function.Supplier;
 public class AiPerformanceRecorder
 {
     private final MeterRegistry meterRegistry;
-    
+
     public <T> T record(String stage, Supplier<T> task) {
         Timer.Sample sample = Timer.start(meterRegistry);
 
@@ -39,21 +39,23 @@ public class AiPerformanceRecorder
         });
     }
 
-    public void recordTokenUsage(Usage usage) {
+    public void recordTokenUsage(String stage, Usage usage) {
         long input = usage.getPromptTokens();
         long output = usage.getCompletionTokens();
 
-        Counter.builder("ai.recommend.tokens")
+        Counter.builder("mopl.ai.recommend.tokens")
+                .tag("stage", stage)
                 .tag("type", "input")
                 .register(meterRegistry)
                 .increment();
 
-        Counter.builder("ai.recommend.tokens")
+        Counter.builder("mopl.ai.recommend.tokens")
+                .tag("stage", stage)
                 .tag("type", "output")
                 .register(meterRegistry)
                 .increment();
 
-        log.info("[AI Recommend] 토큰 사용량 - input: {} | output: {} | total: {}", input, output, input + output);
+        log.info("[AI Recommend] {} 토큰 사용량 - input: {} | output: {} | total: {}", stage, input, output, input + output);
     }
 
     private Timer buildTimer(String stage, String outcome) {

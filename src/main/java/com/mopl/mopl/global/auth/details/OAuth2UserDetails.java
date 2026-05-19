@@ -4,9 +4,9 @@ import com.mopl.mopl.domain.user.dto.UserDto;
 
 import java.util.Map;
 
-public class GoogleUserDetails extends MoplUserDetails {
+public class OAuth2UserDetails extends MoplUserDetails {
 
-    public GoogleUserDetails(UserDto userDto, Map<String, Object> attributes) {
+    public OAuth2UserDetails(UserDto userDto, Map<String, Object> attributes) {
         super(userDto, null, attributes);
     }
 

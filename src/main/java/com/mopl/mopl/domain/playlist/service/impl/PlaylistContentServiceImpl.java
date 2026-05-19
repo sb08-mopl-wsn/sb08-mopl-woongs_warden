@@ -62,14 +62,9 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
 
     playlistContentRepository.delete(playlistContent);
 
-    if (playlist.getContentCount() <= 0) {
-        return; 
-    }
+    playlistContentRepository.flush();
 
-    int updatedRows = playlistRepository.decreaseContentCount(playlistId);
-    if (updatedRows == 0) {
-      throw new PlaylistUpdateFailedException();
-    }
+    playlistRepository.decreaseContentCount(playlistId);
   }
 
   private Playlist findPlaylistAndCheckOwner(UUID playlistId, UUID userId) {

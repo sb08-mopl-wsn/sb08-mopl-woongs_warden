@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -197,6 +198,7 @@ class SseServiceTest {
 
     // then
     verify(emitterRepository, times(1)).findAllEmitters();
+    verify(emitterRepository, never()).delete(any(UUID.class), any(SseEmitter.class));
   }
 
   @Test
@@ -245,5 +247,38 @@ class SseServiceTest {
     // then
     verify(failEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
     verify(emitterRepository, times(1)).delete(eq(userId), eq(failEmitter));
+  }
+
+  @Test
+  @DisplayName("하트비트 스케줄러 - 여러 Emitter 중 일부만 전송에 실패할 경우, 실패한 것만 삭제되고 나머지는 정상 발송된다.")
+  void sendHeartbeat_PartialException_DeletesOnlyFailed() throws Exception {
+
+    // given
+    UUID userId = UUID.randomUUID();
+    SseEmitter successEmitter = mock(SseEmitter.class);
+    SseEmitter failEmitter = mock(SseEmitter.class);
+
+    Map<UUID, List<SseEmitter>> mockEmitters =new HashMap<>();
+    // 한 유저가 탭 2개 열어둔 상태(1개 정상, 1개 죽은 파이프)
+    mockEmitters.put(userId, List.of(successEmitter, failEmitter));
+
+    given(emitterRepository.findAllEmitters()).willReturn(mockEmitters);
+
+    // failEmitter만 에러
+    doThrow(new IOException("죽은 파이프")).when(failEmitter).send(any(SseEmitter.SseEventBuilder.class));
+
+    // when
+    sseService.sendHeartbeat();
+
+    // then
+    // 둘다 한번씩은 핑(send) 시도를 했어야함.
+    verify(successEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+    verify(failEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+
+    // 에러가 난 failEmitter만 삭제
+    verify(emitterRepository, times(1)).delete(eq(userId), eq(failEmitter));
+
+    // 정상 emitter는 살아있는지 검증
+    verify(emitterRepository, never()).delete(eq(userId), eq(successEmitter));
   }
 }

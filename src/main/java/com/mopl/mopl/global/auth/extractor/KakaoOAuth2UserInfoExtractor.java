@@ -29,7 +29,7 @@ public class KakaoOAuth2UserInfoExtractor implements OAuth2UserInfoExtractor {
         Map<String, Object> kakaoAccount = getRequiredMap(attributes, "kakao_account");
 
         String email = getRequiredString(kakaoAccount, "email");
-        Boolean emailVerified = (Boolean) kakaoAccount.get("is_email_verified");
+        Boolean emailVerified = getRequiredBoolean(kakaoAccount, "is_email_verified");
 
         if (!Boolean.TRUE.equals(emailVerified)) {
             throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_EMAIL_NOT_VERIFIED);
@@ -82,5 +82,15 @@ public class KakaoOAuth2UserInfoExtractor implements OAuth2UserInfoExtractor {
         }
 
         return defaultName;
+    }
+
+    private Boolean getRequiredBoolean(Map<String, Object> attributes, String key) {
+        Object value = attributes.get(key);
+
+        if (!(value instanceof Boolean)) {
+            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_MISSING_ATTRIBUTE, key);
+        }
+
+        return (Boolean) value;
     }
 }

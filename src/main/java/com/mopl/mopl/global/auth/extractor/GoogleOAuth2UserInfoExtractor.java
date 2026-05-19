@@ -23,9 +23,9 @@ public class GoogleOAuth2UserInfoExtractor implements OAuth2UserInfoExtractor {
         String socialId = getRequiredString(attributes, "sub");
         String email = getRequiredString(attributes, "email");
         String name = getStringOrDefault(attributes, "name", email);
-        Boolean emailVerified = (Boolean) attributes.get("email_verified");
+        boolean emailVerified = getRequiredBoolean(attributes, "email_verified");
 
-        if (!Boolean.TRUE.equals(emailVerified)) {
+        if (!emailVerified) {
             throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_EMAIL_NOT_VERIFIED);
         }
 
@@ -55,5 +55,13 @@ public class GoogleOAuth2UserInfoExtractor implements OAuth2UserInfoExtractor {
         }
 
         return defaultValue;
+    }
+
+    private boolean getRequiredBoolean(Map<String, Object> attributes, String key) {
+        Object value = attributes.get(key);
+        if (!(value instanceof Boolean booleanValue)) {
+            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_MISSING_ATTRIBUTE, key);
+        }
+        return booleanValue;
     }
 }

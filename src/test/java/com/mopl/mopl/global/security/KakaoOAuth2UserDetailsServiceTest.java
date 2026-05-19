@@ -6,6 +6,7 @@ import com.mopl.mopl.domain.user.entity.Social;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.auth.details.OAuth2UserAccountService;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetails;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetailsService;
 import com.mopl.mopl.global.auth.extractor.KakaoOAuth2UserInfoExtractor;
@@ -23,7 +24,6 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
@@ -56,9 +56,12 @@ class KakaoOAuth2UserDetailsServiceTest {
 
     @BeforeEach
     void setUp() {
+        OAuth2UserAccountService accountService =
+                new OAuth2UserAccountService(userRepository);
+
         service = new OAuth2UserDetailsService(
-                userRepository,
                 userMapper,
+                accountService,
                 List.of(new KakaoOAuth2UserInfoExtractor())
         );
 
@@ -107,16 +110,16 @@ class KakaoOAuth2UserDetailsServiceTest {
     @DisplayName("카카오 이메일 인증 값이 없으면 OAuth2LoginException이 발생한다")
     void loadUser_emailVerifiedMissing_throwOAuth2LoginException() {
         mockKakaoUserInfo("""
-            {
-              "id": 12345,
-              "kakao_account": {
-                "email": "kakao@test.com",
-                "profile": {
-                  "nickname": "카카오사용자"
+                {
+                  "id": 12345,
+                  "kakao_account": {
+                    "email": "kakao@test.com",
+                    "profile": {
+                      "nickname": "카카오사용자"
+                    }
+                  }
                 }
-              }
-            }
-            """);
+                """);
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
@@ -132,17 +135,17 @@ class KakaoOAuth2UserDetailsServiceTest {
         User existingUser = org.mockito.Mockito.mock(User.class);
 
         mockKakaoUserInfo("""
-            {
-              "id": 12345,
-              "kakao_account": {
-                "email": "kakao@test.com",
-                "is_email_verified": true,
-                "profile": {
-                  "nickname": "카카오사용자"
+                {
+                  "id": 12345,
+                  "kakao_account": {
+                    "email": "kakao@test.com",
+                    "is_email_verified": true,
+                    "profile": {
+                      "nickname": "카카오사용자"
+                    }
+                  }
                 }
-              }
-            }
-            """);
+                """);
 
         given(userRepository.findBySocialTypeAndSocialId(Social.KAKAO, "12345"))
                 .willReturn(Optional.empty());
@@ -165,13 +168,13 @@ class KakaoOAuth2UserDetailsServiceTest {
     @DisplayName("카카오 id가 없으면 IllegalArgumentException이 발생한다")
     void loadUser_missingId_throwIllegalArgumentException() {
         mockKakaoUserInfo("""
-            {
-              "kakao_account": {
-                "email": "kakao@test.com",
-                "is_email_verified": true
-              }
-            }
-            """);
+                {
+                  "kakao_account": {
+                    "email": "kakao@test.com",
+                    "is_email_verified": true
+                  }
+                }
+                """);
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(IllegalArgumentException.class)

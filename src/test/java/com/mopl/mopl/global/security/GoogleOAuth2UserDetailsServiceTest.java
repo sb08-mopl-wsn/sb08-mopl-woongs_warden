@@ -7,6 +7,7 @@ import com.mopl.mopl.domain.user.entity.Social;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.auth.details.OAuth2UserAccountService;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetails;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetailsService;
 import com.mopl.mopl.global.auth.extractor.GoogleOAuth2UserInfoExtractor;
@@ -57,9 +58,12 @@ class GoogleOAuth2UserDetailsServiceTest {
 
     @BeforeEach
     void setUp() {
+        OAuth2UserAccountService accountService =
+                new OAuth2UserAccountService(userRepository);
+
         service = new OAuth2UserDetailsService(
-                userRepository,
                 userMapper,
+                accountService,
                 List.of(new GoogleOAuth2UserInfoExtractor())
         );
 
@@ -166,13 +170,13 @@ class GoogleOAuth2UserDetailsServiceTest {
         User existingUser = org.mockito.Mockito.mock(User.class);
 
         mockGoogleUserInfo("""
-            {
-              "sub": "google-sub-1",
-              "email": "google@test.com",
-              "name": "구글사용자",
-              "email_verified": true
-            }
-            """);
+                {
+                  "sub": "google-sub-1",
+                  "email": "google@test.com",
+                  "name": "구글사용자",
+                  "email_verified": true
+                }
+                """);
 
         given(userRepository.findBySocialTypeAndSocialId(Social.GOOGLE, "google-sub-1"))
                 .willReturn(Optional.empty());
@@ -197,13 +201,13 @@ class GoogleOAuth2UserDetailsServiceTest {
         User existingUser = org.mockito.Mockito.mock(User.class);
 
         mockGoogleUserInfo("""
-            {
-              "sub": "google-sub-1",
-              "email": "google@test.com",
-              "name": "구글사용자",
-              "email_verified": true
-            }
-            """);
+                {
+                  "sub": "google-sub-1",
+                  "email": "google@test.com",
+                  "name": "구글사용자",
+                  "email_verified": true
+                }
+                """);
 
         given(userRepository.findBySocialTypeAndSocialId(Social.GOOGLE, "google-sub-1"))
                 .willReturn(Optional.empty());

@@ -48,7 +48,7 @@ public interface DirectMessageApi {
 
     @Operation(summary = "DM 전송", description = "REST API를 통한 DM 전송")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "성공",
+            @ApiResponse(responseCode = "201", description = "생성 성공",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = DirectMessageDto.class))),
             @ApiResponse(responseCode = "400", description = "잘못된 요청",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),

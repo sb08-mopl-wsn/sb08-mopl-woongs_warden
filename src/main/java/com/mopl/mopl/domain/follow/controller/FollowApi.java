@@ -25,7 +25,7 @@ public interface FollowApi {
 
     @Operation(summary = "팔로우", description = "특정 유저를 팔로우합니다.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "성공",
+            @ApiResponse(responseCode = "201", description = "생성 성공",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = FollowDto.class))),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (자기 자신 팔로우 등)",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),

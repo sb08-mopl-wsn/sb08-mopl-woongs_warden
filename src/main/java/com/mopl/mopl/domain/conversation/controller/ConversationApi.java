@@ -29,7 +29,7 @@ public interface ConversationApi {
 
     @Operation(summary = "대화 생성", description = "상대방과의 1:1 대화방을 생성합니다.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "성공",
+            @ApiResponse(responseCode = "201", description = "생성 성공",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ConversationDto.class))),
             @ApiResponse(responseCode = "400", description = "잘못된 요청",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),

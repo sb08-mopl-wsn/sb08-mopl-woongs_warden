@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.user.repository;
 
 import com.mopl.mopl.domain.user.entity.Role;
+import com.mopl.mopl.domain.user.entity.Social;
 import com.mopl.mopl.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -18,4 +19,6 @@ public interface UserRepository extends JpaRepository<User, UUID>, UserRepositor
     boolean existsByRole(Role role);
 
     Optional<User> findByEmail(String email);
+
+    Optional<User> findBySocialTypeAndSocialId(Social socialType, String socialId);
 }

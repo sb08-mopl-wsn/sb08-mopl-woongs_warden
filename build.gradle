@@ -31,13 +31,20 @@ jacocoTestReport {
 			fileTree(dir: it, exclude: [
 					'**/dto/**',
 					'**/entity/**',
-					"**/entity/Q*",
+					'**/entity/Q*',
+					'**/mapper/**',
 					'**/*Config*',
 					'**/*Application*',
 					'**/*Exception*',
 					'**/*Constants*',
 					'**/repository/**',
-					'**/controller/**'
+					'**/controller/**',
+					'**/global/config/**',
+					'**/global/base/**',
+					'**/global/exception/**',
+					'**/global/logging/**',
+					'**/Q*',
+					'**/exception/**'
 			])
 		}))
 	}

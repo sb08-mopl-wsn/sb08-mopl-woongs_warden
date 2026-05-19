@@ -40,7 +40,7 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
 
     try {
       PlaylistContent playlistContent = new PlaylistContent(playlist, content);
-      playlistContentRepository.save(playlistContent);
+      playlistContentRepository.saveAndFlush(playlistContent);
     } catch (DataIntegrityViolationException e) {
       throw new ContentAlreadyInPlaylistException();
     }
@@ -62,10 +62,9 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
 
     playlistContentRepository.delete(playlistContent);
 
-    int updatedRows = playlistRepository.decreaseContentCount(playlistId);
-    if (updatedRows == 0) {
-      throw new PlaylistUpdateFailedException();
-    }
+    playlistContentRepository.flush();
+
+    playlistRepository.decreaseContentCount(playlistId);
   }
 
   private Playlist findPlaylistAndCheckOwner(UUID playlistId, UUID userId) {

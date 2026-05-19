@@ -7,13 +7,20 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "playlist_subscriptions")
+@Table(
+    name = "playlist_subscriptions",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_playlist_subscriptions",
+        columnNames = {"user_id", "playlist_id"}
+    )
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlaylistSubscription extends BaseEntity {

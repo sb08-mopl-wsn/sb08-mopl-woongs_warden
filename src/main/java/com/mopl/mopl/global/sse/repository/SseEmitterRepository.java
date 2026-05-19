@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -58,5 +59,14 @@ public class SseEmitterRepository {
         emitters.remove(userId);
       }
     }
+  }
+
+  // keep-Alive를 위한 현재 접속중인 모든 파이프 맵 반환
+  public Map<UUID, List<SseEmitter>> findAllEmitters() {
+    return emitters.entrySet().stream()
+        .collect(Collectors.toUnmodifiableMap(
+            Map.Entry::getKey,
+            entry -> List.copyOf(entry.getValue())
+        ));
   }
 }

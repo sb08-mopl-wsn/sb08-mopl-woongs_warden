@@ -6,6 +6,7 @@ import com.mopl.mopl.domain.user.entity.Social;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.auth.extractor.OAuth2UserInfoExtractor;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import com.mopl.mopl.global.exception.oauth2.OAuth2LoginException;
 import lombok.RequiredArgsConstructor;
@@ -18,9 +19,9 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final List<OAuth2UserInfoExtractor> extractors;
 
     @Override
     @Transactional
@@ -51,64 +53,11 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
     }
 
     private OAuth2UserInfo extractUserInfo(String registrationId, Map<String, Object> attributes) {
-        return switch (registrationId) {
-            case "google" -> extractGoogleUserInfo(attributes);
-            case "kakao" -> extractKakaoUserInfo(attributes);
-            default -> throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_UNSUPPORTED_PROVIDER);
-        };
-    }
-
-    private OAuth2UserInfo extractGoogleUserInfo(Map<String, Object> attributes) {
-        String socialId = getRequiredString(attributes, "sub");
-        String email = getRequiredString(attributes, "email");
-        String name = getStringOrDefault(attributes, "name", email);
-        Boolean emailVerified = (Boolean) attributes.get("email_verified");
-
-        if (!Boolean.TRUE.equals(emailVerified)) {
-            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_EMAIL_NOT_VERIFIED);
-        }
-
-        return new OAuth2UserInfo(
-                Social.GOOGLE,
-                socialId,
-                email,
-                name
-        );
-    }
-
-    private OAuth2UserInfo extractKakaoUserInfo(Map<String, Object> attributes) {
-        Object id = attributes.get("id");
-
-        if (id == null) {
-            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_MISSING_ATTRIBUTE, "id");
-        }
-
-        Map<String, Object> kakaoAccount = getRequiredMap(attributes, "kakao_account");
-
-        String email = getRequiredString(kakaoAccount, "email");
-
-        Boolean emailVerified = (Boolean) kakaoAccount.get("is_email_verified");
-        if (!Boolean.TRUE.equals(emailVerified)) {
-            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_EMAIL_NOT_VERIFIED);
-        }
-
-        String name = email;
-
-        Object profileValue = kakaoAccount.get("profile");
-        if (profileValue instanceof Map<?, ?> profile) {
-            Object nickname = profile.get("nickname");
-
-            if (nickname instanceof String nicknameValue && !nicknameValue.isBlank()) {
-                name = nicknameValue;
-            }
-        }
-
-        return new OAuth2UserInfo(
-                Social.KAKAO,
-                String.valueOf(id),
-                email,
-                name
-        );
+        return extractors.stream()
+                .filter(extractor -> extractor.supports(registrationId))
+                .findFirst()
+                .orElseThrow(() -> new OAuth2LoginException(GlobalErrorCode.OAUTH2_UNSUPPORTED_PROVIDER))
+                .extract(attributes);
     }
 
     private User findOrCreateSocialUser(OAuth2UserInfo userInfo) {
@@ -165,42 +114,6 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
         }
 
         return existingUser;
-    }
-
-    private Map<String, Object> getRequiredMap(Map<String, Object> attributes, String key) {
-        Object value = attributes.get(key);
-
-        if (!(value instanceof Map<?, ?> mapValue)) {
-            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_MISSING_ATTRIBUTE, key);
-        }
-
-        return mapValue.entrySet()
-                .stream()
-                .filter(entry -> entry.getKey() instanceof String)
-                .collect(Collectors.toMap(
-                        entry -> (String) entry.getKey(),
-                        Map.Entry::getValue
-                ));
-    }
-
-    private String getRequiredString(Map<String, Object> attributes, String key) {
-        Object value = attributes.get(key);
-
-        if (!(value instanceof String stringValue) || stringValue.isBlank()) {
-            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_MISSING_ATTRIBUTE, key);
-        }
-
-        return stringValue;
-    }
-
-    private String getStringOrDefault(Map<String, Object> attributes, String key, String defaultValue) {
-        Object value = attributes.get(key);
-
-        if (value instanceof String stringValue && !stringValue.isBlank()) {
-            return stringValue;
-        }
-
-        return defaultValue;
     }
 
     private void validateNotLocked(User user) {

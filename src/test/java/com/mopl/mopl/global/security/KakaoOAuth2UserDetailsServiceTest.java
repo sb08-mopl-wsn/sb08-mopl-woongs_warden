@@ -8,6 +8,7 @@ import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetails;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetailsService;
+import com.mopl.mopl.global.auth.extractor.KakaoOAuth2UserInfoExtractor;
 import com.mopl.mopl.global.exception.oauth2.OAuth2LoginException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,7 +56,11 @@ class KakaoOAuth2UserDetailsServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OAuth2UserDetailsService(userRepository, userMapper);
+        service = new OAuth2UserDetailsService(
+                userRepository,
+                userMapper,
+                List.of(new KakaoOAuth2UserInfoExtractor())
+        );
 
         RestTemplate restTemplate = new RestTemplate();
         mockServer = MockRestServiceServer.bindTo(restTemplate).build();

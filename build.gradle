@@ -113,6 +113,9 @@ dependencies {
 	implementation 'software.amazon.awssdk:s3'
 	implementation 'software.amazon.awssdk:apache-client'
 
+	// filtering
+	implementation 'org.ahocorasick:ahocorasick:0.6.3'
+
 	// test
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'

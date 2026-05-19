@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.mopl.mopl.domain.dm.dto.DirectMessageDto;
@@ -31,6 +32,7 @@ import com.mopl.mopl.global.event.ReviewCreatedEvent;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -214,5 +216,70 @@ class NotificationEventListenerTest {
     // then
     verify(notificationRepository).saveAll(any());
     verify(sseService).sendNotification(eq(receiverId), eq(mockDto));
+  }
+
+  @Test
+  @DisplayName("DM 수신 시 유저가 이미 채팅방 안에 있으면 알림을 저장하거나 발송하지 않는다.")
+  void handleDirectMessageEvent_InRoom() {
+
+    // given
+    UUID convId = UUID.randomUUID();
+    UserSummary senderSummary = new UserSummary(UUID.randomUUID(), "보낸이", null);
+    DirectMessageDto messageDto = new DirectMessageDto(UUID.randomUUID(), convId, "안녕", senderSummary, null, Instant.now());
+    DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(convId, receiverId, messageDto);
+
+    given(roomPresenceManager.isUserInRoom(receiverId, convId)).willReturn(true);
+
+    // when
+    notificationEventListener.handleDirectMessageEvent(event);
+
+    // then
+    verify(notificationRepository, never()).save(any(Notification.class));
+    verify(sseService, never()).sendNotification(any(), any());
+  }
+
+  @Test
+  @DisplayName("리뷰 작성 시 팔로워가 아무도 없으면 브로드캐스팅 로직을 조용히 건너뛴다.")
+  void handleReviewCreatedEvent_NoFollowers() {
+
+    // given
+    User writer = User.builder().name("작성자").build();
+    UUID writerId = UUID.randomUUID();
+    ReflectionTestUtils.setField(writer, "id", writerId);
+
+    Review review = Review.builder().user(writer).build();
+    ReflectionTestUtils.setField(review, "id", UUID.randomUUID());
+
+    ReviewCreatedEvent event = ReviewCreatedEvent.of(review);
+
+    given(followRepository.findAllByFolloweeIdWithFollower(writerId)).willReturn(Collections.emptyList());
+
+    // when
+    notificationEventListener.handleReviewCreatedEvent(event);
+
+    // then
+    verify(notificationRepository, never()).saveAll(any());
+    verify(sseService, never()).sendNotification(any(), any());
+  }
+
+  @Test
+  @DisplayName("구독 중인 플레이리스트에 콘텐츠가 추가되어도 구독자가 없으면 브로드캐스팅을 건너뛴다.")
+  void handlePlaylistContentAddedEvent_NoSubscribers() {
+
+    // given
+    Playlist playlist = Playlist.builder().user(User.builder().build()).title("업데이트플리").build();
+    UUID playlistId = UUID.randomUUID();
+    ReflectionTestUtils.setField(playlist, "id", playlistId);
+
+    PlaylistContentAddedEvent event = PlaylistContentAddedEvent.of(playlist);
+
+    given(playlistSubscriptionRepository.findAllByPlaylistIdWithUser(playlistId)).willReturn(Collections.emptyList());
+
+    // when
+    notificationEventListener.handlePlaylistContentAddedEvent(event);
+
+    // then
+    verify(notificationRepository, never()).saveAll(any());
+    verify(sseService, never()).sendNotification(any(), any());
   }
 }

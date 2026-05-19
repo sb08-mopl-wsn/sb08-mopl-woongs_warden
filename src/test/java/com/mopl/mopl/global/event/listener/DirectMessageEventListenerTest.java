@@ -113,6 +113,7 @@ class DirectMessageEventListenerTest {
 
     // when & then
     assertDoesNotThrow(() -> directMessageEventListener.onDirectMessageCreated(event));
+    verify(sseService).sendCustomNotification(eq(receiverId), eq("direct-messages"), eq(messageDto));
   }
 
   @Test
@@ -121,11 +122,13 @@ class DirectMessageEventListenerTest {
 
     // given
     DirectMessageSentEvent event = DirectMessageSentEvent.of(conversationId, messageDto);
+    String expectedDestination = "/sub/conversations/" + conversationId + "/direct-messages";
 
     doThrow(new RuntimeException("STOMP 브로커 다운"))
         .when(messagingTemplate).convertAndSend(any(String.class), any(Object.class));
 
     // when & then
     assertDoesNotThrow(() -> directMessageEventListener.onDirectMessageSent(event));
+    verify(messagingTemplate).convertAndSend(eq(expectedDestination), eq(messageDto));
   }
 }

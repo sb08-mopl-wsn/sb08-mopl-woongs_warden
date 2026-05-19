@@ -98,6 +98,64 @@ class KakaoOAuth2UserDetailsServiceTest {
     }
 
     @Test
+    @DisplayName("카카오 이메일 인증 값이 없으면 OAuth2LoginException이 발생한다")
+    void loadUser_emailVerifiedMissing_throwOAuth2LoginException() {
+        mockKakaoUserInfo("""
+            {
+              "id": 12345,
+              "kakao_account": {
+                "email": "kakao@test.com",
+                "profile": {
+                  "nickname": "카카오사용자"
+                }
+              }
+            }
+            """);
+
+        assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
+                .isInstanceOf(OAuth2LoginException.class);
+
+        verifyNoInteractions(userRepository, userMapper);
+
+        mockServer.verify();
+    }
+
+    @Test
+    @DisplayName("같은 이메일 기존 사용자가 잠긴 계정이면 카카오 계정을 연결하지 않고 LockedException이 발생한다")
+    void loadUser_existingEmailLockedUser_throwLockedException() {
+        User existingUser = org.mockito.Mockito.mock(User.class);
+
+        mockKakaoUserInfo("""
+            {
+              "id": 12345,
+              "kakao_account": {
+                "email": "kakao@test.com",
+                "is_email_verified": true,
+                "profile": {
+                  "nickname": "카카오사용자"
+                }
+              }
+            }
+            """);
+
+        given(userRepository.findBySocialTypeAndSocialId(Social.KAKAO, "12345"))
+                .willReturn(Optional.empty());
+        given(userRepository.findByEmail("kakao@test.com"))
+                .willReturn(Optional.of(existingUser));
+        given(existingUser.isLocked()).willReturn(true);
+
+        assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
+                .isInstanceOf(LockedException.class)
+                .hasMessageContaining("잠긴 계정입니다.");
+
+        verify(existingUser, org.mockito.Mockito.never())
+                .updateSocialInfo(org.mockito.Mockito.any(), org.mockito.Mockito.anyString());
+        verifyNoInteractions(userMapper);
+
+        mockServer.verify();
+    }
+
+    @Test
     @DisplayName("카카오 id가 없으면 IllegalArgumentException이 발생한다")
     void loadUser_missingId_throwIllegalArgumentException() {
         mockKakaoUserInfo("""

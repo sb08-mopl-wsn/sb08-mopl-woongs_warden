@@ -155,6 +155,71 @@ class GoogleOAuth2UserDetailsServiceTest {
     }
 
     @Test
+    @DisplayName("같은 이메일 기존 사용자가 잠긴 계정이면 구글 계정을 연결하지 않고 LockedException이 발생한다")
+    void loadUser_existingEmailLockedUser_throwLockedException() {
+        User existingUser = org.mockito.Mockito.mock(User.class);
+
+        mockGoogleUserInfo("""
+            {
+              "sub": "google-sub-1",
+              "email": "google@test.com",
+              "name": "구글사용자",
+              "email_verified": true
+            }
+            """);
+
+        given(userRepository.findBySocialTypeAndSocialId(Social.GOOGLE, "google-sub-1"))
+                .willReturn(Optional.empty());
+        given(userRepository.findByEmail("google@test.com"))
+                .willReturn(Optional.of(existingUser));
+        given(existingUser.isLocked()).willReturn(true);
+
+        assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
+                .isInstanceOf(LockedException.class)
+                .hasMessageContaining("잠긴 계정입니다.");
+
+        verify(existingUser, org.mockito.Mockito.never())
+                .updateSocialInfo(org.mockito.Mockito.any(), org.mockito.Mockito.anyString());
+        verifyNoInteractions(userMapper);
+
+        mockServer.verify();
+    }
+
+    @Test
+    @DisplayName("신규 저장 중 이메일 중복 후 재조회된 사용자가 잠긴 계정이면 LockedException이 발생한다")
+    void loadUser_saveDataIntegrityViolation_lockedUser_throwLockedException() {
+        User existingUser = org.mockito.Mockito.mock(User.class);
+
+        mockGoogleUserInfo("""
+            {
+              "sub": "google-sub-1",
+              "email": "google@test.com",
+              "name": "구글사용자",
+              "email_verified": true
+            }
+            """);
+
+        given(userRepository.findBySocialTypeAndSocialId(Social.GOOGLE, "google-sub-1"))
+                .willReturn(Optional.empty());
+        given(userRepository.findByEmail("google@test.com"))
+                .willReturn(Optional.empty())
+                .willReturn(Optional.of(existingUser));
+        given(userRepository.save(any(User.class)))
+                .willThrow(DataIntegrityViolationException.class);
+        given(existingUser.isLocked()).willReturn(true);
+
+        assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
+                .isInstanceOf(LockedException.class)
+                .hasMessageContaining("잠긴 계정입니다.");
+
+        verify(existingUser, org.mockito.Mockito.never())
+                .updateSocialInfo(org.mockito.Mockito.any(), org.mockito.Mockito.anyString());
+        verifyNoInteractions(userMapper);
+
+        mockServer.verify();
+    }
+
+    @Test
     @DisplayName("기존 구글 사용자가 잠긴 계정이면 LockedException이 발생한다")
     void loadUser_lockedUser_throwLockedException() {
         User lockedUser = org.mockito.Mockito.mock(User.class);

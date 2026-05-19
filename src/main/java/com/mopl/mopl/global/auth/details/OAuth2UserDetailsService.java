@@ -45,9 +45,7 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
                 )
                 .orElseGet(() -> findOrCreateSocialUser(userInfo));
 
-        if (user.isLocked()) {
-            throw new LockedException("잠긴 계정입니다.");
-        }
+        validateNotLocked(user);
 
         return new OAuth2UserDetails(userMapper.toDto(user), attributes);
     }
@@ -90,7 +88,7 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
         String email = getRequiredString(kakaoAccount, "email");
 
         Boolean emailVerified = (Boolean) kakaoAccount.get("is_email_verified");
-        if (Boolean.FALSE.equals(emailVerified)) {
+        if (!Boolean.TRUE.equals(emailVerified)) {
             throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_EMAIL_NOT_VERIFIED);
         }
 
@@ -115,11 +113,14 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
 
     private User findOrCreateSocialUser(OAuth2UserInfo userInfo) {
         return userRepository.findByEmail(userInfo.email())
-                .map(existingUser -> linkSocialAccount(
-                        existingUser,
-                        userInfo.socialType(),
-                        userInfo.socialId()
-                ))
+                .map(existingUser -> {
+                    validateNotLocked(existingUser);
+                    return linkSocialAccount(
+                            existingUser,
+                            userInfo.socialType(),
+                            userInfo.socialId()
+                    );
+                })
                 .orElseGet(() -> {
                     try {
                         return userRepository.save(
@@ -133,11 +134,14 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
                         );
                     } catch (DataIntegrityViolationException e) {
                         return userRepository.findByEmail(userInfo.email())
-                                .map(existingUser -> linkSocialAccount(
-                                        existingUser,
-                                        userInfo.socialType(),
-                                        userInfo.socialId()
-                                ))
+                                .map(existingUser -> {
+                                    validateNotLocked(existingUser);
+                                    return linkSocialAccount(
+                                            existingUser,
+                                            userInfo.socialType(),
+                                            userInfo.socialId()
+                                    );
+                                })
                                 .orElseThrow(AuthAuthenticationFailedException::new);
                     }
                 });
@@ -197,5 +201,11 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
         }
 
         return defaultValue;
+    }
+
+    private void validateNotLocked(User user) {
+        if (user.isLocked()) {
+            throw new LockedException("잠긴 계정입니다.");
+        }
     }
 }

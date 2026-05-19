@@ -13,7 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 @RequestMapping("/api/sse")
 @RequiredArgsConstructor
-public class SseController {
+public class SseController implements SseApi {
 
   private final SseService sseService;
 

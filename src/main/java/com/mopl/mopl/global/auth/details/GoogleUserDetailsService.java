@@ -5,13 +5,14 @@ import com.mopl.mopl.domain.user.entity.Social;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.exception.GlobalErrorCode;
+import com.mopl.mopl.global.exception.oauth2.OAuth2LoginException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +34,7 @@ public class GoogleUserDetailsService extends DefaultOAuth2UserService {
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
 
         if (!"google".equals(registrationId)) {
-            throw oauth2Exception("unsupported_provider", "지원하지 않는 소셜 로그인입니다.");
+            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_UNSUPPORTED_PROVIDER);
         }
 
         Map<String, Object> attributes = oauth2User.getAttributes();
@@ -44,7 +45,7 @@ public class GoogleUserDetailsService extends DefaultOAuth2UserService {
         Boolean emailVerified = (Boolean) attributes.get("email_verified");
 
         if (!Boolean.TRUE.equals(emailVerified)) {
-            throw oauth2Exception("email_not_verified", "구글 이메일 인증이 완료되지 않은 계정입니다.");
+            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_EMAIL_NOT_VERIFIED);
         }
 
         User user = userRepository.findBySocialTypeAndSocialId(Social.GOOGLE, socialId)
@@ -72,10 +73,9 @@ public class GoogleUserDetailsService extends DefaultOAuth2UserService {
                                         .build()
                         );
                     } catch (DataIntegrityViolationException e) {
-                        // 동시에 생성된 경우, 재조회하여 링크
                         return userRepository.findByEmail(email)
                                 .map(user -> linkGoogleAccount(user, socialId))
-                                .orElseThrow(() -> new AuthAuthenticationFailedException());
+                                .orElseThrow(AuthAuthenticationFailedException::new);
                     }
                 });
     }
@@ -86,7 +86,7 @@ public class GoogleUserDetailsService extends DefaultOAuth2UserService {
         }
 
         if (existingUser.getSocialType() != Social.GOOGLE) {
-            throw oauth2Exception("already_linked_other_social", "이미 다른 소셜 계정으로 가입된 이메일입니다.");
+            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_ALREADY_LINKED_OTHER_SOCIAL);
         }
 
         if (existingUser.getSocialId() == null) {
@@ -94,7 +94,7 @@ public class GoogleUserDetailsService extends DefaultOAuth2UserService {
         }
 
         if (!Objects.equals(existingUser.getSocialId(), socialId)) {
-            throw oauth2Exception("social_id_mismatch", "기존 구글 계정 정보와 일치하지 않습니다.");
+            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_SOCIAL_ID_MISMATCH);
         }
 
         return existingUser;
@@ -104,7 +104,7 @@ public class GoogleUserDetailsService extends DefaultOAuth2UserService {
         Object value = attributes.get(key);
 
         if (!(value instanceof String stringValue) || stringValue.isBlank()) {
-            throw oauth2Exception("missing_attribute", "구글 사용자 정보에 " + key + " 값이 없습니다.");
+            throw new OAuth2LoginException(GlobalErrorCode.OAUTH2_MISSING_ATTRIBUTE, key);
         }
 
         return stringValue;
@@ -118,9 +118,5 @@ public class GoogleUserDetailsService extends DefaultOAuth2UserService {
         }
 
         return defaultValue;
-    }
-
-    private OAuth2AuthenticationException oauth2Exception(String code, String message) {
-        return new OAuth2AuthenticationException(new OAuth2Error(code), message);
     }
 }

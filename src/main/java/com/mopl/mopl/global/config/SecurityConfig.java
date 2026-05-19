@@ -2,10 +2,14 @@ package com.mopl.mopl.global.config;
 
 import com.mopl.mopl.global.auth.JwtAuthenticationFilter;
 import com.mopl.mopl.global.auth.details.GoogleUserDetailsService;
-import com.mopl.mopl.global.auth.handler.*;
+import com.mopl.mopl.global.auth.handler.CustomAccessDeniedHandler;
+import com.mopl.mopl.global.auth.handler.CustomAuthenticationEntryPoint;
+import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
+import com.mopl.mopl.global.auth.handler.JwtLogoutHandler;
 import com.mopl.mopl.global.auth.handler.LoginFailureHandler;
 import com.mopl.mopl.global.auth.handler.OAuth2LoginFailureHandler;
-import jakarta.servlet.DispatcherType;
+import com.mopl.mopl.global.auth.handler.OAuth2LoginSuccessHandler;
+import com.mopl.mopl.global.auth.handler.SpaCsrfTokenRequestHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -67,7 +71,6 @@ public class SecurityConfig {
                         .ignoringRequestMatchers("/api/auth/sign-in")
                 )
                 .authorizeHttpRequests(auth -> auth
-                                .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                                 // 문서 관련
                                 .requestMatchers("/", "/index.html").permitAll()
                                 .requestMatchers("/ws/**").permitAll()

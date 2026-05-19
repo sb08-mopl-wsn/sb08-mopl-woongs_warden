@@ -7,12 +7,11 @@ import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.handler.OAuth2LoginSuccessHandler;
 import com.mopl.mopl.global.exception.oauth2.OAuth2PrincipalException;
-import com.mopl.mopl.global.exception.oauth2.Oauth2FailedTokenException;
+import com.mopl.mopl.global.exception.oauth2.OAuth2FailedTokenException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -123,6 +122,6 @@ class OAuth2LoginSuccessHandlerTest {
 
         assertThatThrownBy(() ->
                 successHandler.onAuthenticationSuccess(request, response, authentication)
-        ).isInstanceOf(Oauth2FailedTokenException.class);
+        ).isInstanceOf(OAuth2FailedTokenException.class);
     }
 }

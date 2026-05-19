@@ -12,12 +12,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Getter
 @RequiredArgsConstructor
 public class MoplUserDetails implements UserDetails, OAuth2User {
-
     private final UserDto userDto;
     private final String password;
     private final Map<String, Object> attributes;
@@ -43,7 +41,6 @@ public class MoplUserDetails implements UserDetails, OAuth2User {
         return userDto.email();
     }
 
-    @Override
     public String getName() {
         return userDto.name();
     }
@@ -54,34 +51,7 @@ public class MoplUserDetails implements UserDetails, OAuth2User {
     }
 
     @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
     public boolean isAccountNonLocked() {
         return !userDto.locked();
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return true;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof MoplUserDetails that)) return false;
-        return Objects.equals(userDto.email(), that.userDto.email());
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(userDto.email());
     }
 }

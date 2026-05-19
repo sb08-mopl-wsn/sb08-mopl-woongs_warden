@@ -6,7 +6,7 @@ import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.exception.oauth2.OAuth2PrincipalException;
-import com.mopl.mopl.global.exception.oauth2.Oauth2FailedTokenException;
+import com.mopl.mopl.global.exception.oauth2.OAuth2FailedTokenException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -58,7 +58,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             response.sendRedirect(successRedirectUrl);
 
         } catch (Exception e) {
-            throw new Oauth2FailedTokenException(e.getMessage());
+            throw new OAuth2FailedTokenException(e.getMessage());
         }
     }
 }

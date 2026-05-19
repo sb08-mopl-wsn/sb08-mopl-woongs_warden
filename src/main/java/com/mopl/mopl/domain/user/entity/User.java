@@ -1,8 +1,13 @@
 package com.mopl.mopl.domain.user.entity;
 
-import com.mopl.mopl.domain.user.exception.UserLoginFailedException;
+import com.mopl.mopl.domain.user.exception.UserInvalidSocialInfoException;
 import com.mopl.mopl.global.base.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,7 +16,15 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_users_social_type_social_id",
+                        columnNames = {"social_type", "social_id"}
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseEntity {
@@ -122,7 +135,7 @@ public class User extends BaseEntity {
 
     public User updateSocialInfo(Social socialType, String socialId) {
         if ((socialType == null) != (socialId == null || socialId.isBlank())) {
-            throw new UserLoginFailedException();
+            throw new UserInvalidSocialInfoException();
         }
 
         this.socialType = socialType;

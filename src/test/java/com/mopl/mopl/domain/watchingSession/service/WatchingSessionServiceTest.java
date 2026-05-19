@@ -471,6 +471,8 @@ public class WatchingSessionServiceTest {
             watchingSessionService.receiveMessage(contentId, userId, request);
 
             // then
+            verify(badWordFilter, times(1)).maskBadWord(rawMessage);
+
             ArgumentCaptor<LiveChatEvent> captor =
                     ArgumentCaptor.forClass(LiveChatEvent.class);
             verify(eventPublisher).publishEvent(captor.capture());

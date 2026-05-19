@@ -30,12 +30,11 @@ public class BadWordFilter {
 
     @PostConstruct
     public void init() {
-        try {
-            // 파일에서 단어 목록 읽어옴. (UTF-8 인코딩)
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(badWordsResource.getInputStream(), StandardCharsets.UTF_8)
-            );
-            List<String> badWords = reader.lines()
+        List<String> badWords;
+        // 파일에서 단어 목록 읽어옴. (UTF-8 인코딩)
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(badWordsResource.getInputStream(), StandardCharsets.UTF_8))) {
+            badWords = reader.lines()
                     .map(String::trim)
                     .filter(word -> !word.isEmpty())
                     .toList();
@@ -96,7 +95,7 @@ public class BadWordFilter {
             int originEnd = originalIndices.get(normEnd);
 
             // 원본에서 욕설 시작점부터 끝점까지 '*'로 치환
-            for (int j=originStart; j<= originEnd; j++) {
+            for (int j = originStart; j <= originEnd; j++) {
                 maskedMessage.setCharAt(j, '*');
             }
         }

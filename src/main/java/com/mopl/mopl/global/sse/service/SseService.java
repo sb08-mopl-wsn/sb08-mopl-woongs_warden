@@ -123,6 +123,7 @@ public class SseService {
               .name("heartbeat")
               .data("ping"));
         } catch (Exception e) {
+          log.debug("Heartbeat 전송 실패로 emitter 제거 - userId: {}", userId, e);
           emitterRepository.delete(userId, emitter);
         }
       });

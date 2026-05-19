@@ -14,7 +14,9 @@ import static org.mockito.Mockito.verify;
 import com.mopl.mopl.global.sse.repository.SseEmitterRepository;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -181,5 +183,67 @@ class SseServiceTest {
 
     // then
     verify(emitterRepository, times(3)).delete(eq(userId), eq(emitter));
+  }
+
+  @Test
+  @DisplayName("하트비트 스케줄러 - 저장된 Emitter가 없으면 아무 동작도 하지 않고 종료된다.")
+  void sendHeartbeat_Empty_skip() {
+
+    // given
+    given(emitterRepository.findAllEmitters()).willReturn(Collections.emptyMap());
+
+    // when
+    sseService.sendHeartbeat();
+
+    // then
+    verify(emitterRepository, times(1)).findAllEmitters();
+  }
+
+  @Test
+  @DisplayName("하트비트 스케줄러 - 접속 중인 모든 Emitter에 ping 이벤트를 정상 발송한다.")
+  void sendHeartbeat_Success() throws Exception {
+
+    // given
+    UUID userId1 = UUID.randomUUID();
+    UUID userId2 = UUID.randomUUID();
+
+    SseEmitter emitter1 = mock(SseEmitter.class);
+    SseEmitter emitter2 = mock(SseEmitter.class);
+
+    Map<UUID, List<SseEmitter>> mockEmitters = new HashMap<>();
+    mockEmitters.put(userId1, List.of(emitter1));
+    mockEmitters.put(userId2, List.of(emitter2));
+
+    given(emitterRepository.findAllEmitters()).willReturn(mockEmitters);
+
+    // when
+    sseService.sendHeartbeat();
+
+    // then
+    verify(emitter1, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+    verify(emitter2, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+  }
+
+  @Test
+  @DisplayName("하트비트 스케줄러 - 전송 중 에러(IOException) 발생 시 해당 Emitter를 Repository에서 강제 삭제한다.")
+  void sendHeartbeat_Exception_DeletesEmitter() throws Exception {
+
+    // given
+    UUID userId = UUID.randomUUID();
+    SseEmitter failEmitter = mock(SseEmitter.class);
+
+    Map<UUID, List<SseEmitter>> mockEmitters = new HashMap<>();
+    mockEmitters.put(userId, List.of(failEmitter));
+
+    given(emitterRepository.findAllEmitters()).willReturn(mockEmitters);
+
+    doThrow(new IOException("연결 끊김")).when(failEmitter).send(any(SseEmitter.SseEventBuilder.class));
+
+    // when
+    sseService.sendHeartbeat();
+
+    // then
+    verify(failEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+    verify(emitterRepository, times(1)).delete(eq(userId), eq(failEmitter));
   }
 }

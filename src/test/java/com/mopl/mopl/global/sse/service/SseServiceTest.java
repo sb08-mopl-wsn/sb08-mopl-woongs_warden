@@ -17,12 +17,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @ExtendWith(MockitoExtension.class)
@@ -155,5 +157,29 @@ class SseServiceTest {
 
     // then
     assertThat(emitter).isNotNull();
+  }
+
+  @Test
+  @DisplayName("SSE 구독 - 연결 완료(Completion), 타임아웃, 에러 발생 시 Repository에서 Emitter가 올바르게 삭제된다.")
+  void subscribe_Callbacks_TriggerDelete() {
+
+    // given
+    UUID userId = UUID.randomUUID();
+    SseEmitter emitter = sseService.subscribe(userId);
+
+    // SseEmitter 내부에 등록된 private 콜백 객체들 강제 추출
+    Runnable completionCallback = (Runnable) ReflectionTestUtils.getField(emitter, "completionCallback");
+    Runnable timeoutCallback = (Runnable) ReflectionTestUtils.getField(emitter, "timeoutCallback");
+
+    @SuppressWarnings("unchecked")
+    Consumer<Throwable> errorCallback = (Consumer<Throwable>) ReflectionTestUtils.getField(emitter, "errorCallback");
+
+    // when 추출 콜백들 강제 실행
+    if (completionCallback != null) completionCallback.run();
+    if (timeoutCallback != null) timeoutCallback.run();
+    if (errorCallback != null) errorCallback.accept(new RuntimeException("테스트용 강제 에러 발생"));
+
+    // then
+    verify(emitterRepository, times(3)).delete(eq(userId), eq(emitter));
   }
 }

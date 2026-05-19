@@ -21,6 +21,7 @@ import com.mopl.mopl.domain.watchingSession.entity.WatchingSession;
 import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionNotFoundException;
 import com.mopl.mopl.domain.watchingSession.mapper.WatchingSessionMapper;
 import com.mopl.mopl.domain.watchingSession.repository.WatchingSessionRepository;
+import com.mopl.mopl.global.component.BadWordFilter;
 import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +66,8 @@ public class WatchingSessionServiceTest {
     private WatchingSessionMapper sessionMapper;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private BadWordFilter badWordFilter;
 
     // common
     private UUID contentId;
@@ -449,18 +452,23 @@ public class WatchingSessionServiceTest {
         @Test
         @DisplayName("정상 조건이면 LiveChatEvent가 발행된다.")
         void validRequest_publishesLiveChatEvent() {
-            ContentChatDto chatDto = new ContentChatDto(new UserSummary(userId, "유저", "image.jpg"), "테스트 메시지");
+            String rawMessage = "바보 같은 메시지";
+            String maskedMessage = "** 같은 메시지";
+
+            ContentChatSendRequest request = new ContentChatSendRequest(rawMessage);
 
             // given
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
             given(contentRepository.existsById(contentId)).willReturn(true);
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
-            given(sessionMapper.toChatDto(any(UserSummary.class), eq("테스트 메시지")))
+            given(badWordFilter.maskBadWord(rawMessage)).willReturn(maskedMessage);
+            ContentChatDto chatDto = new ContentChatDto(new UserSummary(userId, "유저", "image.jpg"), maskedMessage);
+            given(sessionMapper.toChatDto(any(UserSummary.class), eq(maskedMessage)))
                     .willReturn(chatDto);
 
             // when
-            watchingSessionService.receiveMessage(contentId, userId, chatRequest);
+            watchingSessionService.receiveMessage(contentId, userId, request);
 
             // then
             ArgumentCaptor<LiveChatEvent> captor =
@@ -469,7 +477,7 @@ public class WatchingSessionServiceTest {
 
             LiveChatEvent published = captor.getValue();
             assertThat(published.contentId()).isEqualTo(contentId);
-            assertThat(published.chatDto().content()).isEqualTo("테스트 메시지");
+            assertThat(published.chatDto().content()).isEqualTo(maskedMessage);
         }
     }
 

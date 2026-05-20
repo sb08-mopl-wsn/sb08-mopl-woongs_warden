@@ -52,11 +52,11 @@ public class ContentRecommendService
     public void recommendStream(String prompt, SseEmitter emitter) {
         try {
             // Stage 1: 의도 분석
-            sendStatus(emitter, "intent_analysis", "질문을 분석하고 있습니다...");
+            if (!sendStatus(emitter, "intent_analysis", "질문을 분석하고 있습니다...")) return;
             IntentAnalysis intentAnalysis = intentAnalysisService.analysis(prompt);
 
             // 비관련 질문 처리
-            if (intentAnalysis.intent().equals("unrelated")) {
+            if ("unrelated".equals(intentAnalysis.intent())) {
                 log.info("[AI Recommend] 비관련 질문 감지 - 즉시 빈 배열 반환");
                 sendResult(emitter, List.of());
                 emitter.complete();
@@ -64,11 +64,11 @@ public class ContentRecommendService
             }
 
             // Stage 2: 후보 필터링
-            sendStatus(emitter, "candidate_filtering", "맞춤 콘텐츠를 찾고 있습니다...");
+            if (!sendStatus(emitter, "candidate_filtering", "맞춤 콘텐츠를 찾고 있습니다...")) return;
             List<Content> candidates = findCandidates(intentAnalysis);
 
             // Stage 3: 텍스트 스트리밍 추천
-            sendStatus(emitter, "recommendation", "추천 결과를 생성하고 있습니다...");
+            if (!sendStatus(emitter, "recommendation", "추천 결과를 생성하고 있습니다...")) return;
             List<AiRecommendation> recommendations = generateRecommendation(prompt, intentAnalysis, candidates);
 
             List<ContentRecommendResponse> response = mapToResponse(recommendations, candidates);
@@ -102,7 +102,7 @@ public class ContentRecommendService
         // 의도 분석
         IntentAnalysis intent = intentAnalysisService.analysis(request.prompt());
 
-        if (intent.intent().equals("unrelated")) {
+        if ("unrelated".equals(intent.intent())) {
             log.info("[AI Recommend] 비관련 질문 감지 — 즉시 빈 배열 반환");
             return List.of();
         }
@@ -227,13 +227,15 @@ public class ContentRecommendService
                         tag.toLowerCase().contains(keyword.toLowerCase())));
     }
 
-    private void sendStatus(SseEmitter emitter, String stage, String message) {
+    private boolean sendStatus(SseEmitter emitter, String stage, String message) {
     try {
         emitter.send(SseEmitter.event()
                 .name("status")
                 .data(new SseStatusEvent(stage, message)));
+        return true;
     } catch (IOException e) {
         log.warn("[AI Recommend] SSE status 전송 실패 — 클라이언트 연결 끊김");
+        return false;
     }
 }
 

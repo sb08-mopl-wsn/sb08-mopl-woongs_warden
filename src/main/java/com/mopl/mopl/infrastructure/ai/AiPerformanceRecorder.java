@@ -40,20 +40,25 @@ public class AiPerformanceRecorder
     }
 
     public void recordTokenUsage(String stage, Usage usage) {
-        long input = usage.getPromptTokens();
-        long output = usage.getCompletionTokens();
+        if (usage == null) {
+            log.warn("[AI Recommend] {} 토큰 사용량 정보가 없어 기록을 건너뜁니다.", stage);
+            return;
+        }
+
+        double input = Math.max(0, usage.getPromptTokens());
+        double output = Math.max(0, usage.getCompletionTokens());
 
         Counter.builder("mopl.ai.recommend.tokens")
                 .tag("stage", stage)
                 .tag("type", "input")
                 .register(meterRegistry)
-                .increment();
+                .increment(input);
 
         Counter.builder("mopl.ai.recommend.tokens")
                 .tag("stage", stage)
                 .tag("type", "output")
                 .register(meterRegistry)
-                .increment();
+                .increment(output);
 
         log.info("[AI Recommend] {} 토큰 사용량 - input: {} | output: {} | total: {}", stage, input, output, input + output);
     }

@@ -15,6 +15,7 @@ import com.mopl.mopl.domain.watchingSession.entity.WatchingSession;
 import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionNotFoundException;
 import com.mopl.mopl.domain.watchingSession.mapper.WatchingSessionMapper;
 import com.mopl.mopl.domain.watchingSession.repository.WatchingSessionRepository;
+import com.mopl.mopl.global.component.BadWordFilter;
 import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,9 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
     // Event
     private final ApplicationEventPublisher eventPublisher;
+
+    // filtering
+    private final BadWordFilter badWordFilter;
 
     /**
      * 콘텐츠 실시간 웹소켓 접속을 위한 로직
@@ -154,7 +158,9 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                 user.getProfileImageKey()
         );
 
-        ContentChatDto chatDto = sessionMapper.toChatDto(sender, request.content());
+        String filteredContent = badWordFilter.maskBadWord(request.content());
+
+        ContentChatDto chatDto = sessionMapper.toChatDto(sender, filteredContent);
 
         eventPublisher.publishEvent(new LiveChatEvent(contentId, chatDto));
     }

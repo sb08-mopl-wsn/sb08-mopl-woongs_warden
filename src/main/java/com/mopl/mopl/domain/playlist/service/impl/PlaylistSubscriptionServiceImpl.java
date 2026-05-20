@@ -45,7 +45,7 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
 
     try {
       PlaylistSubscription subscription = new PlaylistSubscription(user, playlist);
-      playlistSubscriptionRepository.save(subscription);
+      playlistSubscriptionRepository.saveAndFlush(subscription);
     } catch (DataIntegrityViolationException e) {
       throw new PlaylistDuplicateSubscriptionException();
     }
@@ -61,7 +61,7 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
   @Override
   @Transactional
   public void unsubscribeFromPlaylist(UUID playlistId, UUID userId) {
-    Playlist playlist = playlistRepository.findById(playlistId)
+    Playlist playlist = playlistRepository.findByIdWithUser(playlistId)
         .orElseThrow(() -> new PlaylistNotFoundException(playlistId));
     User user = userRepository.findById(userId)
         .orElseThrow(UserNotFoundException::new);
@@ -71,6 +71,8 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
         .orElseThrow(PlaylistSubscriptionNotFoundException::new);
 
     playlistSubscriptionRepository.delete(subscription);
+
+    playlistSubscriptionRepository.flush();
 
     int updatedRows = playlistRepository.decreaseSubscriberCount(playlistId);
     if (updatedRows == 0) {

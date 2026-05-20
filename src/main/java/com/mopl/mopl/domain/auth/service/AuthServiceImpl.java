@@ -1,7 +1,7 @@
 package com.mopl.mopl.domain.auth.service;
 
 import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
-import com.mopl.mopl.domain.auth.exception.AuthFailedRefrshToken;
+import com.mopl.mopl.domain.auth.exception.AuthFailedRefreshToken;
 import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
@@ -117,7 +117,7 @@ public class AuthServiceImpl implements AuthService {
                     newRefreshToken
             );
 
-            throw new AuthFailedRefrshToken();
+            throw new AuthFailedRefreshToken();
         }
     }
 

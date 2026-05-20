@@ -6,10 +6,12 @@ import com.mopl.mopl.global.exception.SseConnectionException;
 import com.mopl.mopl.global.sse.repository.SseEmitterRepository;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -106,6 +108,26 @@ public class SseService {
     log.info("SSE 알림 전송 완료 - userId: {}, eventName: {}, 성공: {}/{}", userId, eventName, successCount, emitters.size());
 
     // TODO: 분산 환경 전환 시 위 단일 서버 환경 로직 대신 Redis Pub/Sub 구조 도입 후 메시지 발행하도록 수정
+  }
+
+  // heartbeat 발송기 (1개 스레드로 30초마다 모든 유저에게 핑 발송)
+  @Scheduled(fixedRate = 30000)
+  public void sendHeartbeat() {
+    Map<UUID, List<SseEmitter>> allEmitters = emitterRepository.findAllEmitters();
+    if (allEmitters.isEmpty()) return;
+
+    allEmitters.forEach((userId, emitterList) -> {
+      emitterList.forEach(emitter -> {
+        try {
+          emitter.send(SseEmitter.event()
+              .name("heartbeat")
+              .data("ping"));
+        } catch (Exception e) {
+          log.debug("Heartbeat 전송 실패로 emitter 제거 - userId: {}", userId, e);
+          emitterRepository.delete(userId, emitter);
+        }
+      });
+    });
   }
 
   /**

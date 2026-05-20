@@ -1,7 +1,7 @@
 package com.mopl.mopl.domain.auth;
 
 import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
-import com.mopl.mopl.domain.auth.exception.AuthFailedRefrshToken;
+import com.mopl.mopl.domain.auth.exception.AuthFailedRefreshToken;
 import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
 import com.mopl.mopl.domain.auth.service.AuthServiceImpl;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
@@ -236,7 +236,7 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("토큰 생성 중 예외 발생 시 rollback 후 AuthFailedRefrshToken")
+        @DisplayName("토큰 생성 중 예외 발생 시 rollback 후 AuthFailedRefreshToken")
         void refresh_fail_tokenGenerationException() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
@@ -268,7 +268,7 @@ class AuthServiceImplTest {
                     .thenThrow(new RuntimeException("access token fail"));
 
             assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
-                    .isInstanceOf(AuthFailedRefrshToken.class);
+                    .isInstanceOf(AuthFailedRefreshToken.class);
 
             verify(jwtRegistry, never()).rotateJwtInformation(any(), any());
             verify(jwtRegistry).rollbackRotateJwtInformation(
@@ -279,7 +279,7 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("쿠키 추가 실패 시 rollback 후 AuthFailedRefrshToken")
+        @DisplayName("쿠키 추가 실패 시 rollback 후 AuthFailedRefreshToken")
         void refresh_fail_addRefreshCookieException() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
@@ -317,7 +317,7 @@ class AuthServiceImplTest {
                     .addRefreshCookie(response, newRefreshToken);
 
             assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
-                    .isInstanceOf(AuthFailedRefrshToken.class);
+                    .isInstanceOf(AuthFailedRefreshToken.class);
 
             verify(jwtRegistry).rotateJwtInformation(any(), any());
             verify(jwtRegistry).rollbackRotateJwtInformation(

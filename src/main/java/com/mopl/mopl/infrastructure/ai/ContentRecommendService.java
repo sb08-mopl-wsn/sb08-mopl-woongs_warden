@@ -9,6 +9,8 @@ import com.mopl.mopl.infrastructure.ai.dto.AiRecommendation;
 import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendRequest;
 import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendResponse;
 import com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis;
+import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
+import com.mopl.mopl.infrastructure.ai.event.SseStatusEvent;
 import com.mopl.mopl.infrastructure.ai.exception.AiParseFailedException;
 import com.mopl.mopl.infrastructure.ai.exception.AiTimeoutException;
 import com.mopl.mopl.infrastructure.ai.exception.AiUnavailableException;
@@ -19,13 +21,18 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.core.convert.ConversionFailedException;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static com.mopl.mopl.global.config.AsyncConfig.AI_RECOMMEND_EXECUTOR;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -40,6 +47,44 @@ public class ContentRecommendService
     private final ObjectMapper objectMapper;
     private final AiPerformanceRecorder aiPerformanceRecorder;
     private final IntentAnalysisService intentAnalysisService;
+
+    @Async(AI_RECOMMEND_EXECUTOR)
+    public void recommendStream(String prompt, SseEmitter emitter) {
+        try {
+            // Stage 1: 의도 분석
+            sendStatus(emitter, "intent_analysis", "질문을 분석하고 있습니다...");
+            IntentAnalysis intentAnalysis = intentAnalysisService.analysis(prompt);
+
+            // 비관련 질문 처리
+            if (intentAnalysis.intent().equals("unrelated")) {
+                log.info("[AI Recommend] 비관련 질문 감지 - 즉시 빈 배열 반환");
+                sendResult(emitter, List.of());
+                emitter.complete();
+                return;
+            }
+
+            // Stage 2: 후보 필터링
+            sendStatus(emitter, "candidate_filtering", "맞춤 콘텐츠를 찾고 있습니다...");
+            List<Content> candidates = findCandidates(intentAnalysis);
+
+            // Stage 3: 텍스트 스트리밍 추천
+            sendStatus(emitter, "recommendation", "추천 결과를 생성하고 있습니다...");
+            List<AiRecommendation> recommendations = generateRecommendation(prompt, intentAnalysis, candidates);
+
+            List<ContentRecommendResponse> response = mapToResponse(recommendations, candidates);
+            sendResult(emitter, response);
+            emitter.complete();
+        } catch (AiTimeoutException e) {
+            sendError(emitter, "AI_TIMEOUT", "AI 서비스 응답이 지연되고 있습니다.");
+        } catch (AiUnavailableException e) {
+            sendError(emitter, "AI_UNAVAILABLE", "AI 서비스를 일시적으로 사용할 수 없습니다.");
+        } catch (AiParseFailedException e) {
+            sendError(emitter, "AI_PARSE_FAILED", "AI 응답을 처리하지 못했습니다.");
+        } catch (Exception e) {
+            log.error("[AI Recommend] SSE 스트리밍 중 예외 발생", e);
+            sendError(emitter, "INTERNAL_ERROR", "추천 처리 중 오류가 발생했습니다.");
+        }
+    }
 
     /**
      * 사용자의 자연어 질문을 기반으로 AI가 콘텐츠를 추천한다.
@@ -180,5 +225,36 @@ public class ContentRecommendService
                         || content.getDescription().toLowerCase().contains(keyword.toLowerCase())
                         || content.getTags().stream().anyMatch(tag ->
                         tag.toLowerCase().contains(keyword.toLowerCase())));
+    }
+
+    private void sendStatus(SseEmitter emitter, String stage, String message) {
+    try {
+        emitter.send(SseEmitter.event()
+                .name("status")
+                .data(new SseStatusEvent(stage, message)));
+    } catch (IOException e) {
+        log.warn("[AI Recommend] SSE status 전송 실패 — 클라이언트 연결 끊김");
+    }
+}
+
+    private void sendResult(SseEmitter emitter, List<ContentRecommendResponse> result) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("result")
+                    .data(result));
+        } catch (IOException e) {
+            log.warn("[AI Recommend] SSE result 전송 실패 — 클라이언트 연결 끊김");
+        }
+    }
+
+    private void sendError(SseEmitter emitter, String code, String message) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data(new SseErrorEvent(code, message)));
+            emitter.complete();
+        } catch (IOException e) {
+            log.warn("[AI Recommend] SSE error 전송 실패 — 클라이언트 연결 끊김");
+        }
     }
 }

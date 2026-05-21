@@ -329,6 +329,9 @@ class DirectMessageServiceImplTest {
     Conversation conversation = mock(Conversation.class);
     DirectMessage message = mock(DirectMessage.class);
 
+    given(conversation.getId()).willReturn(conversationId);
+    given(message.getConversation()).willReturn(conversation);
+
     given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
     given(messageRepository.findById(messageId)).willReturn(Optional.of(message));
     given(message.getCreatedAt()).willReturn(Instant.now());

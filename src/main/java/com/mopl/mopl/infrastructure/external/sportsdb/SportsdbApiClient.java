@@ -9,31 +9,37 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Component
 public class SportsdbApiClient
 {
     private final RestClient restClient;
+    private final Clock clock;
 
-    public SportsdbApiClient(@Qualifier("sportsdbRestClient") RestClient restClient) {
+    public SportsdbApiClient(@Qualifier("sportsdbRestClient") RestClient restClient, Clock clock) {
         this.restClient = restClient;
+        this.clock = clock;
     }
 
     /**
-     * SportsDB API를 통해 특정 리그의 시즌별 경기 일정 및 결과를 조회한다.
+     * 현재 날짜 기준 3일 후의 예정 경기 목록을 조회한다.
+     * <p>
+     * 타임존 의존성을 제거하기 위해 {@link Clock}을 주입받아 날짜를 계산한다.
      *
-     * @param leagueId  조회할 리그의 고유 ID
-     * @return 해당 리그 및 시즌의 대한 정보 목록
+     * @param leagueId 조회할 리그 ID
+     * @return 3일 후 예정 경기 목록
      */
     public List<SportsdbEvent> fetchDayEvents(int leagueId) {
-        String today = LocalDate.now().toString();
+        String date = LocalDate.now(clock).plusDays(3).format(DateTimeFormatter.ISO_LOCAL_DATE);
 
         SportsdbEventResponse response;
         try {
             response = restClient.get()
-                    .uri(ExternalApiConstants.EVENTS_DAY_PATH, today, leagueId)
+                    .uri(ExternalApiConstants.EVENTS_DAY_PATH, date, leagueId)
                     .retrieve()
                     .body(SportsdbEventResponse.class);
         } catch (RestClientException ex) {

@@ -97,6 +97,7 @@ dependencies {
 	// I/O
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'com.github.ben-manes.caffeine:caffeine'
+	implementation 'org.apache.httpcomponents.client5:httpclient5'
 
 	// dev tools
 	compileOnly 'org.projectlombok:lombok'

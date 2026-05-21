@@ -13,6 +13,9 @@ import org.springframework.web.client.RestClient.RequestHeadersSpec;
 import org.springframework.web.client.RestClient.RequestHeadersUriSpec;
 import org.springframework.web.client.RestClient.ResponseSpec;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
@@ -34,7 +37,12 @@ class SportsdbApiClientTest
 
     @BeforeEach
     void setUp() {
-        sportsDbApiClient = new SportsdbApiClient(restClient);
+        Clock fixedClock = Clock.fixed(
+                LocalDate.of(2026, 5, 21).atStartOfDay(ZoneId.systemDefault()).toInstant(),
+                ZoneId.systemDefault()
+        );
+
+        sportsDbApiClient = new SportsdbApiClient(restClient, fixedClock);
     }
 
     @Test

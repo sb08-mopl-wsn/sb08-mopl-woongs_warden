@@ -62,6 +62,8 @@ public class ExternalApiConfig
                 .setConnectionManager(connManager)
                 .build();
 
-        return new HttpComponentsClientHttpRequestFactory(httpClient);
+        HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory(httpClient);
+        factory.setConnectionRequestTimeout(connectTimeout);
+        return factory;
     }
 }

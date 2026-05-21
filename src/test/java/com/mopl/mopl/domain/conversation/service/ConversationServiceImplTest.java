@@ -329,7 +329,7 @@ class ConversationServiceImplTest {
   }
 
   @Test
-  @DisplayName("대화 목록 조회 - limit이 null 이거나 0 이하이면 예외 발생")
+  @DisplayName("대화 목록 조회 - limit이 0 이하이면 예외 발생")
   void getMyConversations_InvalidLimit_ThrowsException() {
 
     // given

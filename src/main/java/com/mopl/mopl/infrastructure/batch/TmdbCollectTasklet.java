@@ -2,6 +2,7 @@ package com.mopl.mopl.infrastructure.batch;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -28,6 +29,7 @@ public class TmdbCollectTasklet implements Tasklet
     private final ContentRepository contentRepository;
     private final EntityManager entityManager;
     private final MeterRegistry meterRegistry;
+    private final ContentIndexService contentIndexService;
 
     private final int totalPages;
 
@@ -85,6 +87,7 @@ public class TmdbCollectTasklet implements Tasklet
             }
             try {
                 contentRepository.saveAndFlush(content);
+                contentIndexService.index(content);
                 saved++;
             } catch (DataIntegrityViolationException e) {
                 log.debug("중복 콘텐츠 경합으로 저장 스킵: externalId={}", content.getExternalId());

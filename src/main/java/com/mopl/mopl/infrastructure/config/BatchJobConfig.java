@@ -3,6 +3,7 @@ package com.mopl.mopl.infrastructure.config;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.batch.SportsdbCollectTasklet;
 import com.mopl.mopl.infrastructure.batch.TmdbCollectTasklet;
+import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
 import com.mopl.mopl.infrastructure.external.sportsdb.mapper.SportsdbContentMapper;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
@@ -43,6 +44,7 @@ public class BatchJobConfig
     private final SportsdbContentMapper sportsdbContentMapper;
 
     private final ContentRepository contentRepository;
+    private final ContentIndexService contentIndexService;
 
     private final EntityManager entityManager;
 
@@ -80,12 +82,12 @@ public class BatchJobConfig
     /* Tasklet */
     @Bean
     public TmdbCollectTasklet tmdbCollectTasklet() {
-        return new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, meterRegistry, collectPages);
+        return new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, meterRegistry, contentIndexService, collectPages);
     }
 
     @Bean
     public SportsdbCollectTasklet sportsdbCollectTasklet() {
-        return new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager, meterRegistry);
+        return new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager, meterRegistry, contentIndexService);
     }
 
     @Bean

@@ -1,7 +1,9 @@
 package com.mopl.mopl.global.security;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.user.dto.UserDto;
+import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.handler.LoginSuccessHandler;
 import org.junit.jupiter.api.DisplayName;
@@ -9,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
+
+import java.time.Instant;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -25,19 +30,36 @@ class LoginSuccessHandlerTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
+        UUID userId = UUID.randomUUID();
+
+        UserDto userDto = new UserDto(
+                userId,
+                Instant.parse("2026-05-08T00:00:00Z"),
+                "user@test.com",
+                "일반유저",
+                null,
+                Role.USER,
+                false
+        );
+
         Authentication authentication = mock(Authentication.class);
-        MoplUserDetails userDetails = mock(MoplUserDetails.class);
-        UserDto userDto = mock(UserDto.class);
+        MoplUserDetails userDetails = new MoplUserDetails(userDto, "encoded-password");
 
         when(authentication.getPrincipal()).thenReturn(userDetails);
-        when(userDetails.getUserDto()).thenReturn(userDto);
 
         handler.onAuthenticationSuccess(request, response, authentication);
 
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(response.getContentType()).contains("application/json");
         assertThat(response.getCharacterEncoding()).isEqualTo("UTF-8");
-        assertThat(response.getContentAsString()).isEqualTo(objectMapper.writeValueAsString(userDto));
+
+        JsonNode body = objectMapper.readTree(response.getContentAsString());
+
+        assertThat(body.get("id").asText()).isEqualTo(userId.toString());
+        assertThat(body.get("email").asText()).isEqualTo("user@test.com");
+        assertThat(body.get("name").asText()).isEqualTo("일반유저");
+        assertThat(body.get("role").asText()).isEqualTo("USER");
+        assertThat(body.get("locked").asBoolean()).isFalse();
     }
 
     @Test

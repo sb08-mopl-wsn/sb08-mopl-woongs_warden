@@ -9,9 +9,11 @@ import com.mopl.mopl.domain.content.service.ContentService;
 import com.mopl.mopl.domain.watchingSession.dto.request.WatchingSessionPageRequest;
 import com.mopl.mopl.domain.watchingSession.dto.response.CursorResponseWatchingSessionDto;
 import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
+import com.mopl.mopl.infrastructure.ai.ContentRecommendService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +24,11 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 
@@ -35,6 +39,8 @@ public class ContentController implements ContentApi
 {
     private final ContentService contentService;
     private final WatchingSessionService watchingSessionService;
+    private final ContentRecommendService contentRecommendService;
+    private final ChatClient chatClient;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ContentDto> createContent(@Valid @RequestPart("request") ContentCreateRequest contentCreateRequest,
@@ -86,5 +92,15 @@ public class ContentController implements ContentApi
         CursorResponseWatchingSessionDto sessionDto = watchingSessionService.findByContentInWatchingSession(contentId, request);
 
         return ResponseEntity.status(HttpStatus.OK).body(sessionDto);
+    }
+
+    // SSE
+    @GetMapping(value = "/recommend", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter recommend(@RequestParam String prompt)
+    {
+        SseEmitter emitter = new SseEmitter(30_000L);
+        contentRecommendService.recommendStream(prompt, emitter);
+
+        return emitter;
     }
 }

@@ -1,5 +1,6 @@
 package com.mopl.mopl.global.event;
 
+import com.mopl.mopl.domain.review.entity.Review;
 import java.util.UUID;
 
 /**
@@ -13,5 +14,10 @@ public record ReviewCreatedEvent(
     UUID writerId,
     String writerName
 ) {
+
+  // 팩토리 메서드
+  public static ReviewCreatedEvent of(Review review) {
+    return new ReviewCreatedEvent(review.getId(), review.getUser().getId(), review.getUser().getName());
+  }
 
 }

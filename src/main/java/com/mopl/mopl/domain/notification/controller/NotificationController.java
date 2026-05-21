@@ -1,9 +1,9 @@
 package com.mopl.mopl.domain.notification.controller;
 
-import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.domain.notification.dto.CursorResponseNotificationDto;
 import com.mopl.mopl.domain.notification.service.NotificationService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
-public class NotificationController {
+public class NotificationController implements NotificationApi {
 
   private final NotificationService notificationService;
 

@@ -8,6 +8,7 @@ import com.mopl.mopl.domain.review.dto.request.ReviewSearchRequest;
 import com.mopl.mopl.domain.review.dto.request.ReviewUpdateRequest;
 import com.mopl.mopl.domain.review.dto.response.CursorResponseReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewDto;
+import com.mopl.mopl.domain.review.dto.response.ReviewStatsDto;
 import com.mopl.mopl.domain.review.entity.Review;
 import com.mopl.mopl.domain.review.exception.ReviewErrorCode;
 import com.mopl.mopl.domain.review.exception.ReviewException;
@@ -19,9 +20,12 @@ import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.event.ReviewCreatedEvent;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Slice;
@@ -39,6 +43,7 @@ public class ReviewServiceImpl implements ReviewService {
   private final ReviewMapper reviewMapper;
   private final ApplicationEventPublisher eventPublisher;
 
+  @CacheEvict(value = "content", allEntries = true)
   @Override
   @Transactional
   public ReviewDto createReview(ReviewCreateRequest request, UUID userId) {
@@ -53,9 +58,9 @@ public class ReviewServiceImpl implements ReviewService {
     try {
       Review savedReview = reviewRepository.saveAndFlush(review);
 
-      eventPublisher.publishEvent(new ReviewCreatedEvent(
-          savedReview.getId(), user.getId(), user.getName()
-      ));
+      updateContentReviewStats(content.getId());
+
+      eventPublisher.publishEvent(ReviewCreatedEvent.of(savedReview));
       return reviewMapper.toDto(savedReview);
     } catch (DataIntegrityViolationException e) {
       throw new ReviewException(ReviewErrorCode.DUPLICATE_REVIEW);
@@ -99,6 +104,7 @@ public class ReviewServiceImpl implements ReviewService {
     );
   }
 
+  @CacheEvict(value = "content", allEntries = true)
   @Override
   @Transactional
   public ReviewDto updateReview(UUID reviewId, ReviewUpdateRequest request, UUID userId) {
@@ -107,9 +113,14 @@ public class ReviewServiceImpl implements ReviewService {
 
     Review reviewToUpdate = getReviewAndCheckPermission(reviewId, user);
     reviewToUpdate.update(request.text(), request.rating());
+
+    reviewRepository.flush();
+    updateContentReviewStats(reviewToUpdate.getContent().getId());
+
     return reviewMapper.toDto(reviewToUpdate);
   }
 
+  @CacheEvict(value = "content", allEntries = true)
   @Override
   @Transactional
   public void deleteReview(UUID reviewId, UUID userId) {
@@ -117,13 +128,32 @@ public class ReviewServiceImpl implements ReviewService {
         .orElseThrow(UserNotFoundException::new);
 
     Review reviewToDelete = getReviewAndCheckPermission(reviewId, user);
+    Content content = reviewToDelete.getContent();
+
     reviewRepository.delete(reviewToDelete);
+
+    reviewRepository.flush();
+
+    updateContentReviewStats(content.getId());
+
+  }
+
+  private void updateContentReviewStats(UUID contentId) {
+
+    Content content = contentRepository.findByIdForUpdate(contentId)
+        .orElseThrow(() -> new ContentNotFoundException(contentId));
+
+    ReviewStatsDto stats = reviewRepository.getReviewStats(contentId);
+
+    BigDecimal newAvgRating = BigDecimal.valueOf(stats.averageRating())
+        .setScale(1, RoundingMode.HALF_UP);
+    int newReviewCount = stats.reviewCount().intValue();
+
+    content.updateReviewStats(newAvgRating, newReviewCount);
   }
 
   /**
    * 리뷰를 ID로 조회, 현재 사용자가 해당 리뷰의 작성자인지 확인
-   * @throws ReviewNotFoundException 리뷰를 찾을 수 없는 경우
-   * @throws ReviewException         현재 사용자가 리뷰의 작성자가 아닌 경우 (FORBIDDEN)
    */
   private Review getReviewAndCheckPermission(UUID reviewId, User user) {
     Review review = reviewRepository.findById(reviewId)

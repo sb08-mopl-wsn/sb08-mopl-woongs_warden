@@ -4,7 +4,7 @@ SELECT
     'User ' || i,
     'user' || i || '@example.com',
     'password_hash_' || i,
-    CASE WHEN i = 1 THEN 'ADMIN' ELSE 'USER' END,
+    'USER',
     FALSE,
     CASE WHEN i % 2 = 0 THEN 'KAKAO' ELSE 'GOOGLE' END,
     'social_id_' || i

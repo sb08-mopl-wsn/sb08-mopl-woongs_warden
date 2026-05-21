@@ -2,6 +2,7 @@ package com.mopl.mopl.global.event.listener;
 
 import com.mopl.mopl.domain.dm.service.RoomPresenceManager;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.event.DirectMessageReadEvent;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
@@ -32,6 +34,7 @@ public class DirectMessageStompEventListener implements RoomPresenceManager {
 
   // 현재 방에 접속 중인 유저 판별용 맵
   private final Map<String, Integer> activeRoomMap = new ConcurrentHashMap<>();
+  private final SimpMessagingTemplate simpMessagingTemplate;
 
   // 유저가 방에 있는지 판별
   @Override
@@ -78,6 +81,23 @@ public class DirectMessageStompEventListener implements RoomPresenceManager {
   public void handleLeave(SessionDisconnectEvent event) {
     StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
     removeSession(accessor.getSessionId());
+  }
+
+  // 메시지 읽음 처리 이벤트 리스너
+  @EventListener
+  public void onDirectMessageRead(DirectMessageReadEvent event) {
+
+    // 채팅방 주소 생성
+    String destination = DM_DESTINATION_PATTERN.replace("{conversationId}", event.conversationId().toString());
+
+    // 프론트엔드쪽에서 '새로운 메시지'인지 '읽음 처리 신호'인지 구별하도록 type을 달아서 전송
+    Map<String, Object> readPayload = Map.of(
+        "type", "READ_WATERMARK",
+        "readerId", event.readerId(),
+        "readAt", event.readAt()
+    );
+
+    simpMessagingTemplate.convertAndSend(destination, readPayload);
   }
 
   private void removeSession(String sessionId) {

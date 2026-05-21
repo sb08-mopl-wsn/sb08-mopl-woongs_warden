@@ -5,6 +5,7 @@ import com.mopl.mopl.domain.conversation.entity.Conversation;
 import com.mopl.mopl.domain.dm.dto.DirectMessageDto;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
+import java.time.Instant;
 import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -29,12 +30,17 @@ public interface ConversationMapper {
 
     UserSummary withUserSummary = toUserSummary(withUser);
 
+    Instant opponentLastReadAt = conversation.getSender().getId().equals(currentUserId)
+        ? conversation.getLastReadAtByReceiver()
+        : conversation.getLastReadAtBySender();
+
     // TODO: lastestMessage 매핑은 Message 도메인 로직 추가 후 연동 예정
     return new ConversationDto(
         conversation.getId(),
         withUserSummary,
         lastestMessage,
-        conversation.isHasUnread()
+        conversation.isHasUnread(),
+        opponentLastReadAt
     );
   }
 

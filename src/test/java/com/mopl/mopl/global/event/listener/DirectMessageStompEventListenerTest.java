@@ -1,27 +1,32 @@
 package com.mopl.mopl.global.event.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import com.mopl.mopl.domain.dm.service.RoomPresenceManager;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
-import com.mopl.mopl.global.exception.BusinessException;
+import com.mopl.mopl.global.event.DirectMessageReadEvent;
 import java.security.Principal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
@@ -36,11 +41,13 @@ class DirectMessageStompEventListenerTest {
   @InjectMocks
   private DirectMessageStompEventListener listener;
 
+  @Mock
+  private SimpMessagingTemplate simpMessagingTemplate;
+
   private UUID userId;
   private UUID conversationId;
   private String sessionId;
   private String validDestination;
-  private RoomPresenceManager roomPresenceManager;
 
   @BeforeEach
   void setUp() {
@@ -177,5 +184,28 @@ class DirectMessageStompEventListenerTest {
 
     // when & then
     assertDoesNotThrow(() -> listener.handleUnSubscribe(event));
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 이벤트 - STOMP로 읽음 Watermark 신호를 브로드캐스팅한다.")
+  void onDirectMessageRead_BroadcastsWatermark() {
+
+    // given
+    Instant now = Instant.now();
+    DirectMessageReadEvent event = DirectMessageReadEvent.of(conversationId, userId, now);
+
+    String expectedDestination = "/sub/conversations/" + conversationId + "/direct-messages";
+
+    // when
+    listener.onDirectMessageRead(event);
+
+    // then
+    ArgumentCaptor<Map> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(simpMessagingTemplate).convertAndSend(eq(expectedDestination), payloadCaptor.capture());
+
+    Map<String, Object> payload = payloadCaptor.getValue();
+    assertThat(payload.get("type")).isEqualTo("READ_WATERMARK");
+    assertThat(payload.get("readerId")).isEqualTo(userId);
+    assertThat(payload.get("readAt")).isEqualTo(now);
   }
 }

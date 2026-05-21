@@ -1,7 +1,10 @@
 package com.mopl.mopl.domain.conversation.entity;
 
+import com.mopl.mopl.domain.conversation.exception.ConversationAccessDeniedException;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.global.base.BaseUpdatableEntity;
+import com.mopl.mopl.global.exception.BusinessException;
+import com.mopl.mopl.global.exception.GlobalErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -44,6 +48,12 @@ public class Conversation extends BaseUpdatableEntity {
     @Column(name = "participant_pair_key", nullable = false, updatable = false, length = 100)
     private String participantPairKey;
 
+    @Column(name = "last_read_at_by_sender")
+    private Instant lastReadAtBySender;
+
+    @Column(name = "last_read_at_by_receiver")
+    private Instant lastReadAtByReceiver;
+
     @Builder
     public Conversation(User sender, User receiver) {
         this.sender = sender;
@@ -57,5 +67,22 @@ public class Conversation extends BaseUpdatableEntity {
 
     public static String buildPairKey(UUID id1, UUID id2) {
         return (id1.compareTo(id2) < 0) ? id1 + ":" + id2 : id2 + ":" + id1;
+    }
+
+    public void updateLastReadAt(UUID userId, Instant readAt) {
+        if (userId == null || readAt == null ) {
+            throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "userId와 readAt은 null일 수 없습니다.");
+        }
+        if (this.sender.getId().equals(userId)) {
+            if (this.lastReadAtBySender == null || this.lastReadAtBySender.isBefore(readAt)) {
+                this.lastReadAtBySender = readAt;
+            }
+        } else if (this.receiver.getId().equals(userId)) {
+            if (this.lastReadAtByReceiver == null || this.lastReadAtByReceiver.isBefore(readAt)) {
+                this.lastReadAtByReceiver = readAt;
+            }
+        } else {
+            throw new ConversationAccessDeniedException();
+        }
     }
 }

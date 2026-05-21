@@ -87,7 +87,7 @@ class ConversationServiceImplTest {
     // given
     ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
     Conversation newConv = Conversation.builder().sender(sender).receiver(receiver).build();
-    ConversationDto expectedDto = new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false);
+    ConversationDto expectedDto = new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false, null);
 
     given(userRepository.findById(currentUserId)).willReturn(Optional.of(sender));
     given(userRepository.findById(withUserId)).willReturn(Optional.of(receiver));
@@ -113,7 +113,7 @@ class ConversationServiceImplTest {
     // given
     ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
     Conversation existingConv = Conversation.builder().sender(sender).receiver(receiver).build();
-    ConversationDto expectedDto = new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false);
+    ConversationDto expectedDto = new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false, null);
 
     given(userRepository.findById(currentUserId)).willReturn(Optional.of(sender));
     given(userRepository.findById(withUserId)).willReturn(Optional.of(receiver));
@@ -259,7 +259,7 @@ class ConversationServiceImplTest {
     given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
 
     given(conversationMapper.toDto(any(), any(), any())).willReturn(
-        new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false)
+        new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false, null)
     );
 
     //when
@@ -280,7 +280,7 @@ class ConversationServiceImplTest {
     // given
     ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
     Conversation concurrentConv = Conversation.builder().sender(sender).receiver(receiver).build();
-    ConversationDto expectedDto = new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false);
+    ConversationDto expectedDto = new ConversationDto(UUID.randomUUID(), new UserSummary(withUserId, null, null), null, false, null);
     String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
 
     given(userRepository.findById(currentUserId)).willReturn(Optional.of(sender));
@@ -433,7 +433,8 @@ class ConversationServiceImplTest {
         conversation.getId(),
         new UserSummary(withUserId, null, null),
         null,
-        false
+        false,
+        null
     );
 
     given(conversationRepository.findByParticipantPairKey(pairKey))

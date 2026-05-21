@@ -7,12 +7,14 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.ai.dto.AiRecommendation;
 import com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis;
+import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
 import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -32,6 +34,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -195,7 +198,6 @@ class ContentRecommendServiceTest
 
         // then
         then(contentSearchQueryService).should().searchCandidateIds("movie", List.of("매칭안됨"));
-        then(contentRepository).should().findAll();
         then(contentRepository).should(never()).findAllById(anyList());
         then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
         then(emitter).should().complete();
@@ -255,7 +257,16 @@ class ContentRecommendServiceTest
         contentRecommendService.recommendStream("액션 영화 추천해줘", emitter);
 
         // then
-        then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
+        ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
+                ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        then(emitter).should(atLeastOnce()).send(captor.capture());
         then(emitter).should().complete();
+
+        boolean hasErrorEvent = captor.getAllValues().stream()
+                .anyMatch(builder -> builder.build().stream()
+                        .anyMatch(d -> d.getData() instanceof SseErrorEvent errorEvent
+                                && "AI_TIMEOUT".equals(errorEvent.code())));
+
+        assertThat(hasErrorEvent).isTrue();
     }
 }

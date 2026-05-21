@@ -50,7 +50,12 @@ public class SportsdbCollectTasklet implements Tasklet
                     }
                     try {
                         contentRepository.saveAndFlush(content);
-                        contentIndexService.index(content);
+                        try {
+                            contentIndexService.index(content);
+                        } catch (Exception e) {
+                            meterRegistry.counter("mopl.batch.sportsdb.index.failed").increment();
+                            log.warn("Sportsdb 인덱싱 실패: externalId={}", content.getExternalId(), e);
+                        }
                         saved++;
                     } catch (DataIntegrityViolationException e) {
                         log.debug("중복 콘텐츠 경합으로 저장 스킵: externalId={}", content.getExternalId());

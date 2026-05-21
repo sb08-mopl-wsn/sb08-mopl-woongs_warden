@@ -41,7 +41,7 @@ public class ContentSearchQueryService
         BoolQuery.Builder boolQuery = new BoolQuery.Builder();
 
         // 제일 먼저 contentType와 정확히 일치하는지 필터링
-        if (contentType != null) {
+        if (contentType != null && !contentType.isBlank()) {
             boolQuery.filter(f -> f.term(t -> t.field("contentType").value(contentType)));
         }
 

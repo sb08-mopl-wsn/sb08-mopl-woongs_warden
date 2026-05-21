@@ -1,10 +1,10 @@
 package com.mopl.mopl.infrastructure.elasticsearch.document;
 
 import com.mopl.mopl.domain.content.entity.Content;
-import jakarta.persistence.Id;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;

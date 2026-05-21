@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.retry.NonTransientAiException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -39,6 +40,7 @@ import static com.mopl.mopl.global.config.AsyncConfig.AI_RECOMMEND_EXECUTOR;
 public class ContentRecommendService
 {
     private static final int MAX_RECOMMENDATIONS = 5;
+    private static final int FALLBACK_LIMIT = 50;
 
     private final ChatClient chatClient;
     private final ContentRepository contentRepository;
@@ -100,8 +102,8 @@ public class ContentRecommendService
             List<String> candidateIds = contentSearchQueryService.searchCandidateIds(intent.contentType(), intent.keywords());
 
             if (candidateIds.isEmpty()) {
-                log.info("[AI Recommend] ES 후보 0건 — 전체 콘텐츠 fallback");
-                return contentRepository.findAll();
+                log.warn("[AI Recommend] ES 후보 0건 — 상위 {}건으로 fallback", FALLBACK_LIMIT);
+                return contentRepository.findAll(PageRequest.of(0, FALLBACK_LIMIT)).getContent();
             }
 
             List<UUID> uuids = candidateIds.stream().map(UUID::fromString).toList();

@@ -17,11 +17,13 @@ public class ContentIndexService
 {
     private final ContentSearchRepository contentSearchRepository;
 
-    public void index(Content content) {
+    public boolean index(Content content) {
         try {
             contentSearchRepository.save(ContentDocument.from(content));
+            return true;
         } catch (Exception e) {
             log.warn("[ES] 콘텐츠 색인 실패: id={}", content.getId(), e);
+            return false;
         }
     }
 

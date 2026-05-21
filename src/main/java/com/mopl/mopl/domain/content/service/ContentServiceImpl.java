@@ -11,11 +11,13 @@ import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
+import com.mopl.mopl.infrastructure.elasticsearch.event.ContentIndexEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Slice;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ public class ContentServiceImpl implements ContentService
     private final ContentMapper contentMapper;
     private final S3ImageStorage s3ImageStorage;
     private final ContentIndexService contentIndexService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     /**
      * 콘텐츠를 생성한다.
@@ -65,7 +68,8 @@ public class ContentServiceImpl implements ContentService
                 .build();
 
         Content savedContent = contentRepository.save(content);
-        contentIndexService.index(savedContent);
+
+        applicationEventPublisher.publishEvent(new ContentIndexEvent(savedContent));
 
         return contentMapper.toContentDto(savedContent);
     }
@@ -150,7 +154,8 @@ public class ContentServiceImpl implements ContentService
         );
 
         Content savedContent = contentRepository.save(content);
-        contentIndexService.index(savedContent);
+
+        applicationEventPublisher.publishEvent(new ContentIndexEvent(savedContent));
 
         return contentMapper.toContentDto(savedContent);
     }

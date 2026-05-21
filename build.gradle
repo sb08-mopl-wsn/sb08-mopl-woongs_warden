@@ -31,13 +31,19 @@ jacocoTestReport {
 			fileTree(dir: it, exclude: [
 					'**/dto/**',
 					'**/entity/**',
-					"**/entity/Q*",
+					'**/entity/Q*',
+					'**/mapper/**',
 					'**/*Config*',
 					'**/*Application*',
 					'**/*Exception*',
 					'**/*Constants*',
 					'**/repository/**',
-					'**/controller/**'
+					'**/controller/**',
+					'**/global/config/**',
+					'**/global/base/**',
+					'**/global/exception/**',
+					'**/global/logging/**',
+					'**/exception/**'
 			])
 		}))
 	}
@@ -107,6 +113,9 @@ dependencies {
 	implementation 'software.amazon.awssdk:s3'
 	implementation 'software.amazon.awssdk:apache-client'
 
+	// filtering
+	implementation 'org.ahocorasick:ahocorasick:0.6.3'
+
 	// test
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
@@ -119,6 +128,9 @@ dependencies {
 
 	// email, 임시 비밀번호 발급에 필요
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+	// 소셜 로그인용
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 }
 
 tasks.named('test') {

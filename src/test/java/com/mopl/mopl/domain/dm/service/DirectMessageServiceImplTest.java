@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -277,5 +278,89 @@ class DirectMessageServiceImplTest {
     assertThatThrownBy(() -> directMessageService.getMessages(currentUserId, conversationId, request))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("항상 함께 전달되어야 합니다.");
+  }
+  
+  @Test
+  @DisplayName("DM 목록 조회 - 정렬 방향(sortDirection)이 잘못되면 예외 발생")
+  void getMessages_InvalidSortDirection_ThrowsException() {
+
+    // given
+    Conversation conversation = mock(Conversation.class);
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10,"wrongDirection", "createdAt");
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.getMessages(currentUserId, conversationId, request))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("정렬 방향");
+  }
+
+  @Test
+  @DisplayName("DM 목록 조회 - 커서 시간 파싱 실패(DateTimeParseException) 시 예외 발생")
+  void getMessages_InvalidCursorFormat_ThrowsException() {
+
+    // given
+    Conversation conversation = mock(Conversation.class);
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    CursorPaginationRequest request = new CursorPaginationRequest("wrong-date-foramt", UUID.randomUUID(), 10, "DESCENDING", "createdAt");
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.getMessages(currentUserId, conversationId, request))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("잘못된 형식의 커서 데이터");
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - 성공 시 대화방의 안읽음 상태(hasUnread)를 false로 업데이트한다.")
+  void readMessage_Success() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    Conversation conversation = mock(Conversation.class);
+
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    // when
+    directMessageService.readMessage(currentUserId, conversationId, messageId);
+
+    // then
+    verify(conversation).updateUnreadStatus(false);
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - 대화방 참여자가 아닌 제 3자가 호출하면 권한 예외 발생")
+  void readMessage_AccessDenied_ThrowsException() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    UUID outsiderId = UUID.randomUUID();
+
+    Conversation conversation = mock(Conversation.class);
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    User sender = mock(User.class);
+    given(sender.getId()).willReturn(UUID.randomUUID());
+    User receiver = mock(User.class);
+    given(receiver.getId()).willReturn(UUID.randomUUID());
+
+    given(conversation.getSender()).willReturn(sender);
+    given(conversation.getReceiver()).willReturn(receiver);
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.readMessage(outsiderId, conversationId, messageId))
+        .isInstanceOf(ConversationAccessDeniedException.class);
   }
 }

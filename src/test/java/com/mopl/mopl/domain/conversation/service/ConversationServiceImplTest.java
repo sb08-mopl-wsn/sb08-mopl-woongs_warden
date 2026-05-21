@@ -16,6 +16,7 @@ import com.mopl.mopl.domain.conversation.dto.response.ConversationDto;
 import com.mopl.mopl.domain.conversation.dto.response.CursorResponseConversationDto;
 import com.mopl.mopl.domain.conversation.entity.Conversation;
 import com.mopl.mopl.domain.conversation.exception.ConversationAccessDeniedException;
+import com.mopl.mopl.domain.conversation.exception.ConversationNotFoundException;
 import com.mopl.mopl.domain.conversation.mapper.ConversationMapper;
 import com.mopl.mopl.domain.conversation.repository.ConversationRepository;
 import com.mopl.mopl.domain.dm.mapper.DirectMessageMapper;
@@ -325,5 +326,74 @@ class ConversationServiceImplTest {
     verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class));
     verify(conversationRepository).countBySenderId(currentUserId);
     verify(conversationRepository).countByReceiverId(currentUserId);
+  }
+
+  @Test
+  @DisplayName("대화 목록 조회 - limit이 null 이거나 0 이하이면 예외 발생")
+  void getMyConversations_InvalidLimit_ThrowsException() {
+
+    // given
+    CursorPaginationRequest reqZero = new CursorPaginationRequest(null, null, 0, "DESCENDING", "updatedAt");
+    CursorPaginationRequest reqMinus = new CursorPaginationRequest(null, null, -1, "DESCENDING", "updatedAt");
+
+    // when & then
+    assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, reqZero))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("limit은 1 이상의 값");
+    assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, reqMinus))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("limit은 1 이상의 값");
+  }
+
+  @Test
+  @DisplayName("대화 목록 조회 - limit이 100 초과이면 예외 발생")
+  void getMyConversations_LimitExceeds100_ThrowsException() {
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 101, "DESCENDING", "updatedAt");
+
+    assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("limit은 100 이하의 값");
+  }
+
+  @Test
+  @DisplayName("대화 목록 조회 - 커서와 idAfter가 짝이 맞지 않으면 예외 발생")
+  void getMyConversations_CursorAndIdMismatch_ThrowsException() {
+    CursorPaginationRequest req1 = new CursorPaginationRequest("2026-05-21T00:00:00Z", null, 10, "DESCENDING", "updatedAt");
+    CursorPaginationRequest req2 = new CursorPaginationRequest(null, UUID.randomUUID(), 10, "DESCENDING", "updatedAt");
+
+    assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, req1))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("항상 함께 전달");
+    assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, req2))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("항상 함께 전달");
+  }
+
+  @Test
+  @DisplayName("대화 목록 조회 - 정렬 방향(sortDirection)이 잘못되면 예외 발생")
+  void getMyConversations_InvalidSortDirection_ThrowsException() {
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "wrongDirection", "updatedAt");
+
+    assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("정렬 방향(sortDirection)");
+  }
+
+  @Test
+  @DisplayName("대화 목록 조회 - 커서 시간 파싱 실패 시 예외 발생")
+  void getMyConversations_InvalidCursorFormat_ThrowsException() {
+    CursorPaginationRequest request = new CursorPaginationRequest("wrong-format", UUID.randomUUID(), 10, "DESCENDING", "updatedAt");
+
+    assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("잘못된 형식의 커서 데이터");
+  }
+
+  @Test
+  @DisplayName("상대방과의 대화 조회 - 대화방이 존재하지 않으면 예외 발생")
+  void getConversationWith_NotFound_ThrowsException() {
+
+    // given
+    UUID withUserId = UUID.randomUUID();
+    String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
+
+    given(conversationRepository.findByParticipantPairKey(pairKey)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> conversationService.getConversationWith(currentUserId, withUserId))
+        .isInstanceOf(ConversationNotFoundException.class);
   }
 }

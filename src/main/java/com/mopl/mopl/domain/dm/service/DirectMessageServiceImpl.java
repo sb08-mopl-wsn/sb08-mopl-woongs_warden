@@ -170,6 +170,10 @@ public class DirectMessageServiceImpl implements DirectMessageService{
     DirectMessage message = messageRepository.findById(messageId)
         .orElseThrow(() -> new BusinessException(GlobalErrorCode.INVALID_INPUT, "해당 메시지를 찾을 수 없습니다."));
 
+    if (!message.getConversation().getId().equals(conversationId)) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "해당 대화방의 메시지가 아닙니다.");
+    }
+    
     // 내가 읽은 수위선(watermark) 갱신
     conversation.updateLastReadAt(currentUserId, message.getCreatedAt());
 

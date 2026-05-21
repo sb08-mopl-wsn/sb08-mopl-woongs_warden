@@ -1,7 +1,10 @@
 package com.mopl.mopl.domain.conversation.entity;
 
+import com.mopl.mopl.domain.conversation.exception.ConversationAccessDeniedException;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.global.base.BaseUpdatableEntity;
+import com.mopl.mopl.global.exception.BusinessException;
+import com.mopl.mopl.global.exception.GlobalErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -67,6 +70,9 @@ public class Conversation extends BaseUpdatableEntity {
     }
 
     public void updateLastReadAt(UUID userId, Instant readAt) {
+        if (userId == null || readAt == null ) {
+            throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "userId와 readAt은 null일 수 없습니다.");
+        }
         if (this.sender.getId().equals(userId)) {
             if (this.lastReadAtBySender == null || this.lastReadAtBySender.isBefore(readAt)) {
                 this.lastReadAtBySender = readAt;
@@ -75,6 +81,8 @@ public class Conversation extends BaseUpdatableEntity {
             if (this.lastReadAtByReceiver == null || this.lastReadAtByReceiver.isBefore(readAt)) {
                 this.lastReadAtByReceiver = readAt;
             }
+        } else {
+            throw new ConversationAccessDeniedException();
         }
     }
 }

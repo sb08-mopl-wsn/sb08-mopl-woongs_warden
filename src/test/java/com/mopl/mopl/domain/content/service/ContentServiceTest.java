@@ -10,6 +10,7 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willDoNothing;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ContentService Unit Test")
@@ -40,6 +42,7 @@ class ContentServiceTest
     @InjectMocks private ContentServiceImpl contentService;
     @Mock private ContentRepository contentRepository;
     @Mock private ContentMapper contentMapper;
+    @Mock private ContentIndexService contentIndexService;
 
     private UUID contentId;
     private Content content;
@@ -109,6 +112,7 @@ class ContentServiceTest
             );
 
             given(contentRepository.save(any(Content.class))).willReturn(content);
+            willDoNothing().given(contentIndexService).index(any(Content.class));
             given(contentMapper.toContentDto(content)).willReturn(contentDto);
 
             // when
@@ -120,6 +124,7 @@ class ContentServiceTest
             assertThat(result.type()).isEqualTo(ContentType.movie);
 
             then(contentRepository).should().save(any(Content.class));
+            then(contentIndexService).should().index(any(Content.class));
             then(contentMapper).should().toContentDto(content);
         }
     }
@@ -279,6 +284,7 @@ class ContentServiceTest
 
             given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
             given(contentRepository.save(any(Content.class))).willReturn(content);
+            willDoNothing().given(contentIndexService).index(any(Content.class));
             given(contentMapper.toContentDto(content)).willReturn(contentDto);
             
             // when
@@ -289,6 +295,7 @@ class ContentServiceTest
             assertThat(result.description()).isEqualTo("test description");
 
             then(contentRepository).should().findById(contentId);
+            then(contentIndexService).should().index(any(Content.class));
             then(contentMapper).should().toContentDto(content);
         }
         

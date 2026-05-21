@@ -43,7 +43,9 @@ jacocoTestReport {
 					'**/global/base/**',
 					'**/global/exception/**',
 					'**/global/logging/**',
-					'**/exception/**'
+					'**/exception/**',
+					'**/ai/*Ai*',
+					'**/elasticsearch/**'
 			])
 		}))
 	}

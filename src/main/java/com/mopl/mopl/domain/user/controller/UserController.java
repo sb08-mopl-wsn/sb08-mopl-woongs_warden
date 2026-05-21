@@ -24,7 +24,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("api/users")
 @Slf4j
-public class UserController {
+public class UserController  implements UserApi{
     private final UserService userService;
     private final WatchingSessionService watchingSessionService;
 

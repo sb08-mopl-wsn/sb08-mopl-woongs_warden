@@ -15,6 +15,7 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.domain.dm.entity.DirectMessage;
 import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
+import com.mopl.mopl.global.event.DirectMessageReadEvent;
 import com.mopl.mopl.global.event.DirectMessageSentEvent;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
@@ -165,9 +166,26 @@ public class DirectMessageServiceImpl implements DirectMessageService{
     // 내 방인지 권한 검사
     validateConversationAccess(conversation, currentUserId);
 
+    // 프론트가 보내준 messageId로 실제 메시지의 작성 시간(createdAt)을 찾아옴
+    DirectMessage message = messageRepository.findById(messageId)
+        .orElseThrow(() -> new BusinessException(GlobalErrorCode.INVALID_INPUT, "해당 메시지를 찾을 수 없습니다."));
+
+    if (!message.getConversation().getId().equals(conversationId)) {
+      throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "해당 대화방의 메시지가 아닙니다.");
+    }
+    
+    // 내가 읽은 수위선(watermark) 갱신
+    conversation.updateLastReadAt(currentUserId, message.getCreatedAt());
+
     // 방의 읽음 상태(hasUnread)를 false로 업데이트
-    // TODO: 현재 방 전체의 상태만 관리하지만, 추후 카카오톡처럼 각 메시지별 읽음/안읽음 기능 확장 예정 (messageId 기반으로 Read-Watermark 커서 로직)
     conversation.updateUnreadStatus(false);
+
+    // 웹소켓(STOMP)으로 상대방에게 읽은 범위를 브로드캐스팅 이벤트로 던짐
+    eventPublisher.publishEvent(DirectMessageReadEvent.of(
+        conversationId,
+        currentUserId,
+        message.getCreatedAt()
+    ));
   }
 
 

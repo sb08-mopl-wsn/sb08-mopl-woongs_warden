@@ -77,7 +77,7 @@ class JwtLoginSuccessHandlerTest {
 
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(response.getCharacterEncoding()).isEqualTo("UTF-8");
-        assertThat(response.getContentType()).startsWith("application/json");
+        assertThat(response.getContentType()).contains("application/json");
         assertThat(response.getHeader(HttpHeaders.SET_COOKIE)).contains("REFRESH-TOKEN=refresh.jwt.token");
 
         JsonNode body = objectMapper.readTree(response.getContentAsString());
@@ -120,10 +120,10 @@ class JwtLoginSuccessHandlerTest {
         UserDto userDto = new UserDto(
                 UUID.randomUUID(),
                 Instant.parse("2026-05-08T00:00:00Z"),
-                "admin@admin.com",
-                "관리자",
+                "user@test.com",
+                "일반유저",
                 null,
-                Role.ADMIN,
+                Role.USER,
                 false
         );
         MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -23,6 +24,7 @@ import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
+import com.mopl.mopl.global.event.DirectMessageReadEvent;
 import com.mopl.mopl.global.exception.BusinessException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -277,5 +279,147 @@ class DirectMessageServiceImplTest {
     assertThatThrownBy(() -> directMessageService.getMessages(currentUserId, conversationId, request))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("항상 함께 전달되어야 합니다.");
+  }
+  
+  @Test
+  @DisplayName("DM 목록 조회 - 정렬 방향(sortDirection)이 잘못되면 예외 발생")
+  void getMessages_InvalidSortDirection_ThrowsException() {
+
+    // given
+    Conversation conversation = mock(Conversation.class);
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10,"wrongDirection", "createdAt");
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.getMessages(currentUserId, conversationId, request))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("정렬 방향");
+  }
+
+  @Test
+  @DisplayName("DM 목록 조회 - 커서 시간 파싱 실패(DateTimeParseException) 시 예외 발생")
+  void getMessages_InvalidCursorFormat_ThrowsException() {
+
+    // given
+    Conversation conversation = mock(Conversation.class);
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    CursorPaginationRequest request = new CursorPaginationRequest("wrong-date-foramt", UUID.randomUUID(), 10, "DESCENDING", "createdAt");
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.getMessages(currentUserId, conversationId, request))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("잘못된 형식의 커서 데이터");
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - 성공 시 Watermark와 읽음 상태를 업데이트하고 이벤트를 발행한다.")
+  void readMessage_Success() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    Conversation conversation = mock(Conversation.class);
+    DirectMessage message = mock(DirectMessage.class);
+
+    given(conversation.getId()).willReturn(conversationId);
+    given(message.getConversation()).willReturn(conversation);
+
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+    given(messageRepository.findById(messageId)).willReturn(Optional.of(message));
+    given(message.getCreatedAt()).willReturn(Instant.now());
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    // when
+    directMessageService.readMessage(currentUserId, conversationId, messageId);
+
+    // then
+    verify(conversation).updateLastReadAt(eq(currentUserId), any(Instant.class));
+    verify(conversation).updateUnreadStatus(false);
+    verify(eventPublisher).publishEvent(any(DirectMessageReadEvent.class));
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - 대화방 참여자가 아닌 제 3자가 호출하면 권한 예외 발생")
+  void readMessage_AccessDenied_ThrowsException() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    UUID outsiderId = UUID.randomUUID();
+
+    Conversation conversation = mock(Conversation.class);
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    User sender = mock(User.class);
+    given(sender.getId()).willReturn(UUID.randomUUID());
+    User receiver = mock(User.class);
+    given(receiver.getId()).willReturn(UUID.randomUUID());
+
+    given(conversation.getSender()).willReturn(sender);
+    given(conversation.getReceiver()).willReturn(receiver);
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.readMessage(outsiderId, conversationId, messageId))
+        .isInstanceOf(ConversationAccessDeniedException.class);
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - DB에 존재하지 않는 메시지 ID를 요청하면 예외가 발생한다.")
+  void readMessage_MessageNotFound_ThrowsException() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    Conversation conversation = mock(Conversation.class);
+
+    // 대화방 찾기
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+    // 권한 검사 통과
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    // 메시지 리포지토리에서 메시지 못찾음
+    given(messageRepository.findById(messageId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.readMessage(currentUserId, conversationId, messageId))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("찾을 수 없습니다.");
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - 해커가 다른 대화방의 메시지 ID를 조작해 요청하면 보안 예외가 발생한다 (IDOR 방어).")
+  void readMessage_MessageBelongsToOtherConversation_ThrowsException() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    Conversation myConversation = mock(Conversation.class);
+    Conversation otherConversation = mock(Conversation.class);
+    DirectMessage hackedMessage = mock(DirectMessage.class);
+
+    // 내 대화방 찾기 및 권한 검사 정상 통과
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(myConversation));
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(myConversation.getSender()).willReturn(mockUser);
+
+    // 파라미터로 넘어온 메시지가 다른 방 소속
+    given(messageRepository.findById(messageId)).willReturn(Optional.of(hackedMessage));
+    given(hackedMessage.getConversation()).willReturn(otherConversation);
+    given(otherConversation.getId()).willReturn(UUID.randomUUID());
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.readMessage(currentUserId, conversationId, messageId))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("해당 대화방의 메시지가 아닙니다");
   }
 }

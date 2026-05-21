@@ -36,7 +36,6 @@ public interface ReviewApi {
               schema = @Schema(implementation = ReviewDto.class)
           )
       ),
-      @ApiResponse(responseCode = "200", description = "성공", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ReviewDto.class))),
       @ApiResponse(responseCode = "400", description = "잘못된 요청", content = @Content(schema = @Schema(hidden = true))),
       @ApiResponse(responseCode = "401", description = "인증 오류", content = @Content(schema = @Schema(hidden = true))),
       @ApiResponse(responseCode = "500", description = "서버 오류", content = @Content(schema = @Schema(hidden = true)))

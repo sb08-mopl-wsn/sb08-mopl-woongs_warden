@@ -25,11 +25,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/reviews")
 @RequiredArgsConstructor
-public class ReviewController {
+public class ReviewController implements ReviewApi {
 
   private final ReviewService reviewService;
 
   //생성
+  @Override
   @PostMapping
   public ResponseEntity<ReviewDto> createReview(
       @Valid @RequestBody ReviewCreateRequest request,
@@ -40,6 +41,7 @@ public class ReviewController {
     return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
   }
 
+  @Override
   @PatchMapping("/{reviewId}")
   public ResponseEntity<ReviewDto> updateReview(
       @PathVariable UUID reviewId,
@@ -51,12 +53,14 @@ public class ReviewController {
     return ResponseEntity.ok(responseDto);
   }
 
+  @Override
   @GetMapping("/{reviewId}")
   public ResponseEntity<ReviewDto> findReviewById(@PathVariable UUID reviewId) {
     ReviewDto responseDto = reviewService.findReviewById(reviewId);
     return ResponseEntity.ok(responseDto);
   }
 
+  @Override
   @GetMapping
   public ResponseEntity<CursorResponseReviewDto> findReviews(
       @Valid ReviewSearchRequest request
@@ -65,6 +69,7 @@ public class ReviewController {
     return ResponseEntity.ok(response);
   }
 
+  @Override
   @DeleteMapping("/{reviewId}")
   public ResponseEntity<Void> deleteReview(
       @PathVariable UUID reviewId,

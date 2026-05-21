@@ -127,6 +127,7 @@ class DirectMessageStompEventListenerTest {
 
     // when & then
     assertDoesNotThrow(() -> listener.handleSubscribe(event));
+    assertThat(listener.isUserInRoom(userId, conversationId)).isFalse();
   }
 
   @Test
@@ -162,6 +163,7 @@ class DirectMessageStompEventListenerTest {
 
     // when & then
     assertDoesNotThrow(() -> listener.handleSubscribe(event));
+    assertThat(listener.isUserInRoom(userId, conversationId)).isFalse();
   }
 
   @Test

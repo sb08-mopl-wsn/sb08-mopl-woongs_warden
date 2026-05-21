@@ -396,4 +396,59 @@ class ConversationServiceImplTest {
     assertThatThrownBy(() -> conversationService.getConversationWith(currentUserId, withUserId))
         .isInstanceOf(ConversationNotFoundException.class);
   }
+
+  @Test
+  @DisplayName("대화 목록 조회 - sortDirection이 ASCENDING이면 정상 조회된다")
+  void getMyConversations_AscendingSort_Success() {
+    // given
+    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "ASCENDING", "updatedAt");
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(true), any(), any(), any()))
+        .willReturn(new ArrayList<>());
+    given(conversationRepository.countBySenderId(currentUserId)).willReturn(0L);
+    given(conversationRepository.countByReceiverId(currentUserId)).willReturn(0L);
+
+    // when
+    CursorResponseConversationDto result = conversationService.getMyConversations(currentUserId, request);
+
+    // then
+    assertThat(result).isNotNull();
+    // ASCENDING일 때 isAscending = true로 호출되는지 검증
+    verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(true), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("상대방과의 대화 조회 - 대화방이 존재하면 정상 조회된다")
+  void getConversationWith_Success() {
+    // given
+    UUID withUserId = UUID.randomUUID();
+    String pairKey = Conversation.buildPairKey(currentUserId, withUserId);
+
+    Conversation conversation = Conversation.builder()
+        .sender(sender)
+        .receiver(receiver)
+        .build();
+    ReflectionTestUtils.setField(conversation, "id", UUID.randomUUID());
+
+    ConversationDto expectedDto = new ConversationDto(
+        conversation.getId(),
+        new UserSummary(withUserId, null, null),
+        null,
+        false
+    );
+
+    given(conversationRepository.findByParticipantPairKey(pairKey))
+        .willReturn(Optional.of(conversation));
+    given(directMessageRepository.findLatestMessage(any()))
+        .willReturn(Optional.empty());
+    given(conversationMapper.toDto(conversation, currentUserId, null))
+        .willReturn(expectedDto);
+
+    // when
+    ConversationDto result = conversationService.getConversationWith(currentUserId, withUserId);
+
+    // then
+    assertThat(result).isNotNull();
+    assertThat(result.id()).isEqualTo(conversation.getId());
+    verify(conversationRepository).findByParticipantPairKey(pairKey);
+  }
 }

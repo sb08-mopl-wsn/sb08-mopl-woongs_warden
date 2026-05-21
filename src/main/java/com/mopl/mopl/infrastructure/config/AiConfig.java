@@ -8,6 +8,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
+import java.time.Clock;
 import java.time.Duration;
 
 @Configuration
@@ -20,12 +21,17 @@ public class AiConfig
     private Duration readTimeout;
 
     @Bean
+    public Clock clock() {
+        return Clock.systemDefaultZone();
+    }
+
+    @Bean
     public ChatClient chatClient(ChatClient.Builder builder) {
         return builder.build();
     }
 
-    @Bean
-    public RestClient.Builder restClientBuilder() {
+    @Bean("aiRestClientBuilder")
+    public RestClient.Builder aiRestClientBuilder() {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder()
                         .connectTimeout(connectTimeout)

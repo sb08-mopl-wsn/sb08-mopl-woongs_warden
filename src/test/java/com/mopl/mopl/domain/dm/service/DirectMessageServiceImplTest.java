@@ -396,4 +396,30 @@ class DirectMessageServiceImplTest {
     assertThatThrownBy(() -> directMessageService.readMessage(currentUserId, conversationId, messageId))
         .isInstanceOf(BusinessException.class).hasMessageContaining("찾을 수 없습니다.");
   }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - 해커가 다른 대화방의 메시지 ID를 조작해 요청하면 보안 예외가 발생한다 (IDOR 방어).")
+  void readMessage_MessageBelongsToOtherConversation_ThrowsException() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    Conversation myConversation = mock(Conversation.class);
+    Conversation otherConversation = mock(Conversation.class);
+    DirectMessage hackedMessage = mock(DirectMessage.class);
+
+    // 내 대화방 찾기 및 권한 검사 정상 통과
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(myConversation));
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(myConversation.getSender()).willReturn(mockUser);
+
+    // 파라미터로 넘어온 메시지가 다른 방 소속
+    given(messageRepository.findById(messageId)).willReturn(Optional.of(hackedMessage));
+    given(hackedMessage.getConversation()).willReturn(otherConversation);
+    given(otherConversation.getId()).willReturn(UUID.randomUUID());
+
+    // when & then
+    assertThatThrownBy(() -> directMessageService.readMessage(currentUserId, conversationId, messageId))
+        .isInstanceOf(BusinessException.class).hasMessageContaining("해당 대화방의 메시지가 아닙니다");
+  }
 }

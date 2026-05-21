@@ -1,27 +1,40 @@
 package com.mopl.mopl.infrastructure.ai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.ai.dto.AiRecommendation;
 import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendRequest;
 import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendResponse;
+import com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis;
+import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
+import com.mopl.mopl.infrastructure.ai.event.SseStatusEvent;
 import com.mopl.mopl.infrastructure.ai.exception.AiParseFailedException;
 import com.mopl.mopl.infrastructure.ai.exception.AiTimeoutException;
 import com.mopl.mopl.infrastructure.ai.exception.AiUnavailableException;
 import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.retry.NonTransientAiException;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.convert.ConversionFailedException;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.mopl.mopl.global.config.AsyncConfig.AI_RECOMMEND_EXECUTOR;
+
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class ContentRecommendService
@@ -31,16 +44,47 @@ public class ContentRecommendService
     private final ChatClient chatClient;
     private final ContentRepository contentRepository;
     private final ImageUrlConverter imageUrlConverter;
+    private final ObjectMapper objectMapper;
+    private final AiPerformanceRecorder aiPerformanceRecorder;
+    private final IntentAnalysisService intentAnalysisService;
 
-    private static final String SYSTEM_PROMPT = """
-            너는 MOLE 플랫폼의 콘텐츠 추천 어시스턴트야.
-            영화, 드라마, 스포츠 콘텐츠에 대한 질문에만 답변해.
-            아래 콘텐츠 목록에서만 추천하고, 목록에 없는 콘텐츠는 절대 추천하지 마.
-            반드시 아래 JSON 형식으로만 응답해:
-            [{"id": "UUID", "reason": "추천 이유"}]
-            최대 5개까지 추천해.
-            콘텐츠와 관련 없는 질문에는 빈 배열 []로 응답해.
-            """;
+    @Async(AI_RECOMMEND_EXECUTOR)
+    public void recommendStream(String prompt, SseEmitter emitter) {
+        try {
+            // Stage 1: 의도 분석
+            if (!sendStatus(emitter, "intent_analysis", "질문을 분석하고 있습니다...")) return;
+            IntentAnalysis intentAnalysis = intentAnalysisService.analysis(prompt);
+
+            // 비관련 질문 처리
+            if ("unrelated".equals(intentAnalysis.intent())) {
+                log.info("[AI Recommend] 비관련 질문 감지 - 즉시 빈 배열 반환");
+                sendResult(emitter, List.of());
+                emitter.complete();
+                return;
+            }
+
+            // Stage 2: 후보 필터링
+            if (!sendStatus(emitter, "candidate_filtering", "맞춤 콘텐츠를 찾고 있습니다...")) return;
+            List<Content> candidates = findCandidates(intentAnalysis);
+
+            // Stage 3: 텍스트 스트리밍 추천
+            if (!sendStatus(emitter, "recommendation", "추천 결과를 생성하고 있습니다...")) return;
+            List<AiRecommendation> recommendations = generateRecommendation(prompt, intentAnalysis, candidates);
+
+            List<ContentRecommendResponse> response = mapToResponse(recommendations, candidates);
+            sendResult(emitter, response);
+            emitter.complete();
+        } catch (AiTimeoutException e) {
+            sendError(emitter, "AI_TIMEOUT", "AI 서비스 응답이 지연되고 있습니다.");
+        } catch (AiUnavailableException e) {
+            sendError(emitter, "AI_UNAVAILABLE", "AI 서비스를 일시적으로 사용할 수 없습니다.");
+        } catch (AiParseFailedException e) {
+            sendError(emitter, "AI_PARSE_FAILED", "AI 응답을 처리하지 못했습니다.");
+        } catch (Exception e) {
+            log.error("[AI Recommend] SSE 스트리밍 중 예외 발생", e);
+            sendError(emitter, "INTERNAL_ERROR", "추천 처리 중 오류가 발생했습니다.");
+        }
+    }
 
     /**
      * 사용자의 자연어 질문을 기반으로 AI가 콘텐츠를 추천한다.
@@ -55,30 +99,96 @@ public class ContentRecommendService
      * @throws ConversionFailedException Gemini 응답 파싱 실패
      */
     public List<ContentRecommendResponse> recommend(ContentRecommendRequest request) {
-        List<Content> contents = contentRepository.findAll();
-        String contentContext = buildContentContext(contents);
+        // 의도 분석
+        IntentAnalysis intent = intentAnalysisService.analysis(request.prompt());
 
-        List<AiRecommendation> recommendations;
-        try {
-            recommendations = chatClient.prompt()
-                    .system(SYSTEM_PROMPT)
-                    .user("콘텐츠 목록:\n" + contentContext + "\n\n사용자 질문: " + request.prompt())
-                    .call()
-                    .entity(new ParameterizedTypeReference<>() {});
-        } catch (ResourceAccessException e) {
-            throw new AiTimeoutException();
-        } catch (NonTransientAiException e) {
-            throw new AiUnavailableException();
-        } catch (ConversionFailedException e) {
-            throw new AiParseFailedException();
+        if ("unrelated".equals(intent.intent())) {
+            log.info("[AI Recommend] 비관련 질문 감지 — 즉시 빈 배열 반환");
+            return List.of();
         }
 
-        List<AiRecommendation> safeRecommendations = recommendations == null ? List.of() : recommendations;
+        // 후보 필터링
+        List<Content> candidates = findCandidates(intent);
 
-        Map<UUID, Content> contentMap = contents.stream()
+        // 후보 + 의도 정보로 최종 추천
+        List<AiRecommendation> recommendations = generateRecommendation(request.prompt(), intent, candidates);
+
+        return mapToResponse(recommendations, candidates);
+    }
+
+    /**
+     * 의도 분서 결과를 기반으로 후보 콘텐츠를 필터링한다.
+     * <p>
+     * conetentType과 키워드로 Java 스트림 필터링하며,
+     * 후보가 0건이면 전체 콘텐츠로 fallback으로 반환한다.
+     *
+     * @param intent 의도 분석 결과
+     * @return 후보 콘텐츠 목록
+     */
+    private List<Content> findCandidates(IntentAnalysis intent) {
+        return aiPerformanceRecorder.record("candidate-retrieval", () -> {
+            List<Content> allContents = contentRepository.findAll();
+
+            List<Content> filtered = allContents.stream()
+                    .filter(c -> matchesType(c, intent.contentType()))
+                    .filter(c -> matchesKeywords(c, intent.keywords()))
+                    .toList();
+
+            log.info("[AI Recommend] 후보 필터링 — 전체 {}건 → 후보 {}건", allContents.size(), filtered.size());
+
+            return filtered.isEmpty() ? allContents : filtered;
+        });
+    }
+
+    /**
+     * 후보 콘텐츠와 사용자 질문을 기반으로 Gemini API를 호출하여 최종 추천을 생성한다.
+     *
+     * @param prompt     사용자의 원본 질문
+     * @param intent     의도 분석 결과
+     * @param candidates 후보 콘텐츠 목록
+     * @return AI 추천 결과 목록
+     * @throws  AiTimeoutException Gemini 응답 시간 초과
+     * @throws  AiUnavailableException Gemini 서비스 불가
+     * @throws  AiParseFailedException Gemini 응답 파싱 불가
+     */
+    private List<AiRecommendation> generateRecommendation(String prompt, IntentAnalysis intent, List<Content> candidates) {
+        String contentContext = buildContentContext(candidates);
+        String userMessage = "사용자 의도: %s\n키워드: %s\n\n후보 콘텐츠 목록:\n%s\n\n사용자 질문: %s"
+                .formatted(intent.intent(), intent.keywords(), contentContext, prompt);
+
+        ChatResponse chatResponse = aiPerformanceRecorder.record("final-recommendation", () -> {
+            try {
+                return chatClient.prompt()
+                        .system(AiPrompts.RECOMMENDATION)
+                        .user(userMessage)
+                        .call()
+                        .chatResponse();
+            } catch (ResourceAccessException e) {
+                throw new AiTimeoutException();
+            } catch (NonTransientAiException e) {
+                throw new AiUnavailableException();
+            }
+        });
+
+        aiPerformanceRecorder.recordTokenUsage("final-recommendation", chatResponse.getMetadata().getUsage());
+
+        return aiPerformanceRecorder.record("recommendation-parse", () -> {
+            String rawResponse = chatResponse.getResult().getOutput().getText();
+            try {
+                List<AiRecommendation> result = objectMapper.readValue(
+                        rawResponse, new TypeReference<>() {});
+                return result == null ? List.of() : result;
+            } catch (JsonProcessingException e) {
+                throw new AiParseFailedException();
+            }
+        });
+    }
+
+    private List<ContentRecommendResponse> mapToResponse(List<AiRecommendation> recommendations, List<Content> candidates) {
+        Map<UUID, Content> contentMap = candidates.stream()
                 .collect(Collectors.toMap(Content::getId, content -> content));
 
-        return safeRecommendations.stream()
+        return recommendations.stream()
                 .limit(MAX_RECOMMENDATIONS)
                 .filter(rec -> contentMap.containsKey(rec.id()))
                 .map(rec -> {
@@ -101,5 +211,52 @@ public class ContentRecommendService
                         c.getId(), c.getTitle(), c.getContentType(), String.join(",", c.getTags()), c.getAvgRating()
                 ))
                 .collect(Collectors.joining("\n"));
+    }
+
+    private boolean matchesType(Content content, String contentType) {
+        if (contentType == null) return true;
+        return content.getContentType().name().equals(contentType);
+    }
+
+    private boolean matchesKeywords(Content content, List<String> keywords) {
+        if (keywords == null || keywords.isEmpty()) return true;
+        return keywords.stream().anyMatch(keyword ->
+                content.getTitle().toLowerCase().contains(keyword.toLowerCase())
+                        || content.getDescription().toLowerCase().contains(keyword.toLowerCase())
+                        || content.getTags().stream().anyMatch(tag ->
+                        tag.toLowerCase().contains(keyword.toLowerCase())));
+    }
+
+    private boolean sendStatus(SseEmitter emitter, String stage, String message) {
+    try {
+        emitter.send(SseEmitter.event()
+                .name("status")
+                .data(new SseStatusEvent(stage, message)));
+        return true;
+    } catch (IOException e) {
+        log.warn("[AI Recommend] SSE status 전송 실패 — 클라이언트 연결 끊김");
+        return false;
+    }
+}
+
+    private void sendResult(SseEmitter emitter, List<ContentRecommendResponse> result) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("result")
+                    .data(result));
+        } catch (IOException e) {
+            log.warn("[AI Recommend] SSE result 전송 실패 — 클라이언트 연결 끊김");
+        }
+    }
+
+    private void sendError(SseEmitter emitter, String code, String message) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data(new SseErrorEvent(code, message)));
+            emitter.complete();
+        } catch (IOException e) {
+            log.warn("[AI Recommend] SSE error 전송 실패 — 클라이언트 연결 끊김");
+        }
     }
 }

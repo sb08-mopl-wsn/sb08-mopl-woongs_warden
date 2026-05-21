@@ -24,8 +24,8 @@ public class AiConfig
         return builder.build();
     }
 
-    @Bean
-    public RestClient.Builder restClientBuilder() {
+    @Bean("aiRestClientBuilder")
+    public RestClient.Builder aiRestClientBuilder() {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder()
                         .connectTimeout(connectTimeout)

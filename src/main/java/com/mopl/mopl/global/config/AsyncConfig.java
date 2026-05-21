@@ -17,6 +17,12 @@ public class AsyncConfig implements AsyncConfigurer {
     public static final String NOTIFICATION_EXECUTOR = "notificationExecutor";
     public static final String DIRECT_MESSAGE_EXECUTOR = "directMessageExecutor";
     public static final String USER_EXECUTOR = "userExecutor";
+    public static final String AI_RECOMMEND_EXECUTOR = "aiRecommendExecutor";
+
+    @Bean(name = AI_RECOMMEND_EXECUTOR)
+    public Executor aiRecommendExecutor() {
+        return createExecutor(2, 5, 50, "ai-rec-");
+    }
 
     @Bean(name = WATCHING_SESSION_EXECUTOR)
     public Executor watchingSessionExecutor() {

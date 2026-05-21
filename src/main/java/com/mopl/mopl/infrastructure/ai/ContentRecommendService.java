@@ -14,6 +14,7 @@ import com.mopl.mopl.infrastructure.ai.event.SseStatusEvent;
 import com.mopl.mopl.infrastructure.ai.exception.AiParseFailedException;
 import com.mopl.mopl.infrastructure.ai.exception.AiTimeoutException;
 import com.mopl.mopl.infrastructure.ai.exception.AiUnavailableException;
+import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
 import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,7 @@ public class ContentRecommendService
     private final ObjectMapper objectMapper;
     private final AiPerformanceRecorder aiPerformanceRecorder;
     private final IntentAnalysisService intentAnalysisService;
+    private final ContentSearchQueryService contentSearchQueryService;
 
     @Async(AI_RECOMMEND_EXECUTOR)
     public void recommendStream(String prompt, SseEmitter emitter) {
@@ -127,16 +129,19 @@ public class ContentRecommendService
      */
     private List<Content> findCandidates(IntentAnalysis intent) {
         return aiPerformanceRecorder.record("candidate-retrieval", () -> {
-            List<Content> allContents = contentRepository.findAll();
+            List<String> candidateIds = contentSearchQueryService.searchCandidateIds(intent.contentType(), intent.keywords());
 
-            List<Content> filtered = allContents.stream()
-                    .filter(c -> matchesType(c, intent.contentType()))
-                    .filter(c -> matchesKeywords(c, intent.keywords()))
-                    .toList();
+            if (candidateIds.isEmpty()) {
+                log.info("[AI Recommend] ES 후보 0건 — 전체 콘텐츠 fallback");
+                return contentRepository.findAll();
+            }
 
-            log.info("[AI Recommend] 후보 필터링 — 전체 {}건 → 후보 {}건", allContents.size(), filtered.size());
+            List<UUID> uuids = candidateIds.stream().map(UUID::fromString).toList();
+            List<Content> candidates = contentRepository.findAllById(uuids);
 
-            return filtered.isEmpty() ? allContents : filtered;
+            log.info("[AI Recommend] 후보 필터링 — ES {}건 → DB 조회 {}건", candidateIds.size(), candidates.size());
+
+            return candidates;
         });
     }
 
@@ -213,31 +218,17 @@ public class ContentRecommendService
                 .collect(Collectors.joining("\n"));
     }
 
-    private boolean matchesType(Content content, String contentType) {
-        if (contentType == null) return true;
-        return content.getContentType().name().equals(contentType);
-    }
-
-    private boolean matchesKeywords(Content content, List<String> keywords) {
-        if (keywords == null || keywords.isEmpty()) return true;
-        return keywords.stream().anyMatch(keyword ->
-                content.getTitle().toLowerCase().contains(keyword.toLowerCase())
-                        || content.getDescription().toLowerCase().contains(keyword.toLowerCase())
-                        || content.getTags().stream().anyMatch(tag ->
-                        tag.toLowerCase().contains(keyword.toLowerCase())));
-    }
-
     private boolean sendStatus(SseEmitter emitter, String stage, String message) {
-    try {
-        emitter.send(SseEmitter.event()
-                .name("status")
-                .data(new SseStatusEvent(stage, message)));
-        return true;
-    } catch (IOException e) {
-        log.warn("[AI Recommend] SSE status 전송 실패 — 클라이언트 연결 끊김");
-        return false;
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("status")
+                    .data(new SseStatusEvent(stage, message)));
+            return true;
+        } catch (IOException e) {
+            log.warn("[AI Recommend] SSE status 전송 실패 — 클라이언트 연결 끊김");
+            return false;
+        }
     }
-}
 
     private void sendResult(SseEmitter emitter, List<ContentRecommendResponse> result) {
         try {

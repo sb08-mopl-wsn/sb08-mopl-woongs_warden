@@ -28,12 +28,12 @@ public class SportsdbApiClient
      * @return 해당 리그 및 시즌의 대한 정보 목록
      */
     public List<SportsdbEvent> fetchDayEvents(int leagueId) {
-        String today = LocalDate.now().toString();
+        String day = LocalDate.now().plusDays(3).toString();
 
         SportsdbEventResponse response;
         try {
             response = restClient.get()
-                    .uri(ExternalApiConstants.EVENTS_DAY_PATH, today, leagueId)
+                    .uri(ExternalApiConstants.EVENTS_DAY_PATH, day, leagueId)
                     .retrieve()
                     .body(SportsdbEventResponse.class);
         } catch (RestClientException ex) {

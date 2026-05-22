@@ -60,6 +60,8 @@ spring:
         max-interval: 10000
         multiplier: 2
         initial-interval: 2000
+  elasticsearch:
+    uris: http://localhost:9200
 
   # 소셜 로그인용
   security:

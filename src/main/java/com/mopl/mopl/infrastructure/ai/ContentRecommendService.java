@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.ai.dto.AiRecommendation;
-import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendRequest;
 import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendResponse;
 import com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis;
 import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
@@ -14,13 +13,14 @@ import com.mopl.mopl.infrastructure.ai.event.SseStatusEvent;
 import com.mopl.mopl.infrastructure.ai.exception.AiParseFailedException;
 import com.mopl.mopl.infrastructure.ai.exception.AiTimeoutException;
 import com.mopl.mopl.infrastructure.ai.exception.AiUnavailableException;
+import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
 import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.retry.NonTransientAiException;
-import org.springframework.core.convert.ConversionFailedException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -40,6 +40,7 @@ import static com.mopl.mopl.global.config.AsyncConfig.AI_RECOMMEND_EXECUTOR;
 public class ContentRecommendService
 {
     private static final int MAX_RECOMMENDATIONS = 5;
+    private static final int FALLBACK_LIMIT = 50;
 
     private final ChatClient chatClient;
     private final ContentRepository contentRepository;
@@ -47,6 +48,7 @@ public class ContentRecommendService
     private final ObjectMapper objectMapper;
     private final AiPerformanceRecorder aiPerformanceRecorder;
     private final IntentAnalysisService intentAnalysisService;
+    private final ContentSearchQueryService contentSearchQueryService;
 
     @Async(AI_RECOMMEND_EXECUTOR)
     public void recommendStream(String prompt, SseEmitter emitter) {
@@ -87,36 +89,6 @@ public class ContentRecommendService
     }
 
     /**
-     * 사용자의 자연어 질문을 기반으로 AI가 콘텐츠를 추천한다.
-     * <p>
-     * DB에서 전체 콘텐츠를 조회한 뒤 Gemini API에 프롬프트와 함께 전달하고,
-     * AI 응답을 파싱하여 최대 5건의 추천 결과를 반환한다.
-     *
-     * @param request 사용자의 추천 요청 (자연어 프롬프트)
-     * @return 추천 콘텐츠 목록
-     * @throws ResourceAccessException Gemini 응답 시간 초과
-     * @throws NonTransientAiException Gemini 서비스 불가
-     * @throws ConversionFailedException Gemini 응답 파싱 실패
-     */
-    public List<ContentRecommendResponse> recommend(ContentRecommendRequest request) {
-        // 의도 분석
-        IntentAnalysis intent = intentAnalysisService.analysis(request.prompt());
-
-        if ("unrelated".equals(intent.intent())) {
-            log.info("[AI Recommend] 비관련 질문 감지 — 즉시 빈 배열 반환");
-            return List.of();
-        }
-
-        // 후보 필터링
-        List<Content> candidates = findCandidates(intent);
-
-        // 후보 + 의도 정보로 최종 추천
-        List<AiRecommendation> recommendations = generateRecommendation(request.prompt(), intent, candidates);
-
-        return mapToResponse(recommendations, candidates);
-    }
-
-    /**
      * 의도 분서 결과를 기반으로 후보 콘텐츠를 필터링한다.
      * <p>
      * conetentType과 키워드로 Java 스트림 필터링하며,
@@ -127,16 +99,19 @@ public class ContentRecommendService
      */
     private List<Content> findCandidates(IntentAnalysis intent) {
         return aiPerformanceRecorder.record("candidate-retrieval", () -> {
-            List<Content> allContents = contentRepository.findAll();
+            List<String> candidateIds = contentSearchQueryService.searchCandidateIds(intent.contentType(), intent.keywords());
 
-            List<Content> filtered = allContents.stream()
-                    .filter(c -> matchesType(c, intent.contentType()))
-                    .filter(c -> matchesKeywords(c, intent.keywords()))
-                    .toList();
+            if (candidateIds.isEmpty()) {
+                log.warn("[AI Recommend] ES 후보 0건 — 상위 {}건으로 fallback", FALLBACK_LIMIT);
+                return contentRepository.findAll(PageRequest.of(0, FALLBACK_LIMIT)).getContent();
+            }
 
-            log.info("[AI Recommend] 후보 필터링 — 전체 {}건 → 후보 {}건", allContents.size(), filtered.size());
+            List<UUID> uuids = candidateIds.stream().map(UUID::fromString).toList();
+            List<Content> candidates = contentRepository.findAllById(uuids);
 
-            return filtered.isEmpty() ? allContents : filtered;
+            log.info("[AI Recommend] 후보 필터링 — ES {}건 → DB 조회 {}건", candidateIds.size(), candidates.size());
+
+            return candidates;
         });
     }
 
@@ -213,31 +188,17 @@ public class ContentRecommendService
                 .collect(Collectors.joining("\n"));
     }
 
-    private boolean matchesType(Content content, String contentType) {
-        if (contentType == null) return true;
-        return content.getContentType().name().equals(contentType);
-    }
-
-    private boolean matchesKeywords(Content content, List<String> keywords) {
-        if (keywords == null || keywords.isEmpty()) return true;
-        return keywords.stream().anyMatch(keyword ->
-                content.getTitle().toLowerCase().contains(keyword.toLowerCase())
-                        || content.getDescription().toLowerCase().contains(keyword.toLowerCase())
-                        || content.getTags().stream().anyMatch(tag ->
-                        tag.toLowerCase().contains(keyword.toLowerCase())));
-    }
-
     private boolean sendStatus(SseEmitter emitter, String stage, String message) {
-    try {
-        emitter.send(SseEmitter.event()
-                .name("status")
-                .data(new SseStatusEvent(stage, message)));
-        return true;
-    } catch (IOException e) {
-        log.warn("[AI Recommend] SSE status 전송 실패 — 클라이언트 연결 끊김");
-        return false;
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("status")
+                    .data(new SseStatusEvent(stage, message)));
+            return true;
+        } catch (IOException e) {
+            log.warn("[AI Recommend] SSE status 전송 실패 — 클라이언트 연결 끊김");
+            return false;
+        }
     }
-}
 
     private void sendResult(SseEmitter emitter, List<ContentRecommendResponse> result) {
         try {

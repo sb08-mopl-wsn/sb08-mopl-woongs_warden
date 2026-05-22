@@ -10,6 +10,7 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.elasticsearch.event.ContentIndexEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -40,6 +42,7 @@ class ContentServiceTest
     @InjectMocks private ContentServiceImpl contentService;
     @Mock private ContentRepository contentRepository;
     @Mock private ContentMapper contentMapper;
+    @Mock private ApplicationEventPublisher applicationEventPublisher;
 
     private UUID contentId;
     private Content content;
@@ -120,6 +123,7 @@ class ContentServiceTest
             assertThat(result.type()).isEqualTo(ContentType.movie);
 
             then(contentRepository).should().save(any(Content.class));
+            then(applicationEventPublisher).should().publishEvent(any(ContentIndexEvent.class));
             then(contentMapper).should().toContentDto(content);
         }
     }
@@ -289,6 +293,7 @@ class ContentServiceTest
             assertThat(result.description()).isEqualTo("test description");
 
             then(contentRepository).should().findById(contentId);
+            then(applicationEventPublisher).should().publishEvent(any(ContentIndexEvent.class));
             then(contentMapper).should().toContentDto(content);
         }
         

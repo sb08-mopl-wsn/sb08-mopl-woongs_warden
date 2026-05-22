@@ -43,7 +43,9 @@ jacocoTestReport {
 					'**/global/base/**',
 					'**/global/exception/**',
 					'**/global/logging/**',
-					'**/exception/**'
+					'**/exception/**',
+					'**/ai/*Ai*',
+					'**/elasticsearch/**'
 			])
 		}))
 	}
@@ -99,6 +101,9 @@ dependencies {
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 	implementation 'org.apache.httpcomponents.client5:httpclient5'
 
+	// NoSQL
+	implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+
 	// dev tools
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -118,6 +123,7 @@ dependencies {
 	implementation 'org.ahocorasick:ahocorasick:0.6.3'
 
 	// test
+	testImplementation 'org.testcontainers:elasticsearch'
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'

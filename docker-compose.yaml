@@ -6,6 +6,7 @@ services:
     profiles:
       - local
       - develop
+      - lb
     ports:
       - "${POSTGRES_PORT}:5432"
     environment:
@@ -25,14 +26,16 @@ services:
     networks:
       - mopl-network
 
-  app1:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mopl-app-1
+    container_name: mopl-app
     restart: unless-stopped
     profiles:
       - develop
+    ports:
+      - "${APP_PORT}:${SERVER_PORT}"
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
@@ -41,6 +44,8 @@ services:
       SERVER_PORT: ${SERVER_PORT}
       REDIS_HOST: redis
       TZ: "Asia/Seoul"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
     env_file:
       - .env
     volumes:
@@ -49,6 +54,46 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${SERVER_PORT}/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mopl-network
+
+  app1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mopl-app-1
+    restart: unless-stopped
+    profiles:
+      - lb
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: ${SERVER_PORT}
+      REDIS_HOST: redis
+      TZ: "Asia/Seoul"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
+    env_file:
+      - .env
+    volumes:
+      - app_logs:/app.logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${SERVER_PORT}/actuator/health" ]
@@ -66,7 +111,7 @@ services:
     container_name: mopl-app-2
     restart: unless-stopped
     profiles:
-      - develop
+      - lb
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
@@ -76,6 +121,7 @@ services:
       REDIS_HOST: redis
       TZ: "Asia/Seoul"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
     env_file:
       - .env
     volumes:
@@ -175,6 +221,7 @@ services:
     restart: unless-stopped
     profiles:
       - search
+      - lb
     ports:
       - "9200:9200"
     environment:
@@ -216,6 +263,7 @@ services:
     profiles:
       - local
       - develop
+      - lb
     ports:
       - "6379:6379"
     volumes:
@@ -236,8 +284,15 @@ services:
     profiles:
       - local
       - develop
+      - lb
     ports:
       - "9092:9092"
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     environment:
       # 1. KRaft 전용 프로세스 역할 설정 (본인이 브로커이자 컨트롤러)
       - KAFKA_NODE_ID=1
@@ -268,7 +323,7 @@ services:
     container_name: mopl-nginx
     restart: unless-stopped
     profiles:
-      - develop
+      - lb
     ports:
       - "80:80"
     volumes:

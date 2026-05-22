@@ -75,12 +75,15 @@ services:
       SERVER_PORT: ${SERVER_PORT}
       REDIS_HOST: redis
       TZ: "Asia/Seoul"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     env_file:
       - .env
     volumes:
       - app_logs:/app.logs
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -226,6 +229,40 @@ services:
     networks:
       - mopl-network
 
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    restart: unless-stopped
+    profiles:
+      - local
+      - develop
+    ports:
+      - "9092:9092"
+    environment:
+      # 1. KRaft 전용 프로세스 역할 설정 (본인이 브로커이자 컨트롤러)
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=controller,broker
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:29093
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+
+      # 2. 리스너 설정 (외부 IDE는 9092, 내부 도커망은 29092로 분리)
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093,INTERNAL://0.0.0.0:29092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+
+      # 3. KRaft 모드 클러스터 ID (고정값)
+      - CLUSTER_ID=MkU3OEVBNTcwNTJDRDRCMz
+
+      # 4. 싱글 노드(로컬) 환경 필수 운영 설정
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_HEAP_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - mopl-network
+
   nginx:
     image: nginx:alpine
     container_name: mopl-nginx
@@ -252,6 +289,7 @@ volumes:
   loki-data:
   es-data:
   redis-data:
+  kafka-data:
 
 networks:
   mopl-network:

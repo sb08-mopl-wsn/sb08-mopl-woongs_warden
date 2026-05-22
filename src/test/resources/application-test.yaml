@@ -48,6 +48,8 @@ spring:
               - profile
 
 app:
+  jwt:
+    registry: memory
   oauth2:
     success-redirect-url: http://localhost:3000/oauth2/success
     failure-redirect-url: http://localhost:3000/oauth2/failure

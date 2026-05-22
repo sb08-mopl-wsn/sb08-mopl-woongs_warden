@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final UserRepository userRepository;
-    private final JwtRegistry jwtRegistry;  // todo 분산에서는 다른걸로
+    private final JwtRegistry jwtRegistry;
     private final JwtTokenProvider jwtTokenProvider;
     private final MoplUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
@@ -140,7 +140,7 @@ public class AuthServiceImpl implements AuthService {
         // 임시 비번 적용 및 원본 비번 저장
         target.updateTemporaryPassword(encodedPassword, originPassword, expiredAt);
 
-        eventPublisher.publishEvent(UserPasswordInitEvent.of(target,expiredAt));
+        eventPublisher.publishEvent(UserPasswordInitEvent.of(target,expiredAt,rawPassword));
     }
 
     /**

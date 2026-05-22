@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 @Service
-//@ConditionalOnProperty(name = "app.jwt.registry", havingValue = "memory")  // TODO redis 하면 주석 해제
+@ConditionalOnProperty(name = "app.jwt.registry", havingValue = "memory")
 public class InMemoryJwtRegistry implements JwtRegistry {
     private final JwtTokenProvider jwtTokenProvider;
     private final Map<UUID, Queue<JwtInformation>> origin;

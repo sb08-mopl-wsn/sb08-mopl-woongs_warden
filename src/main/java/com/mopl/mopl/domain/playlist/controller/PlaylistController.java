@@ -28,13 +28,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/playlists")
 @RequiredArgsConstructor
-public class PlaylistController {
+public class PlaylistController implements PlaylistApi {
 
   private final PlaylistService playlistService;
   private final PlaylistContentService playlistContentService;
   private final PlaylistSubscriptionService playlistSubscriptionService;
 
 
+  @Override
   @PostMapping
   public ResponseEntity<PlaylistDto> createPlaylist(
       @Valid @RequestBody PlaylistCreateRequest request,
@@ -45,6 +46,7 @@ public class PlaylistController {
     return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
   }
 
+  @Override
   @GetMapping("/{playlistId}")
   public ResponseEntity<PlaylistDto> findPlaylistById(
       @PathVariable UUID playlistId,
@@ -57,6 +59,7 @@ public class PlaylistController {
     return ResponseEntity.ok(responseDto);
   }
 
+  @Override
   @GetMapping
   public ResponseEntity<CursorResponsePlaylistDto> findPlaylists(
       @Valid @ParameterObject PlaylistSearchRequest request
@@ -65,6 +68,7 @@ public class PlaylistController {
     return ResponseEntity.ok(responseDto);
   }
 
+  @Override
   @PatchMapping("/{playlistId}")
   public ResponseEntity<PlaylistDto> updatePlaylist(
       @PathVariable UUID playlistId,
@@ -76,6 +80,7 @@ public class PlaylistController {
     return ResponseEntity.ok(responseDto);
   }
 
+  @Override
   @DeleteMapping("/{playlistId}")
   public ResponseEntity<Void> deletePlaylist(
       @PathVariable UUID playlistId,
@@ -86,6 +91,7 @@ public class PlaylistController {
     return ResponseEntity.noContent().build();
   }
 
+  @Override
   @PostMapping("/{playlistId}/contents/{contentId}")
   public ResponseEntity<Void> addContentToPlaylist(
       @PathVariable UUID playlistId,
@@ -94,9 +100,10 @@ public class PlaylistController {
   ) {
     UUID userId = userDetails.getUserDto().id();
     playlistContentService.addContentToPlaylist(playlistId, contentId, userId);
-    return ResponseEntity.status(HttpStatus.CREATED).build();
+    return ResponseEntity.noContent().build();
   }
 
+  @Override
   @DeleteMapping("/{playlistId}/contents/{contentId}")
   public ResponseEntity<Void> removeContentFromPlaylist(
       @PathVariable UUID playlistId,
@@ -108,6 +115,7 @@ public class PlaylistController {
     return ResponseEntity.noContent().build();
   }
 
+  @Override
   @PostMapping("/{playlistId}/subscription")
   public ResponseEntity<Void> subscribeToPlaylist(
       @PathVariable UUID playlistId,
@@ -115,9 +123,10 @@ public class PlaylistController {
   ) {
     UUID userId = userDetails.getUserDto().id();
     playlistSubscriptionService.subscribeToPlaylist(playlistId, userId);
-    return ResponseEntity.status(HttpStatus.CREATED).build();
+    return ResponseEntity.noContent().build();
   }
 
+  @Override
   @DeleteMapping("/{playlistId}/subscription")
   public ResponseEntity<Void> unsubscribeFromPlaylist(
       @PathVariable UUID playlistId,

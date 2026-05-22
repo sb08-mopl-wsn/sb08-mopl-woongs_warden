@@ -34,6 +34,7 @@ public class CacheConfig
         return RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(defaultConfig.entryTtl(Duration.ofMinutes(10)))
                 .withInitialCacheConfigurations(cacheConfigs)
+                .transactionAware()
                 .build();
     }
 }

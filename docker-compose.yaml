@@ -87,7 +87,7 @@ services:
     env_file:
       - .env
     volumes:
-      - app_logs:/app.logs
+      - app1_logs:/app.logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,7 +125,7 @@ services:
     env_file:
       - .env
     volumes:
-      - app_logs:/app.logs
+      - app2_logs:/app.logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -339,6 +339,8 @@ services:
 volumes:
   mopl-db-data:
   app_logs:
+  app1_logs:
+  app2_logs:
   prometheus-data:
   grafana-data:
   loki-data:

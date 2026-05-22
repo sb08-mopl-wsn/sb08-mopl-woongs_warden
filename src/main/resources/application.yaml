@@ -62,6 +62,8 @@ spring:
         initial-interval: 2000
   elasticsearch:
     uris: http://localhost:9200
+    connection-timeout: 10s
+    socket-timeout: 30s
   data:
     redis:
       host: ${REDIS_HOST}

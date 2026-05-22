@@ -12,12 +12,12 @@ public record UserPasswordInitEvent(
         String password,
         Instant expiredAt
 ) {
-    public static UserPasswordInitEvent of(User user, Instant expiredAt) {
+    public static UserPasswordInitEvent of(User user, Instant expiredAt, String initPassword) {
         return new UserPasswordInitEvent(
                 user.getName(),
                 user.getId(),
                 user.getEmail(),
-                user.getPassword(),
+                initPassword,
                 expiredAt
         );
     }

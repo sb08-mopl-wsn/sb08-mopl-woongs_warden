@@ -402,6 +402,7 @@ class UserServiceImplTest {
     void updateUserPassword_success() {
         UUID userId = UUID.randomUUID();
         User user = createUser();
+        user.updateTemporaryPassword("temp-password-hash", "origin-password-hash", Instant.now().plusSeconds(300));
 
         ChangePasswordRequest request = new ChangePasswordRequest("NewPassword1!");
         UserDto expected = createUserDto(userId, user);
@@ -414,6 +415,8 @@ class UserServiceImplTest {
 
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("new-encoded-password");
+        assertThat(user.getTemporaryPassword()).isNull();
+        assertThat(user.getTemporaryPasswordExpiredAt()).isNull();
 
         verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
         verifyNoInteractions(eventPublisher);

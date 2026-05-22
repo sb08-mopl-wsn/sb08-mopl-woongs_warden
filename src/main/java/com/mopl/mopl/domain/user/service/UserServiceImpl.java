@@ -3,7 +3,12 @@ package com.mopl.mopl.domain.user.service;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.CursorResponseUserDto;
 import com.mopl.mopl.domain.user.dto.UserDto;
-import com.mopl.mopl.domain.user.dto.request.*;
+import com.mopl.mopl.domain.user.dto.request.ChangePasswordRequest;
+import com.mopl.mopl.domain.user.dto.request.CursorUserRequest;
+import com.mopl.mopl.domain.user.dto.request.UserCreateRequest;
+import com.mopl.mopl.domain.user.dto.request.UserLockUpdateRequest;
+import com.mopl.mopl.domain.user.dto.request.UserRoleUpdateRequest;
+import com.mopl.mopl.domain.user.dto.request.UserUpdateRequest;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserDuplicateException;
@@ -35,7 +40,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
-    private final JwtRegistry jwtRegistry;  //todo 분산에서는 다른걸로
+    private final JwtRegistry jwtRegistry;
     private final S3ImageStorage s3ImageStorage;
     private final ApplicationEventPublisher eventPublisher;
 

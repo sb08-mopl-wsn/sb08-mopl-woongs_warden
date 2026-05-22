@@ -101,6 +101,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.apache.httpcomponents.client5:httpclient5'
 
+	// Message Broker
+	implementation 'org.springframework.kafka:spring-kafka'
+
 	// NoSQL
 	implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
 

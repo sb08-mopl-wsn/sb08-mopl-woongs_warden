@@ -18,5 +18,6 @@ public interface PlaylistMapper {
 
   @Mapping(source = "user", target = "owner")
   @Mapping(target = "subscribedByMe", constant = "false")
+  @Mapping(target = "contents", expression = "java(java.util.Collections.emptyList())")
   PlaylistDto toDto(Playlist playlist);
 }

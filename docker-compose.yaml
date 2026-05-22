@@ -172,6 +172,23 @@ services:
     networks:
       - mopl-network
 
+  redis:
+    image: redis:8-alpine
+    container_name: redis
+    profiles:
+      - local
+      - develop
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   mopl-db-data:
   app_logs:
@@ -179,6 +196,7 @@ volumes:
   grafana-data:
   loki-data:
   es-data:
+  redis-data:
 
 networks:
   mopl-network:

@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -63,6 +64,18 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private boolean initPassword;
 
+    @Column(nullable = false)
+    private int warningCount;
+
+    @Column(nullable = false)
+    private boolean isBanned;
+
+    @Column(nullable = false)
+    private LocalDateTime bannedAt;
+
+    @Column(nullable = true)
+    private LocalDateTime banExpiresAt;
+
     @Builder(
             builderMethodName = "builder",
             builderClassName = "UserBuilder"
@@ -77,6 +90,8 @@ public class User extends BaseEntity {
         this.socialType = socialType != null ? socialType : null;
         this.socialId = socialId != null ? socialId : null;
         this.initPassword = false;
+        this.warningCount = 0;
+        this.isBanned = false;
     }
 
     @Builder(
@@ -93,6 +108,8 @@ public class User extends BaseEntity {
         this.profileImageKey = null;
         this.socialType = null;
         this.socialId = null;
+        this.warningCount = 0;
+        this.isBanned = false;
     }
 
     public User updateName(String newName) {
@@ -102,8 +119,6 @@ public class User extends BaseEntity {
 
     public User updatePassword(String encryptedPassword) {
         this.password = encryptedPassword;
-        this.temporaryPassword = null;
-        this.temporaryPasswordExpiredAt = null;
         this.initPassword = false;
         return this;
     }
@@ -143,5 +158,30 @@ public class User extends BaseEntity {
         this.socialType = socialType;
         this.socialId = socialId;
         return this;
+    }
+
+    public void increaseWarningCount() {
+        this.warningCount++;
+        if (this.warningCount % 3 == 0) {
+            this.isBanned = true;
+            this.bannedAt = LocalDateTime.now();
+
+            int banCount = this.warningCount / 3;
+
+            switch (banCount) {
+                case 1 -> this.banExpiresAt = LocalDateTime.now().plusMinutes(1);
+                case 2 -> this.banExpiresAt = LocalDateTime.now().plusHours(1);
+                default -> {
+                    this.isLocked = true;
+                    this.banExpiresAt = null;
+                }
+            }
+        }
+    }
+
+    public void unBan() {
+        this.isBanned = false;
+        this.bannedAt = null;
+        this.banExpiresAt = null;
     }
 }

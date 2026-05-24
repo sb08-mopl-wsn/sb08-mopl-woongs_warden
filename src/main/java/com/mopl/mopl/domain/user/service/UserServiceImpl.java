@@ -20,6 +20,9 @@ import com.mopl.mopl.global.event.user.UserUpdateLockEvent;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -108,6 +111,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "user", key = "#userId")
     public UserDto getUser(UUID userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
         UserDto result = userMapper.toDto(user);
@@ -129,6 +133,10 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @PreAuthorize("principal.userDto.id == #userId")
+    @Caching(evict = {
+            @CacheEvict(value = "user", key = "#userId"),
+            @CacheEvict(value = "securityUserDetails", allEntries = true)
+    })
     public UserDto updateUserPassword(UUID userId, ChangePasswordRequest request) {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
@@ -142,6 +150,10 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
+    @Caching(evict = {
+            @CacheEvict(value = "user", key = "#userId"),
+            @CacheEvict(value = "securityUserDetails", allEntries = true)
+    })
     public UserDto updateUserLocked(UUID userId, UserLockUpdateRequest request) {
         User target = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
@@ -161,6 +173,10 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @PreAuthorize("principal.userDto.id == #userId")
+    @Caching(evict = {
+            @CacheEvict(value = "user", key = "#userId"),
+            @CacheEvict(value = "securityUserDetails", allEntries = true)
+    })
     public UserDto updateProfile(
             UUID userId, UserUpdateRequest request,
             MultipartFile profile

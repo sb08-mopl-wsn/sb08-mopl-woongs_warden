@@ -74,7 +74,8 @@ public class SecurityConfig {
                                 // 문서 관련
                                 .requestMatchers("/", "/index.html").permitAll()
                                 .requestMatchers("/ws/**").permitAll()
-                                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
+                                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").hasRole("ADMIN")
+                                .requestMatchers("/actuator/health").permitAll()
 
                                 // 로그인/아웃 관련
                                 .requestMatchers("/api/auth/sign-in", "/api/auth/sign-out").permitAll()

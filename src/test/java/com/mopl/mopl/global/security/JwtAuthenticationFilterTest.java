@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -96,6 +97,7 @@ class JwtAuthenticationFilterTest {
         when(tokenProvider.validateAccessToken(accessToken)).thenReturn(true);
         when(jwtRegistry.hasActiveJwtInformationByAccessToken(accessToken)).thenReturn(true);
         when(tokenProvider.parseAccessToken(accessToken)).thenReturn(userDetails);
+        when(userDetailsService.loadUserByUsername(email)).thenReturn(userDetails);
 
         filter.doFilter(request, response, filterChain);
 
@@ -110,6 +112,42 @@ class JwtAuthenticationFilterTest {
 
         verify(filterChain).doFilter(request, response);
         verify(authenticationEntryPoint, never()).commence(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("잠긴 계정의 Access Token이면 강제로 로그아웃 처리한다")
+    void lockedAccountToken_forcesLogout() throws Exception {
+        JwtAuthenticationFilter filter = createFilter();
+
+        String accessToken = "locked-user-access-token";
+        String email = "locked@user.com";
+        UUID userId = UUID.randomUUID();
+        UserDto tokenUserDto = new UserDto(userId, null, email, "잠긴유저", null, Role.USER, false);
+        MoplUserDetails tokenUserDetails = new MoplUserDetails(tokenUserDto, "encoded-password");
+        UserDto lockedUserDto = new UserDto(userId, null, email, "잠긴유저", null, Role.USER, true);
+        MoplUserDetails lockedUserDetails = new MoplUserDetails(lockedUserDto, "encoded-password");
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/users/me");
+        request.addHeader("Authorization", "Bearer " + accessToken);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(tokenProvider.validateAccessToken(accessToken)).thenReturn(true);
+        when(jwtRegistry.hasActiveJwtInformationByAccessToken(accessToken)).thenReturn(true);
+        when(tokenProvider.parseAccessToken(accessToken)).thenReturn(tokenUserDetails);
+        when(userDetailsService.loadUserByUsername(email)).thenReturn(lockedUserDetails);
+
+        filter.doFilter(request, response, filterChain);
+
+        ArgumentCaptor<LockedException> captor = ArgumentCaptor.forClass(LockedException.class);
+        verify(authenticationEntryPoint).commence(
+                org.mockito.Mockito.eq(request),
+                org.mockito.Mockito.eq(response),
+                captor.capture()
+        );
+
+        assertThat(captor.getValue().getMessage()).isEqualTo("잠긴 계정입니다.");
+        verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
+        verify(filterChain, never()).doFilter(request, response);
     }
 
     @Test

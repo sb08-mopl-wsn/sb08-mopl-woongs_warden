@@ -5,6 +5,7 @@ import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collections;
 
 @Slf4j
 @Service
@@ -22,6 +24,7 @@ public class MoplUserDetailsService implements UserDetailsService {
     private final UserMapper userMapper;
 
     @Override
+    @Cacheable(value = "securityUserDetails", key = "#username")
     @Transactional(noRollbackFor = CredentialsExpiredException.class)
     public UserDetails loadUserByUsername(String username) {
         User user = userRepository.findByEmail(username)
@@ -33,6 +36,6 @@ public class MoplUserDetailsService implements UserDetailsService {
             throw new CredentialsExpiredException("임시 비밀번호가 만료되었습니다.");
         }
 
-        return new MoplUserDetails(userMapper.toDto(user), user.getPassword());
+        return new MoplUserDetails(userMapper.toDto(user), user.getPassword(), Collections.emptyMap());
     }
 }

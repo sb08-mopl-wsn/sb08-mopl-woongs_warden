@@ -20,6 +20,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -254,7 +255,7 @@ public class JwtTokenProvider {
             );
 
             log.info("[TokenProvider] parseAccessToken 완료: UserDto 생성");
-            return new MoplUserDetails(userDto, null);
+            return new MoplUserDetails(userDto, null, Collections.emptyMap());
 
         } catch (Exception e) {
             log.error("[TokenProvider] parseAccessToken 중 예외 발생: {}", e.getMessage());

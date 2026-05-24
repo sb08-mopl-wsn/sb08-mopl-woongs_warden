@@ -10,10 +10,11 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -68,12 +69,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
 
                     MoplUserDetails userDetails = tokenProvider.parseAccessToken(token);
+                    UserDetails currentUserDetails = userDetailsService.loadUserByUsername(userDetails.getUsername());
+
+                    if (!currentUserDetails.isAccountNonLocked()) {
+                        jwtRegistry.invalidateJwtInformationByUserId(userDetails.getUserDto().id());
+                        authenticationEntryPoint.commence(
+                                request,
+                                response,
+                                new LockedException("잠긴 계정입니다.")
+                        );
+                        return;
+                    }
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails,
+                                    currentUserDetails,
                                     null,
-                                    userDetails.getAuthorities()
+                                    currentUserDetails.getAuthorities()
                             );
 
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

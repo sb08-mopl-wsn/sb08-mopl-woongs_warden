@@ -18,6 +18,7 @@ import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,7 @@ class JwtLoginSuccessHandlerTest {
                 Role.ADMIN,
                 false
         );
-        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");
+        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password", Collections.emptyMap());
 
         Authentication authentication = mock(Authentication.class);
         when(authentication.getPrincipal()).thenReturn(principal);
@@ -126,7 +127,7 @@ class JwtLoginSuccessHandlerTest {
                 Role.USER,
                 false
         );
-        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");
+        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password", Collections.emptyMap());
 
         Authentication authentication = mock(Authentication.class);
         when(authentication.getPrincipal()).thenReturn(principal);

@@ -33,6 +33,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -98,7 +99,7 @@ class AuthServiceImplTest {
                     false
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
             User user = mock(User.class);
 
             when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
@@ -133,7 +134,7 @@ class AuthServiceImplTest {
                     false
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
 
             when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
 
@@ -170,7 +171,7 @@ class AuthServiceImplTest {
                     oldRefreshToken
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
 
             when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
@@ -257,7 +258,7 @@ class AuthServiceImplTest {
                     oldRefreshToken
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
 
             when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
@@ -302,7 +303,7 @@ class AuthServiceImplTest {
                     oldRefreshToken
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
 
             when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);

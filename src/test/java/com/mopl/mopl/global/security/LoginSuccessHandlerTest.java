@@ -13,6 +13,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,7 +44,7 @@ class LoginSuccessHandlerTest {
         );
 
         Authentication authentication = mock(Authentication.class);
-        MoplUserDetails userDetails = new MoplUserDetails(userDto, "encoded-password");
+        MoplUserDetails userDetails = new MoplUserDetails(userDto, "encoded-password", Collections.emptyMap());
 
         when(authentication.getPrincipal()).thenReturn(userDetails);
 

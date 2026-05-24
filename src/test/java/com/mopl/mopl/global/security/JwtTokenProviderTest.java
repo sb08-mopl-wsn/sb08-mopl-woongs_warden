@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseCookie;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -159,6 +160,6 @@ class JwtTokenProviderTest {
                 false
         );
 
-        return new MoplUserDetails(userDto, "encoded-password");
+        return new MoplUserDetails(userDto, "encoded-password", Collections.emptyMap());
     }
 }

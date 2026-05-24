@@ -20,6 +20,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,7 +67,7 @@ class OAuth2LoginSuccessHandlerTest {
                 false
         );
 
-        MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
+        MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -112,7 +113,7 @@ class OAuth2LoginSuccessHandlerTest {
                 false
         );
 
-        MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
+        MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 

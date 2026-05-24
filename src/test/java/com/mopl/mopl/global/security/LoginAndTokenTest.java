@@ -20,6 +20,7 @@ import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
 import com.mopl.mopl.global.auth.handler.LoginFailureHandler;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -80,7 +81,8 @@ class LoginAndTokenTest {
         );
         MoplUserDetails userDetails = new MoplUserDetails(
                 userDto,
-                passwordEncoder.encode("Admin1234!")
+                passwordEncoder.encode("Admin1234!"),
+                Collections.emptyMap()
         );
 
         given(userDetailsService.loadUserByUsername("admin@admin.com"))
@@ -135,7 +137,8 @@ class LoginAndTokenTest {
         );
         MoplUserDetails userDetails = new MoplUserDetails(
                 userDto,
-                passwordEncoder.encode("Admin1234!")
+                passwordEncoder.encode("Admin1234!"),
+                Collections.emptyMap()
         );
 
         given(userDetailsService.loadUserByUsername("admin@admin.com"))

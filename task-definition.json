@@ -40,10 +40,6 @@
         {
           "name": "KAFKA_BOOTSTRAP_SERVERS",
           "value": "pkc-e82om.ap-northeast-2.aws.confluent.cloud:9092"
-        },
-        {
-          "name": "KAFKA_API_KEY",
-          "value": "KQDXBG3P5Y235QDQ"
         }
       ],
       "secrets": [
@@ -54,6 +50,10 @@
         {
           "name": "KAFKA_API_SECRET",
           "valueFrom": "arn:aws:ssm:ap-northeast-2:542508027261:parameter/mopl/kafka/secret"
+        },
+        {
+          "name": "KAFKA_API_KEY",
+          "valueFrom": "arn:aws:ssm:ap-northeast-2:542508027261:parameter/mopl/kafka/key"
         }
       ],
       "logConfiguration": {

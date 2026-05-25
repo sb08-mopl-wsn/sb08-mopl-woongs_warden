@@ -55,6 +55,7 @@ public class NotificationKafkaConsumer {
         .user(receiver)
         .title(title)
         .content(content)
+        .level(NotificationLevel.INFO)
         .build();
 
     Notification saved = notificationRepository.save(notification);

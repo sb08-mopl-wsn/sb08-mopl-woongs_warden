@@ -33,8 +33,6 @@ public class NotificationKafkaProducer {
     kafkaTemplate.send("notification-follow-topic", event.followeeId().toString(), event);
   }
 
-  // TODO: 나머지 Review, DM, Playlist 이벤트 추가
-
   /**
    * 리뷰 이벤트 발행
    * @param event 리뷰 이벤트 객체

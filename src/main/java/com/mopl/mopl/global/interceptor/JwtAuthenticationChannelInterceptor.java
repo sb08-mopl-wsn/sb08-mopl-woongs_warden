@@ -4,6 +4,7 @@ import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.event.kafka.UserSecurityEventKafkaPublisher;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
     private final JwtTokenProvider tokenProvider;
     private final RoleHierarchy roleHierarchy;
     private final JwtRegistry jwtRegistry;
+    private final UserSecurityEventKafkaPublisher kafkaPublisher;
 
     private static final String PREFIX = "Bearer ";
     private static final String HEADER_NAME = "ACCESS_TOKEN";
@@ -76,8 +78,10 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
                     );
 
             accessor.setUser(authentication);
+            kafkaPublisher.publishSecurityEvent("WS_AUTH_SUCCESS", userDto.id(), userDto.email(), "웹소켓 CONNECT 인증 성공");
             log.debug("웹 소켓 유저를 위한 인증 설정 완료. user: {}", userDto.name());
         } else {
+            kafkaPublisher.publishSecurityEvent("WS_AUTH_FAILED", null, null, "웹소켓 CONNECT 인증 실패");
             log.debug("웹소켓 통신을 위한 유효하지 않은 JWT 토큰");
             throw new BusinessException(GlobalErrorCode.UNAUTHORIZED);
         }

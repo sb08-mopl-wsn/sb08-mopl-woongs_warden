@@ -1,6 +1,7 @@
 package com.mopl.mopl.global.event.listener;
 
 import com.mopl.mopl.global.config.AsyncConfig;
+import com.mopl.mopl.global.event.kafka.UserSecurityEventKafkaPublisher;
 import com.mopl.mopl.global.event.user.UserEvent;
 import com.mopl.mopl.global.event.user.UserPasswordInitEvent;
 import com.mopl.mopl.global.event.user.UserUpdateLockEvent;
@@ -20,18 +21,16 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class UserEventListener {
     private final SseService sseService;
     private final MailService mailService;
+    private final UserSecurityEventKafkaPublisher kafkaPublisher;
 
     @Async(AsyncConfig.USER_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserCreated(UserEvent event) {
         log.info("[UserEvent] 생성 - name: {}, id: {}", event.name(), event.userId());
+        kafkaPublisher.publishUserEvent("USER_CREATED", event.userId(), null, event.name(), "회원 생성 완료");
 
-        // SSE 푸시 알림 발송
         try {
-            sseService.sendNotification(
-                    event.userId(),
-                    "환영합니다! " + event.name() + "님"
-            );
+            sseService.sendNotification(event.userId(), "환영합니다! " + event.name() + "님");
         } catch (Exception e) {
             log.warn("생성 알림 전송 실패 - name: {}, id: {}", event.name(), event.userId(), e);
         }
@@ -41,15 +40,10 @@ public class UserEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserLock(UserUpdateLockEvent event) {
         log.info("[UserEvent] 정지관련 이벤트 발생 - name: {}, id: {}", event.name(), event.userId());
+        kafkaPublisher.publishSecurityEvent("USER_LOCK_UPDATED", event.userId(), event.userEmail(), "계정 잠금 상태 변경: " + event.isLocked());
 
-        // SSE 푸시 알림 발송
         try {
-            mailService.userLockedUpdate(
-                    event.userEmail(),
-                    event.isLocked(),
-                    event.name()
-            );
-
+            mailService.userLockedUpdate(event.userEmail(), event.isLocked(), event.name());
         } catch (Exception e) {
             log.warn("메일 전송 실패 - name: {}, id: {}", event.name(), event.userId(), e);
         }
@@ -59,15 +53,10 @@ public class UserEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserPasswordInit(UserPasswordInitEvent event) {
         log.info("[UserEvent] 비밀번호 초기화 이벤트 발생 - name: {}, id: {}", event.username(), event.userId());
+        kafkaPublisher.publishSecurityEvent("USER_PASSWORD_INITIALIZED", event.userId(), event.email(), "임시 비밀번호 발급");
 
-        // SSE 푸시 알림 발송
         try {
-            mailService.sendInitPassword(
-                    event.email(),
-                    event.password(),
-                    event.expiredAt()
-            );
-
+            mailService.sendInitPassword(event.email(), event.password(), event.expiredAt());
         } catch (Exception e) {
             log.warn("메일 전송 실패 - name: {}, id: {}", event.username(), event.userId(), e);
         }
@@ -77,13 +66,10 @@ public class UserEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserRoleUpdate(UserUpdateRoleEvent event) {
         log.warn("[UserEvent] 권한 변경 - name: {}, id: {}, 권한: {}", event.name(), event.userId(), event.role());
+        kafkaPublisher.publishSecurityEvent("USER_ROLE_UPDATED", event.userId(), null, "권한 변경: " + event.role());
 
-        // SSE 푸시 알림 발송
         try {
-            sseService.sendNotification(
-                    event.userId(),
-                    event.name() + "님의 권한이 " + event.role() + "로 변경되었습니다."
-            );
+            sseService.sendNotification(event.userId(), event.name() + "님의 권한이 " + event.role() + "로 변경되었습니다.");
         } catch (Exception e) {
             log.warn("권한 변경 알림 전송 실패 - name: {}, id: {}", event.name(), event.userId(), e);
         }
@@ -93,13 +79,10 @@ public class UserEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserProfileUpdate(UserEvent event) {
         log.info("[UserEvent] 프로필 변경 - name: {}, id: {}", event.name(), event.userId());
+        kafkaPublisher.publishUserEvent("USER_PROFILE_UPDATED", event.userId(), null, event.name(), "프로필 변경");
 
-        // SSE 푸시 알림 발송
         try {
-            sseService.sendNotification(
-                    event.userId(),
-                    event.name() + "님의 프로필이 변경됐어요."
-            );
+            sseService.sendNotification(event.userId(), event.name() + "님의 프로필이 변경됐어요.");
         } catch (Exception e) {
             log.warn("프로필 알림 전송 실패 - name: {}, id: {}", event.name(), event.userId(), e);
         }

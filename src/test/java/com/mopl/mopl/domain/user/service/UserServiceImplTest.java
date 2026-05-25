@@ -29,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
@@ -73,6 +74,9 @@ class UserServiceImplTest {
 
     private UserServiceImpl userService;
 
+    @Mock
+    private CacheManager cacheManager;
+
     @BeforeEach
     void setUp() {
         userService = new UserServiceImpl(
@@ -81,7 +85,8 @@ class UserServiceImplTest {
                 passwordEncoder,
                 jwtRegistry,
                 s3ImageStorage,
-                eventPublisher
+                eventPublisher,
+                cacheManager
         );
     }
 

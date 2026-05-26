@@ -256,7 +256,7 @@ public class JwtTokenProvider {
             );
 
             log.info("[TokenProvider] parseAccessToken 완료: UserDto 생성");
-            return new MoplUserDetails(userDto, null, Collections.emptyMap());
+            return new MoplUserDetails(userDto, null);
 
         } catch (Exception e) {
             log.error("[TokenProvider] parseAccessToken 중 예외 발생: {}", e.getMessage());

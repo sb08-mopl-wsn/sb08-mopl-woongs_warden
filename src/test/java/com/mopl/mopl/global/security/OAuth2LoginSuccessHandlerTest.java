@@ -6,8 +6,8 @@ import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.handler.OAuth2LoginSuccessHandler;
-import com.mopl.mopl.global.exception.oauth2.OAuth2PrincipalException;
 import com.mopl.mopl.global.exception.oauth2.OAuth2FailedTokenException;
+import com.mopl.mopl.global.exception.oauth2.OAuth2PrincipalException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,7 +66,7 @@ class OAuth2LoginSuccessHandlerTest {
                 false
         );
 
-        MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
+        MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -113,7 +112,7 @@ class OAuth2LoginSuccessHandlerTest {
                 false
         );
 
-        MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
+        MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 

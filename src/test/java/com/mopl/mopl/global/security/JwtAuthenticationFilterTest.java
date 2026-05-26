@@ -24,7 +24,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
-import java.util.Collections;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,7 +88,7 @@ class JwtAuthenticationFilterTest {
         String accessToken = "valid-access-token";
         String email = "admin@admin.com";
         UserDto userDto = new UserDto(UUID.randomUUID(), null, email, "관리자", null, Role.ADMIN, false);
-        MoplUserDetails userDetails = new MoplUserDetails(userDto, "encoded-password", Collections.emptyMap());
+        MoplUserDetails userDetails = new MoplUserDetails(userDto, "encoded-password");
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/users/me");
         request.addHeader("Authorization", "Bearer " + accessToken);
@@ -124,9 +123,9 @@ class JwtAuthenticationFilterTest {
         String email = "locked@user.com";
         UUID userId = UUID.randomUUID();
         UserDto tokenUserDto = new UserDto(userId, null, email, "잠긴유저", null, Role.USER, false);
-        MoplUserDetails tokenUserDetails = new MoplUserDetails(tokenUserDto, "encoded-password", Collections.emptyMap());
+        MoplUserDetails tokenUserDetails = new MoplUserDetails(tokenUserDto, "encoded-password");
         UserDto lockedUserDto = new UserDto(userId, null, email, "잠긴유저", null, Role.USER, true);
-        MoplUserDetails lockedUserDetails = new MoplUserDetails(lockedUserDto, "encoded-password", Collections.emptyMap());
+        MoplUserDetails lockedUserDetails = new MoplUserDetails(lockedUserDto, "encoded-password");
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/users/me");
         request.addHeader("Authorization", "Bearer " + accessToken);

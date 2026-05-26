@@ -1,14 +1,8 @@
 package com.mopl.mopl.global.security;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
@@ -17,15 +11,22 @@ import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.Instant;
-import java.util.Collections;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.core.Authentication;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.Authentication;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 class JwtLoginSuccessHandlerTest {
 
@@ -51,7 +52,7 @@ class JwtLoginSuccessHandlerTest {
                 Role.ADMIN,
                 false
         );
-        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password", Collections.emptyMap());
+        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");
 
         Authentication authentication = mock(Authentication.class);
         when(authentication.getPrincipal()).thenReturn(principal);
@@ -127,7 +128,7 @@ class JwtLoginSuccessHandlerTest {
                 Role.USER,
                 false
         );
-        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password", Collections.emptyMap());
+        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");
 
         Authentication authentication = mock(Authentication.class);
         when(authentication.getPrincipal()).thenReturn(principal);

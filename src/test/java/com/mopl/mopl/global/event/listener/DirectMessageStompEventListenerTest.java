@@ -24,7 +24,6 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 
 import java.security.Principal;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
@@ -61,7 +60,7 @@ class DirectMessageStompEventListenerTest {
     // 가짜 인증 토큰 생성 헬퍼 메서드
     private UsernamePasswordAuthenticationToken createAuthToken(UUID userId) {
         UserDto userDto = new UserDto(userId, Instant.now(), "test@test.com", "테스트", null, Role.USER, false);
-        MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
+        MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
         return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 

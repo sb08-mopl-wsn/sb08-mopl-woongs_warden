@@ -36,6 +36,6 @@ public class MoplUserDetailsService implements UserDetailsService {
             throw new CredentialsExpiredException("임시 비밀번호가 만료되었습니다.");
         }
 
-        return new MoplUserDetails(userMapper.toDto(user), user.getPassword(), Collections.emptyMap());
+        return new MoplUserDetails(userMapper.toDto(user), user.getPassword());
     }
 }

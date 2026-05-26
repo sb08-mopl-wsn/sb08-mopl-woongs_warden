@@ -24,13 +24,11 @@ public class MoplUserDetails implements UserDetails, OAuth2User {
 
     @JsonCreator
     public MoplUserDetails(
-            @JsonProperty("userDto") UserDto userDto,
-            @JsonProperty("password") String password,
-            @JsonProperty("attributes") Map<String, Object> attributes
+            @JsonProperty("userDto") UserDto userDto, @JsonProperty("password") String password
     ) {
         this.userDto = userDto;
         this.password = password;
-        this.attributes = attributes == null ? Collections.emptyMap() : attributes;
+        this.attributes = Collections.emptyMap();
     }
 
     @Override

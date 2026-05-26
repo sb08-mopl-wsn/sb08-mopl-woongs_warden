@@ -33,14 +33,21 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceImplTest {
@@ -99,7 +106,7 @@ class AuthServiceImplTest {
                     false
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
             User user = mock(User.class);
 
             when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
@@ -134,7 +141,7 @@ class AuthServiceImplTest {
                     false
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
 
             when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
 
@@ -171,7 +178,7 @@ class AuthServiceImplTest {
                     oldRefreshToken
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
 
             when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
@@ -258,7 +265,7 @@ class AuthServiceImplTest {
                     oldRefreshToken
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
 
             when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
@@ -303,7 +310,7 @@ class AuthServiceImplTest {
                     oldRefreshToken
             );
 
-            MoplUserDetails userDetails = new MoplUserDetails(userDto, null, Collections.emptyMap());
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, null);
 
             when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);

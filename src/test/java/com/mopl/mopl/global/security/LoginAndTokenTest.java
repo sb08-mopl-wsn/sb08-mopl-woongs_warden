@@ -1,14 +1,5 @@
 package com.mopl.mopl.global.security;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
@@ -19,9 +10,6 @@ import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
 import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
 import com.mopl.mopl.global.auth.handler.LoginFailureHandler;
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.Instant;
-import java.util.Collections;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -41,6 +29,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest
 @AutoConfigureMockMvc(addFilters = true)
@@ -81,8 +81,7 @@ class LoginAndTokenTest {
         );
         MoplUserDetails userDetails = new MoplUserDetails(
                 userDto,
-                passwordEncoder.encode("Admin1234!"),
-                Collections.emptyMap()
+                passwordEncoder.encode("Admin1234!")
         );
 
         given(userDetailsService.loadUserByUsername("admin@admin.com"))
@@ -137,8 +136,7 @@ class LoginAndTokenTest {
         );
         MoplUserDetails userDetails = new MoplUserDetails(
                 userDto,
-                passwordEncoder.encode("Admin1234!"),
-                Collections.emptyMap()
+                passwordEncoder.encode("Admin1234!")
         );
 
         given(userDetailsService.loadUserByUsername("admin@admin.com"))

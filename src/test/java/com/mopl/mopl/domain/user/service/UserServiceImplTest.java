@@ -29,7 +29,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
@@ -46,9 +45,15 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,9 +79,6 @@ class UserServiceImplTest {
 
     private UserServiceImpl userService;
 
-    @Mock
-    private CacheManager cacheManager;
-
     @BeforeEach
     void setUp() {
         userService = new UserServiceImpl(
@@ -85,8 +87,7 @@ class UserServiceImplTest {
                 passwordEncoder,
                 jwtRegistry,
                 s3ImageStorage,
-                eventPublisher,
-                cacheManager
+                eventPublisher
         );
     }
 

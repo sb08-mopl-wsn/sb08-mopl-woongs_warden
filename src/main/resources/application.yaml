@@ -71,7 +71,7 @@ spring:
       connect-timeout: 2000ms
       timeout: 2000ms
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -82,6 +82,16 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.mopl.mopl"
+    properties:
+      security:
+        protocol: SASL_SSL
+      sasl:
+        mechanism: PLAIN
+        jaas:
+          config: |
+            org.apache.kafka.common.security.plain.PlainLoginModule required \
+            username="${KAFKA_API_KEY}" \
+            password="${KAFKA_API_SECRET}";
 
   # 소셜 로그인용
   security:

@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -27,7 +28,7 @@ public class BatchSchedulerConfig
     public void runContentCollectJob() {
         try {
             JobParameters jobParameters = new JobParametersBuilder()
-                    .addLocalDate("date", LocalDate.now()) // timestamp: 밀리초 단위라 인스턴스마다 다른 값이 들어감.
+                    .addLocalDate("date", LocalDate.now(ZoneId.of("Asia/Seoul")))
                     .toJobParameters();
 
             jobLauncher.run(contentCollectJob, jobParameters);

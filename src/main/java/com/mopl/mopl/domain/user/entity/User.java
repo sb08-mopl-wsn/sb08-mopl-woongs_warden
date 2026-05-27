@@ -70,7 +70,7 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private boolean isBanned;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private LocalDateTime bannedAt;
 
     @Column(nullable = true)

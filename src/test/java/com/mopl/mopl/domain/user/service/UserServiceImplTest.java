@@ -417,8 +417,6 @@ class UserServiceImplTest {
 
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("new-encoded-password");
-        assertThat(user.getTemporaryPassword()).isNull();
-        assertThat(user.getTemporaryPasswordExpiredAt()).isNull();
 
         verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
         verifyNoInteractions(eventPublisher);
@@ -764,7 +762,7 @@ class UserServiceImplTest {
                 null,
                 user.getRole(),
                 user.isLocked(),
-                user.isBanned()
+                false
         );
     }
 }

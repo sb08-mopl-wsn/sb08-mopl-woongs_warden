@@ -1,6 +1,5 @@
-package com.mopl.mopl.domain.notification.service.listener;
+package com.mopl.mopl.domain.notification.service.kafka;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -45,10 +44,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-class NotificationEventListenerTest {
+class NotificationKafkaConsumerTest {
 
   @InjectMocks
-  private NotificationEventListener notificationEventListener;
+  private NotificationKafkaConsumer notificationKafkaConsumer;
 
   @Mock
   private NotificationRepository notificationRepository;
@@ -95,7 +94,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handleFollowEvent(event);
+    notificationKafkaConsumer.consumeFollowEvent(event);
 
     // then
     verify(notificationRepository).save(any(Notification.class));
@@ -119,7 +118,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handleDirectMessageEvent(event);
+    notificationKafkaConsumer.consumeDirectMessageEvent(event);
 
     // then
     verify(notificationRepository).save(any(Notification.class));
@@ -137,7 +136,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handleUserUpdateRoleEvent(event);
+    notificationKafkaConsumer.consumeUserUpdateRoleEvent(event);
 
     // then
     verify(notificationRepository).save(any(Notification.class));
@@ -164,7 +163,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handleReviewCreatedEvent(event);
+    notificationKafkaConsumer.consumeReviewEvent(event);
 
     // then
     verify(notificationRepository).saveAll(any());
@@ -187,7 +186,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handlePlaylistSubscribedEvent(event);
+    notificationKafkaConsumer.consumePlaylistSubscribedEvent(event);
 
     // then
     verify(notificationRepository).save(any(Notification.class));
@@ -211,7 +210,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handlePlaylistContentAddedEvent(event);
+    notificationKafkaConsumer.consumePlaylistContentAddedEvent(event);
 
     // then
     verify(notificationRepository).saveAll(any());
@@ -231,7 +230,7 @@ class NotificationEventListenerTest {
     given(roomPresenceManager.isUserInRoom(receiverId, convId)).willReturn(true);
 
     // when
-    notificationEventListener.handleDirectMessageEvent(event);
+    notificationKafkaConsumer.consumeDirectMessageEvent(event);
 
     // then
     verify(notificationRepository, never()).save(any(Notification.class));
@@ -255,7 +254,7 @@ class NotificationEventListenerTest {
     given(followRepository.findAllByFolloweeIdWithFollower(writerId)).willReturn(Collections.emptyList());
 
     // when
-    notificationEventListener.handleReviewCreatedEvent(event);
+    notificationKafkaConsumer.consumeReviewEvent(event);
 
     // then
     verify(notificationRepository, never()).saveAll(any());
@@ -276,7 +275,7 @@ class NotificationEventListenerTest {
     given(playlistSubscriptionRepository.findAllByPlaylistIdWithUser(playlistId)).willReturn(Collections.emptyList());
 
     // when
-    notificationEventListener.handlePlaylistContentAddedEvent(event);
+    notificationKafkaConsumer.consumePlaylistContentAddedEvent(event);
 
     // then
     verify(notificationRepository, never()).saveAll(any());

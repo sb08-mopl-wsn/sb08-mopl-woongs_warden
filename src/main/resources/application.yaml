@@ -60,13 +60,9 @@ spring:
         max-interval: 10000
         multiplier: 2
         initial-interval: 2000
-  elasticsearch:
-    uris: http://localhost:9200
-    connection-timeout: 10s
-    socket-timeout: 30s
   data:
     redis:
-      host: ${REDIS_HOST}
+      host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       connect-timeout: 2000ms
       timeout: 2000ms
@@ -114,6 +110,11 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+
+opensearch:
+  uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+  connection-timeout: 10s
+  socket-timeout: 30s
 
 app:
 #  분산 환경용 jwtRegistry 설정, 인메모리는 redis를 memory로 수정하면 됨

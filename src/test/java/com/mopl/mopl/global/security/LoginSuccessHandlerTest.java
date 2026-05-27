@@ -39,6 +39,7 @@ class LoginSuccessHandlerTest {
                 "일반유저",
                 null,
                 Role.USER,
+                false,
                 false
         );
 

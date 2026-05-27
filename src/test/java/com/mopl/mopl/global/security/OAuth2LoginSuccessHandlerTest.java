@@ -63,6 +63,7 @@ class OAuth2LoginSuccessHandlerTest {
                 "구글사용자",
                 null,
                 Role.USER,
+                false,
                 false
         );
 
@@ -109,6 +110,7 @@ class OAuth2LoginSuccessHandlerTest {
                 "구글사용자",
                 null,
                 Role.USER,
+                false,
                 false
         );
 

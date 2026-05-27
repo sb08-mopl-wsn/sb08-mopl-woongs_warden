@@ -86,7 +86,7 @@ class JwtAuthenticationFilterTest {
 
         String accessToken = "valid-access-token";
         String email = "admin@admin.com";
-        UserDto userDto = new UserDto(UUID.randomUUID(), null, email, "관리자", null, Role.ADMIN, false);
+        UserDto userDto = new UserDto(UUID.randomUUID(), null, email, "관리자", null, Role.ADMIN, false, false);
         MoplUserDetails userDetails = new MoplUserDetails(userDto, "encoded-password");
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/users/me");

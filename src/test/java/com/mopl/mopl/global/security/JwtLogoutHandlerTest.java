@@ -8,6 +8,7 @@ import com.mopl.mopl.global.auth.handler.JwtLogoutHandler;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
@@ -20,7 +21,8 @@ class JwtLogoutHandlerTest {
 
     private final JwtTokenProvider tokenProvider = mock(JwtTokenProvider.class);
     private final JwtRegistry jwtRegistry = mock(JwtRegistry.class);
-    private final JwtLogoutHandler handler = new JwtLogoutHandler(tokenProvider, jwtRegistry);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final JwtLogoutHandler handler = new JwtLogoutHandler(tokenProvider, jwtRegistry, eventPublisher);
 
     @Test
     @DisplayName("인증 객체에서 사용자 ID를 찾으면 해당 사용자의 JWT 정보를 무효화한다")

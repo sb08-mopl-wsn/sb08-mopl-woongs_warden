@@ -76,6 +76,7 @@ class LoginAndTokenTest {
                 "관리자",
                 null,
                 Role.ADMIN,
+                false,
                 false
         );
         MoplUserDetails userDetails = new MoplUserDetails(
@@ -131,6 +132,7 @@ class LoginAndTokenTest {
                 "관리자",
                 null,
                 Role.ADMIN,
+                false,
                 false
         );
         MoplUserDetails userDetails = new MoplUserDetails(

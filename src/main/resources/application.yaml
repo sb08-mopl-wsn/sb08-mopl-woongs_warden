@@ -78,6 +78,16 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.mopl.mopl"
+    properties:
+      security:
+        protocol: SASL_SSL
+      sasl:
+        mechanism: PLAIN
+        jaas:
+          config: |
+            org.apache.kafka.common.security.plain.PlainLoginModule required \
+            username="${KAFKA_API_KEY}" \
+            password="${KAFKA_API_SECRET}";
 
   # 소셜 로그인용
   security:

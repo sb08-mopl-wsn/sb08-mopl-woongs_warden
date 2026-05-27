@@ -47,6 +47,14 @@ spring:
               - email
               - profile
 
+  kafka:
+    bootstrap-servers: localhost:9092
+    listener:
+      auto-startup: false
+    properties:
+      security:
+        protocol: PLAINTEXT
+
 app:
   jwt:
     registry: memory

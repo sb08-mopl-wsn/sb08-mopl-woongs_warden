@@ -10,9 +10,9 @@ env:
   AWS_REGION: ap-northeast-2                   # 리전 (서울)
   ECR_REPOSITORY: sb08/mopl                    # AWS ECR 리포지토리 이름
   ECS_SERVICE: mopl-task-service               # AWS ECS 서비스 이름
-  ECS_CLUSTER: mopl-cluster                    # AWS ECS 클러스터 이름
+  ECS_CLUSTER: mopl                            # AWS ECS 클러스터 이름
   ECS_TASK_DEFINITION: ./task-definition.json  # ECS 태스크 정의서 파일 경로
-  CONTAINER_NAME: mopl-container               # 태스크 정의서 안에 있는 컨테이너 이름
+  CONTAINER_NAME: mopl-app               # 태스크 정의서 안에 있는 컨테이너 이름
 
 jobs:
   deploy:

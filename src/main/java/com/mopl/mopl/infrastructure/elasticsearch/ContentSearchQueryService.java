@@ -1,16 +1,21 @@
 package com.mopl.mopl.infrastructure.elasticsearch;
 
-import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import com.mopl.mopl.infrastructure.elasticsearch.document.ContentDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.opensearch.data.client.orhlc.NativeSearchQueryBuilder;
+import org.opensearch.index.query.BoolQueryBuilder;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+
+import static org.opensearch.index.query.QueryBuilders.boolQuery;
+import static org.opensearch.index.query.QueryBuilders.multiMatchQuery;
+import static org.opensearch.index.query.QueryBuilders.termQuery;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -38,28 +43,28 @@ public class ContentSearchQueryService
      * @return 후보 콘텐츠 ID(UUID 문자열) 목록. 관련도 높은 순으로 정렬됨
      */
     public List<String> searchCandidateIds(String contentType, List<String> keywords) {
-        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+        BoolQueryBuilder boolQuery = boolQuery();
 
         // 제일 먼저 contentType와 정확히 일치하는지 필터링
         if (contentType != null && !contentType.isBlank()) {
-            boolQuery.filter(f -> f.term(t -> t.field("contentType").value(contentType)));
+            boolQuery.filter(termQuery("contentType", contentType));
         }
 
         // 키워드 검색
         // 가중치 부여, 오타 허용, 최소 1개는 매칭
         if (keywords != null && !keywords.isEmpty()) {
             String keywordQuery = String.join(" ", keywords);
-            boolQuery.should(s -> s.multiMatch(m -> m
-                    .query(keywordQuery)
-                    .fields("tags^3", "description^2", "title")
-                    .fuzziness("AUTO")
-            ));
+            boolQuery.should(multiMatchQuery(keywordQuery, "tags", "description", "title")
+                    .field("tags", 3.0f)
+                    .field("description", 2.0f)
+                    .field("title", 1.0f)
+                    .fuzziness(org.opensearch.common.unit.Fuzziness.AUTO));
             boolQuery.minimumShouldMatch("1");
         }
 
         // 상위 30개만
-        NativeQuery query = NativeQuery.builder()
-                .withQuery(q -> q.bool(boolQuery.build()))
+        Query query = new NativeSearchQueryBuilder()
+                .withQuery(boolQuery)
                 .withPageable(PageRequest.of(0, CANDIDATE_SIZE))
                 .build();
 

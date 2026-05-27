@@ -216,7 +216,7 @@ services:
   elasticsearch:
     build:
       context: .
-      dockerfile: Dockerfile.elasticsearch
+      dockerfile: Dockerfile.opensearch
     container_name: elasticsearch
     restart: unless-stopped
     profiles:
@@ -226,11 +226,11 @@ services:
       - "9200:9200"
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
       - TZ=Asia/Seoul
     volumes:
-      - es-data:/usr/share/elasticsearch/data
+      - es-data:/usr/share/opensearch/data
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1" ]
       interval: 10s
@@ -240,16 +240,17 @@ services:
     networks:
       - mopl-network
 
-  kibana:
-    image: kibana:8.19.15
-    container_name: kibana
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.19.1
+    container_name: opensearch-dashboards
     restart: unless-stopped
     profiles:
       - search
     ports:
       - "5601:5601"
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - OPENSEARCH_HOSTS=["http://elasticsearch:9200"]
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
       - TZ=Asia/Seoul
     depends_on:
       elasticsearch:

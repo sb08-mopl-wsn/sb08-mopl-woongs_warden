@@ -24,7 +24,13 @@ jobs:
         run: chmod +x gradlew
 
       - name: 빌드 및 테스트
-        run: ./gradlew build
+        run: ./gradlew build jacocoTestReport
+
+      - name: Codecov에 커버리지 리포트 업로드
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: build/reports/jacoco/test/jacocoTestReport.xml
 
       - name: Discord 알림
         if: always()

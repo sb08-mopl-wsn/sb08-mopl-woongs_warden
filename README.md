@@ -1,1 +1,1 @@
-# 모두의 플리
+# 모두의 플리 [![codecov](https://codecov.io/github/sb08-mopl-wsn/sb08-mopl-woongs_warden/graph/badge.svg?token=CGP8564D5J)](https://codecov.io/github/sb08-mopl-wsn/sb08-mopl-woongs_warden)

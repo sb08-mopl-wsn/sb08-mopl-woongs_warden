@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -126,6 +128,32 @@ public class GlobalExceptionHandler {
 
         ErrorResponse response = ErrorResponse.of(code, INVALID_REQUEST, request.getRequestURI(), details);
 
+        return ResponseEntity.status(code.getHttpStatus()).body(response);
+    }
+
+    // 시큐리티 - 인증 실패 401
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(
+        AuthenticationException e, HttpServletRequest request
+    ) {
+        ErrorCode code = GlobalErrorCode.UNAUTHORIZED;
+        log.warn("인증 예외 발생: code={}, message={}, path={}",
+            code.getCode(), e.getMessage(), request.getRequestURI(), e);
+
+        ErrorResponse response = ErrorResponse.of(code, e.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(code.getHttpStatus()).body(response);
+    }
+
+    // 시큐리티 - 인가/권한 실패 403
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
+        AccessDeniedException e, HttpServletRequest request
+    ) {
+        ErrorCode code = GlobalErrorCode.FORBIDDEN;
+        log.warn("인가(권한) 예외 발생 : code={}, message={}, path={}",
+            code.getCode(), e.getMessage(), request.getRequestURI(), e);
+
+        ErrorResponse response = ErrorResponse.of(code, e.getMessage(), request.getRequestURI());
         return ResponseEntity.status(code.getHttpStatus()).body(response);
     }
 

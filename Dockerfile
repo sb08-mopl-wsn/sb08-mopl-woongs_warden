@@ -1,4 +1,4 @@
-FROM amazoncorretto:17 AS builder
+FROM amazoncorretto:21 AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY src src
 
 RUN ./gradlew build -x test --no-daemon
 
-FROM amazoncorretto:17
+FROM amazoncorretto:21
 
 WORKDIR /app
 
@@ -21,6 +21,6 @@ RUN yum install -y curl
 
 COPY --from=builder /app/build/libs/*.jar app.jar
 
-EXPOSE 80
+EXPOSE 8080
 
 ENTRYPOINT ["sh", "-c", "java $JVM_OPTS -jar app.jar"]

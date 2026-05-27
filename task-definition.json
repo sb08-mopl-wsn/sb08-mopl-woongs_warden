@@ -1,0 +1,52 @@
+{
+  "family": "mopl-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::477322310889:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::477322310889:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "mopl-app",
+      "image": "477322310889.dkr.ecr.ap-northeast-2.amazonaws.com/sb08/mopl:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp",
+          "name": "mopl-port",
+          "appProtocol": "http"
+        }
+      ],
+      "environmentFiles": [
+        {
+          "value": "arn:aws:s3:::mopl-s3/.env",
+          "type": "s3"
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:8080/actuator/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 150
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/mopl-task",
+          "awslogs-create-group": "true",
+          "awslogs-region": "ap-northeast-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

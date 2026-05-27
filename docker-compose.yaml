@@ -6,6 +6,7 @@ services:
     profiles:
       - local
       - develop
+      - lb
     ports:
       - "${POSTGRES_PORT}:5432"
     environment:
@@ -41,13 +42,20 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SERVER_PORT: ${SERVER_PORT}
+      REDIS_HOST: redis
       TZ: "Asia/Seoul"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
     env_file:
       - .env
     volumes:
       - app_logs:/app.logs
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${SERVER_PORT}/actuator/health" ]
@@ -58,9 +66,288 @@ services:
     networks:
       - mopl-network
 
+  app1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mopl-app-1
+    restart: unless-stopped
+    profiles:
+      - lb
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: ${SERVER_PORT}
+      REDIS_HOST: redis
+      TZ: "Asia/Seoul"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
+    env_file:
+      - .env
+    volumes:
+      - app1_logs:/app.logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${SERVER_PORT}/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mopl-network
+
+  app2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mopl-app-2
+    restart: unless-stopped
+    profiles:
+      - lb
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: ${SERVER_PORT}
+      REDIS_HOST: redis
+      TZ: "Asia/Seoul"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
+    env_file:
+      - .env
+    volumes:
+      - app2_logs:/app.logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${SERVER_PORT}/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mopl-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    profiles:
+      - develop
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    networks:
+      - mopl-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    profiles:
+      - develop
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      TZ: "Asia/Seoul"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - mopl-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    user: "0"
+    restart: unless-stopped
+    profiles:
+      - develop
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml
+      - loki-data:/tmp/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    networks:
+      - mopl-network
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    profiles:
+      - develop
+    volumes:
+      - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml
+      - app_logs:/app-logs/develop:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      - loki
+    networks:
+      - mopl-network
+
+  elasticsearch:
+    build:
+      context: .
+      dockerfile: Dockerfile.opensearch
+    container_name: elasticsearch
+    restart: unless-stopped
+    profiles:
+      - search
+      - lb
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - TZ=Asia/Seoul
+    volumes:
+      - es-data:/usr/share/opensearch/data
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - mopl-network
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.19.1
+    container_name: opensearch-dashboards
+    restart: unless-stopped
+    profiles:
+      - search
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=["http://elasticsearch:9200"]
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+      - TZ=Asia/Seoul
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - mopl-network
+
+  redis:
+    image: redis:8-alpine
+    container_name: redis
+    profiles:
+      - local
+      - develop
+      - lb
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mopl-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    restart: unless-stopped
+    profiles:
+      - local
+      - develop
+      - lb
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    environment:
+      # 1. KRaft 전용 프로세스 역할 설정 (본인이 브로커이자 컨트롤러)
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=controller,broker
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:29093
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+
+      # 2. 리스너 설정 (외부 IDE는 9092, 내부 도커망은 29092로 분리)
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093,INTERNAL://0.0.0.0:29092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+
+      # 3. KRaft 모드 클러스터 ID (고정값)
+      - CLUSTER_ID=MkU3OEVBNTcwNTJDRDRCMz
+
+      # 4. 싱글 노드(로컬) 환경 필수 운영 설정
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_HEAP_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - mopl-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: mopl-nginx
+    restart: unless-stopped
+    profiles:
+      - lb
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app1:
+        condition: service_healthy
+      app2:
+        condition: service_healthy
+    networks:
+      - mopl-network
+
 volumes:
   mopl-db-data:
   app_logs:
+  app1_logs:
+  app2_logs:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  es-data:
+  redis-data:
+  kafka-data:
 
 networks:
   mopl-network:

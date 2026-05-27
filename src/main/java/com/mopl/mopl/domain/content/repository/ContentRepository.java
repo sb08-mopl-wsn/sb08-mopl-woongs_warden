@@ -1,0 +1,34 @@
+package com.mopl.mopl.domain.content.repository;
+
+import com.mopl.mopl.domain.content.entity.Content;
+import com.mopl.mopl.domain.content.entity.ContentType;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.UUID;
+
+@Repository
+public interface ContentRepository extends JpaRepository<Content, UUID>, ContentRepositoryCustom
+{
+    boolean existsByExternalIdAndContentType(String externalId, ContentType contentType);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000")})
+    @Query("SELECT c FROM Content c WHERE c.id = :contentId")
+    Optional<Content> findByIdForUpdate(@Param("contentId") UUID contentId);
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = "UPDATE contents " +
+                   "SET watcher_count = 0 " +
+                   "WHERE id IN (" +
+                   "    SELECT id FROM contents " +
+                   "    WHERE watcher_count > 0 " +
+                   "    LIMIT :limit" +
+                   ")",  nativeQuery = true)
+    int resetWatcherCountsInBatches(@Param("limit") int limit);
+}

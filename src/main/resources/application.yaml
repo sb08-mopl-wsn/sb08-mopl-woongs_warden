@@ -22,20 +22,166 @@ spring:
     enabled: true
     locations:
       - classpath:db/migration
+  batch:
+    jdbc:
+      initialize-schema: never
+    job:
+      enabled: false
+  # 임시비빌번호에서 사용
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+          starttls:
+            enable: true
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          options:
+            model: gemini-3.1-flash-lite
+            temperature: 0.7
+        timeout:
+          connect-timeout: 5s
+          read-timeout: 30s
+    retry:
+      max-attempts: 3
+      on-http-codes: 429, 500, 503
+      backoff:
+        max-interval: 10000
+        multiplier: 2
+        initial-interval: 2000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 2000ms
+      timeout: 2000ms
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: mopl-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.mopl.mopl"
+
+  # 소셜 로그인용
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+            # 이게 들어가면 구글이 DefaultOidcUser이라는 객체로 유저디테일을 보냄 이러면 로컬에서 만든 유저디테일이 무시되면서 동작을 안함
+#              - openid
+              - profile
+
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID}
+            client-secret: ${KAKAO_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            client-authentication-method: client_secret_post
+            scope:
+              - account_email
+              - profile_nickname
+            client-name: Kakao
+
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+opensearch:
+  uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+  connection-timeout: 10s
+  socket-timeout: 30s
+
+app:
+#  분산 환경용 jwtRegistry 설정, 인메모리는 redis를 memory로 수정하면 됨
+  jwt:
+    registry: redis
+  oauth2:
+    success-redirect-url: ${OAUTH2_SUCCESS_REDIRECT_URL}
+    failure-redirect-url: ${OAUTH2_FAILURE_REDIRECT_URL}
 
 logging:
   level:
     root: info
     org.springframework.web.socket: DEBUG
 
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY}
+      secret-key: ${AWS_SECRET_KEY}
+    region: ${AWS_REGION:ap-northeast-2}
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+      cdn-url: ${AWS_S3_CDN_URL}
+
+external:
+  tmdb:
+    api:
+      token: ${TMDB_API_TOKEN}
+      base-url: ${TMDB_BASE_URL}
+    collect-pages: 5
+  sportsdb:
+    api:
+      base-url: ${SPORTSDB_BASE_URL}
+  timeout:
+    connect-timeout: 5000
+    read-timeout: 5000
+
 management:
   endpoints:
     web:
       exposure:
-        include: health, info, loggers
+        include: health, info, loggers, caches, metrics, prometheus
   endpoint:
     health:
       show-details: always
   info:
     env:
       enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# 커스텀 프로퍼티 추가
+# jwt사용을 위해 임시로 만들었습니다. 추후 삭제나 변경이 필요합니다
+jwt:
+  access-token:
+    secret: ${JWT_ACCESS_TOKEN_SECRET}
+    exp: ${JWT_ACCESS_TOKEN_EXP:900000}
+  refresh-token:
+    secret: ${JWT_REFRESH_TOKEN_SECRET}
+    exp: ${JWT_REFRESH_TOKEN_EXP:3600000}
+    cookie:
+      secure: ${JWT_REFRESH_COOKIE_SECURE:true}
+      same-site: ${JWT_REFRESH_COOKIE_SAME_SITE:Lax}
+
+initAdmin:
+  create:
+    admin: ${INIT_ADMIN_EMAIL}
+    pw: ${INIT_ADMIN_PASSWORD}

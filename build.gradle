@@ -2,6 +2,55 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.14'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+}
+ext {
+	springAiVersion = "1.1.6"
+}
+
+jacoco {
+	toolVersion = "0.8.14"
+}
+
+test {
+	useJUnitPlatform()
+	finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+	dependsOn test
+
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = false
+	}
+
+	afterEvaluate {
+		classDirectories.setFrom(files(classDirectories.files.collect {
+			fileTree(dir: it, exclude: [
+					'**/dto/**',
+					'**/entity/**',
+					'**/entity/Q*',
+					'**/mapper/**',
+					'**/*Config*',
+					'**/*Application*',
+					'**/*Exception*',
+					'**/*Constants*',
+					'**/repository/**',
+					'**/controller/**',
+					'**/global/config/**',
+					'**/global/base/**',
+					'**/global/exception/**',
+					'**/global/logging/**',
+					'**/exception/**',
+					'**/ai/*Ai*',
+					'**/elasticsearch/**'
+			])
+		}))
+	}
+
+	finalizedBy jacocoTestCoverageVerification  // 리포트 후 커버리지 기준 검증
 }
 
 group = 'com.mopl'
@@ -23,6 +72,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	implementation 'org.springframework.security:spring-security-messaging'
 
 	// security
 	implementation 'com.nimbusds:nimbus-jose-jwt:10.3'
@@ -30,6 +80,7 @@ dependencies {
 
 	// monitoring
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
 
 	// db
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -42,6 +93,22 @@ dependencies {
 	annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
 	annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
 
+	// ai
+	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+
+	// I/O
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.apache.httpcomponents.client5:httpclient5'
+
+	// Message Broker
+	implementation 'org.springframework.kafka:spring-kafka'
+
+	// NoSQL
+	implementation('org.opensearch.client:spring-data-opensearch-starter:1.8.0') {
+		exclude group: 'org.springframework.boot', module: 'spring-boot-starter-data-elasticsearch'
+	}
+
 	// dev tools
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -52,6 +119,14 @@ dependencies {
 	// docs
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.16'
 
+	// cloud
+	implementation platform('software.amazon.awssdk:bom:2.41.34')
+	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:apache-client'
+
+	// filtering
+	implementation 'org.ahocorasick:ahocorasick:0.6.3'
+
 	// test
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
@@ -61,6 +136,12 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation 'org.testcontainers:postgresql'
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+
+	// email, 임시 비밀번호 발급에 필요
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+	// 소셜 로그인용
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 }
 
 tasks.named('test') {
@@ -69,4 +150,10 @@ tasks.named('test') {
 
 jar {
 	enabled = false
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.ai:spring-ai-bom:$springAiVersion"
+	}
 }

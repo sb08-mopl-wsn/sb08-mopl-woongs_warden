@@ -4,62 +4,45 @@
   "requiresCompatibilities": [
     "FARGATE"
   ],
-  "cpu": "512",
-  "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::542508027261:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::542508027261:role/ecsTaskExecutionRole",
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::477322310889:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::477322310889:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
-      "name": "mopl-container",
-      "image": "542508027261.dkr.ecr.ap-northeast-2.amazonaws.com/sb08/mopl:latest",
+      "name": "mopl-app",
+      "image": "477322310889.dkr.ecr.ap-northeast-2.amazonaws.com/sb08/mopl:latest",
       "essential": true,
       "portMappings": [
         {
           "containerPort": 8080,
           "hostPort": 8080,
-          "protocol": "tcp"
+          "protocol": "tcp",
+          "name": "mopl-port",
+          "appProtocol": "http"
         }
       ],
-      "environment": [
+      "environmentFiles": [
         {
-          "name": "SPRING_PROFILES_ACTIVE",
-          "value": "prod"
-        },
-        {
-          "name": "SPRING_DATASOURCE_URL",
-          "value": "jdbc:postgresql://mopl-db.cf0qwgqwodaf.ap-northeast-2.rds.amazonaws.com:5432/mopl"
-        },
-        {
-          "name": "POSTGRES_DB",
-          "value": "mopl"
-        },
-        {
-          "name": "POSTGRES_USERNAME",
-          "value": "mopl_user"
-        },
-        {
-          "name": "KAFKA_BOOTSTRAP_SERVERS",
-          "value": "pkc-e82om.ap-northeast-2.aws.confluent.cloud:9092"
+          "value": "arn:aws:s3:::mopl-s3/.env",
+          "type": "s3"
         }
       ],
-      "secrets": [
-        {
-          "name": "SPRING_DATASOURCE_PASSWORD",
-          "valueFrom": "arn:aws:ssm:ap-northeast-2:542508027261:parameter/mopl/db/password"
-        },
-        {
-          "name": "KAFKA_API_SECRET",
-          "valueFrom": "arn:aws:ssm:ap-northeast-2:542508027261:parameter/mopl/kafka/secret"
-        },
-        {
-          "name": "KAFKA_API_KEY",
-          "valueFrom": "arn:aws:ssm:ap-northeast-2:542508027261:parameter/mopl/kafka/key"
-        }
-      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:8080/actuator/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 150
+      },
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/mopl-task",
+          "awslogs-create-group": "true",
           "awslogs-region": "ap-northeast-2",
           "awslogs-stream-prefix": "ecs"
         }

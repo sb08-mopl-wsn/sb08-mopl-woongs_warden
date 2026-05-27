@@ -2,6 +2,7 @@ package com.mopl.mopl.global.auth.details;
 
 import com.mopl.mopl.domain.auth.dto.OAuth2UserInfo;
 import com.mopl.mopl.domain.auth.exception.AuthAuthenticationFailedException;
+import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.Social;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
@@ -91,6 +92,10 @@ public class OAuth2UserAccountService {
     }
 
     private void validateNotLocked(User user) {
+        if (user.getRole() == Role.ADMIN) {
+            return;
+        }
+
         if (user.isLocked()) {
             throw new LockedException("잠긴 계정입니다.");
         }

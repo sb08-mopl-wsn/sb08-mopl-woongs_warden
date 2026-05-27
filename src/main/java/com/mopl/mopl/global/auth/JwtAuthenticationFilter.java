@@ -2,6 +2,7 @@ package com.mopl.mopl.global.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
+import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
 import jakarta.servlet.FilterChain;

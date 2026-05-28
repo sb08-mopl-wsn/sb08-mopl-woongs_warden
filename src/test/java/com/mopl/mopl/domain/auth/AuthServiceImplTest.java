@@ -95,6 +95,7 @@ class AuthServiceImplTest {
                     "tester",
                     null,
                     Role.USER,
+                    false,
                     false
             );
 
@@ -131,6 +132,7 @@ class AuthServiceImplTest {
                     null,
                     Role.USER,
                     false
+                    ,false
             );
 
             MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
@@ -161,6 +163,7 @@ class AuthServiceImplTest {
                     "관리자",
                     null,
                     Role.ADMIN,
+                    false,
                     false
             );
 
@@ -248,6 +251,7 @@ class AuthServiceImplTest {
                     "관리자",
                     null,
                     Role.ADMIN,
+                    false,
                     false
             );
 
@@ -293,6 +297,7 @@ class AuthServiceImplTest {
                     "관리자",
                     null,
                     Role.ADMIN,
+                    false,
                     false
             );
 

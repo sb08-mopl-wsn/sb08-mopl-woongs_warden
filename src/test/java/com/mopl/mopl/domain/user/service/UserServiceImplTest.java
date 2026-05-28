@@ -278,6 +278,7 @@ class UserServiceImplTest {
                 request.name(),
                 null,
                 Role.USER,
+                false,
                 false
         );
 
@@ -369,6 +370,7 @@ class UserServiceImplTest {
                 user.getName(),
                 null,
                 Role.ADMIN,
+                false,
                 false
         );
 
@@ -415,8 +417,6 @@ class UserServiceImplTest {
 
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("new-encoded-password");
-        assertThat(user.getTemporaryPassword()).isNull();
-        assertThat(user.getTemporaryPasswordExpiredAt()).isNull();
 
         verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
         verifyNoInteractions(eventPublisher);
@@ -451,7 +451,8 @@ class UserServiceImplTest {
                 user.getName(),
                 null,
                 user.getRole(),
-                true
+                true,
+                false
         );
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
@@ -482,6 +483,7 @@ class UserServiceImplTest {
                 user.getName(),
                 null,
                 user.getRole(),
+                false,
                 false
         );
 
@@ -536,6 +538,7 @@ class UserServiceImplTest {
                 "변경된이름",
                 "https://cdn.example.com/profile/test-profile.png",
                 user.getRole(),
+                false,
                 false
         );
 
@@ -580,6 +583,7 @@ class UserServiceImplTest {
                 "변경된이름",
                 "https://cdn.example.com/profile/test-profile.png",
                 user.getRole(),
+                false,
                 false
         );
 
@@ -617,6 +621,7 @@ class UserServiceImplTest {
                 "이름만수정",
                 null,
                 user.getRole(),
+                false,
                 false
         );
 
@@ -659,6 +664,7 @@ class UserServiceImplTest {
                 user.getName(),
                 "https://cdn.example.com/profile/test-profile.jpg",
                 user.getRole(),
+                false,
                 false
         );
 
@@ -699,6 +705,7 @@ class UserServiceImplTest {
                 "변경된이름",
                 null,
                 user.getRole(),
+                false,
                 false
         );
 
@@ -754,7 +761,8 @@ class UserServiceImplTest {
                 user.getName(),
                 null,
                 user.getRole(),
-                user.isLocked()
+                user.isLocked(),
+                false
         );
     }
 }

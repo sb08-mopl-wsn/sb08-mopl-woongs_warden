@@ -250,6 +250,7 @@ public class JwtTokenProvider {
                     name,
                     null, // profile
                     role,
+                    false,
                     false
             );
 

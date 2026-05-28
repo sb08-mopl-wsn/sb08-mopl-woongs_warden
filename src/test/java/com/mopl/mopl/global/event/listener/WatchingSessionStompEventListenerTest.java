@@ -4,6 +4,8 @@ import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.component.WebSocketSessionRegistry;
+import com.mopl.mopl.global.event.UserLogoutEvent;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,13 +22,17 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +44,8 @@ public class WatchingSessionStompEventListenerTest {
 
     @Mock
     private WatchingSessionService sessionService;
+    @Mock
+    private WebSocketSessionRegistry registry;
 
     private UUID contentId;
     private UUID userId;
@@ -59,6 +67,7 @@ public class WatchingSessionStompEventListenerTest {
                 "테스트 유저",
                 "profile.jpg",
                 Role.USER,
+                false,
                 false
         );
         MoplUserDetails userDetails = new MoplUserDetails(userDto, null, null);
@@ -84,6 +93,39 @@ public class WatchingSessionStompEventListenerTest {
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 
+    private UserLogoutEvent mockLogoutEvent() {
+        UserLogoutEvent event = mock(UserLogoutEvent.class);
+        when(event.userId()).thenReturn(userId);
+        return event;
+    }
+
+    @Nested
+    @DisplayName("handleConnect()")
+    class HandleConnect {
+
+        @Test
+        @DisplayName("인증된 사용자가 연결되면 예외 없이 유저-세션 매핑이 등록된다.")
+        void authenticatedUser_registersSessionUserMapping() {
+            Message<byte[]> message = createStompMessage(StompCommand.CONNECT, null);
+            SessionConnectedEvent event = new SessionConnectedEvent(this, message);
+
+            assertDoesNotThrow(() -> stompEventListener.handleConnect(event));
+        }
+
+        @Test
+        @DisplayName("인증 정보가 없는 연결은 내부 예외를 삼키고 정상 종료된다.")
+        void unauthenticatedUser_ignored() {
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+            accessor.setSessionId(sessionId);
+            accessor.setUser(null);
+            accessor.setLeaveMutable(true);
+            Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+            SessionConnectedEvent event = new SessionConnectedEvent(this, message);
+
+            assertDoesNotThrow(() -> stompEventListener.handleConnect(event));
+        }
+    }
+
     @Nested
     @DisplayName("handleSubscribe()")
     class HandleSubscribe {
@@ -104,6 +146,20 @@ public class WatchingSessionStompEventListenerTest {
         }
 
         @Test
+        @DisplayName("구독 경로가 null이면 무시하고 서비스의 join()을 호출하지 않는다.")
+        void nullDestination_doesNothing() {
+            // given
+            Message<byte[]> message = createStompMessage(StompCommand.SUBSCRIBE, null);
+            SessionSubscribeEvent event = new SessionSubscribeEvent(this, message);
+
+            // when
+            stompEventListener.handleSubscribe(event);
+
+            // then
+            verifyNoInteractions(sessionService);
+        }
+
+        @Test
         @DisplayName("구독 경로가 맞지 않으면 무시하고 서비스의 join()을 호출하지 않는다.")
         void invalidDestination_doesNothing() {
             // given
@@ -116,6 +172,19 @@ public class WatchingSessionStompEventListenerTest {
 
             // then
             verifyNoInteractions(sessionService);
+        }
+
+        @Test
+        @DisplayName("같은 유저가 동일한 콘텐츠를 이미 시청 중이면 join()을 중복 호출하지 않는다.")
+        void alreadyWatching_doesNotCallJoinAgain() {
+            // given
+            String destination = "/sub/contents/" + contentId + "/watch";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            subscriptionId = "another-sub-id-5678";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            verify(sessionService, times(1)).join(contentId, userId);
         }
 
         @Test
@@ -230,6 +299,51 @@ public class WatchingSessionStompEventListenerTest {
             // then
             verify(sessionService, times(1)).leave(contentId, userId);
         }
+
+        @Test
+        @DisplayName("구독 취소 전 동일 콘텐츠에 재구독이 이미 완료된 경우, 빠른 재구독을 감지하고 leave()를 호출하지 않는다.")
+        void quickResubscribeSameContent_doesNotCallLeave() {
+            // given
+            String destination = "/sub/contents/" + contentId + "/watch";
+            String firstSubId = subscriptionId;
+
+            // 최초 구독
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            // 구독 취소 전 새 subscriptionId로 동일 콘텐츠 재구독
+            subscriptionId = "new-sub-id-5678";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            // when
+            // 첫 번째 구독 ID로 구독 취소, 새 구독이 남아있으므로 isSessionStillSubscribed = true
+            subscriptionId = firstSubId;
+            stompEventListener.handleUnSubscribe(new SessionUnsubscribeEvent(this, createStompMessage(StompCommand.UNSUBSCRIBE, null)));
+
+            // then
+            verify(sessionService, times(1)).join(contentId, userId);
+            verify(sessionService, never()).leave(any(), any());
+        }
+
+        @Test
+        @DisplayName("하나의 세션에서 여러 콘텐츠 구독 중 하나만 취소하면 나머지 콘텐츠 시청은 유지된다.")
+        void unsubscribeOneOfMultipleContents_remainingContentStillActive() {
+            // given
+            UUID contentId2 = UUID.randomUUID();
+            String firstSubId = subscriptionId;
+
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, "/sub/contents/" + contentId + "/watch")));
+            subscriptionId = "sub-id-for-content2";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, "/sub/contents/" + contentId2 + "/watch")));
+
+            // when
+            // contentId만 구독 취소
+            subscriptionId = firstSubId;
+            stompEventListener.handleUnSubscribe(new SessionUnsubscribeEvent(this, createStompMessage(StompCommand.UNSUBSCRIBE, null)));
+
+            // then
+            verify(sessionService, times(1)).leave(contentId, userId);
+            verify(sessionService, never()).leave(contentId2, userId);
+        }
     }
 
     @Nested
@@ -317,6 +431,164 @@ public class WatchingSessionStompEventListenerTest {
 
             // then
             verify(sessionService, never()).leave(any(), any());
+        }
+
+        @Test
+        @DisplayName("구독 없이 연결만 했다가 끊어진 경우 contentIds가 null이므로 leave()를 호출하지 않는다.")
+        void disconnectWithoutSubscription_contentIdsNull_doesNotCallLeave() {
+            // given
+            stompEventListener.handleConnect(new SessionConnectedEvent(this, createStompMessage(StompCommand.CONNECT, null)));
+
+            SessionDisconnectEvent event = new SessionDisconnectEvent(this, createStompMessage(StompCommand.DISCONNECT, null), sessionId, null);
+
+            // when
+            stompEventListener.handleLeave(event);
+
+            // then
+            verifyNoInteractions(sessionService);
+        }
+
+        @Test
+        @DisplayName("멀티 세션 환경에서 한 세션이 끊어져도 다른 세션이 동일 콘텐츠를 시청 중이면 leave()를 호출하지 않는다.")
+        void multiSession_oneDisconnects_otherSessionStillWatching_doesNotCallLeave() {
+            // given
+            String destination = "/sub/contents/" + contentId + "/watch";
+            String session1 = sessionId;
+
+            // 세션 1 구독
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            // 세션 2 구독
+            sessionId = "mock-session-id-5678";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            // 세션 1 연결 종료
+            sessionId = session1;
+            SessionDisconnectEvent event = new SessionDisconnectEvent(this, createStompMessage(StompCommand.DISCONNECT, null), session1, null);
+
+            // when
+            stompEventListener.handleLeave(event);
+
+            // then
+            verify(sessionService, never()).leave(contentId, userId);
+        }
+    }
+
+    @Nested
+    @DisplayName("handleUserLogout()")
+    class HandleUserLogout {
+
+        @Test
+        @DisplayName("유저 세션 맵에 없는 유저의 로그아웃 요청은 early return하고 아무것도 수행하지 않는다.")
+        void userNotInSessionMap_earlyReturn_doesNothing() {
+            // when
+            stompEventListener.handleUserLogout(mockLogoutEvent());
+
+            // then
+            verifyNoInteractions(sessionService);
+        }
+
+        @Test
+        @DisplayName("로그아웃 시 열려있는 웹소켓 세션을 강제 종료하고 모든 콘텐츠에 대해 leave()를 호출한다.")
+        void logout_openSession_closesAndCallsLeave() throws Exception {
+            // given
+            String destination = "/sub/contents/" + contentId + "/watch";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            WebSocketSession mockWsSession = mock(WebSocketSession.class);
+            when(registry.getSession(sessionId)).thenReturn(mockWsSession);
+            when(mockWsSession.isOpen()).thenReturn(true);
+
+            // when
+            stompEventListener.handleUserLogout(mockLogoutEvent());
+
+            // then
+            verify(mockWsSession).close();
+            verify(sessionService, times(1)).leave(contentId, userId);
+        }
+
+        @Test
+        @DisplayName("로그아웃 시 웹소켓 세션이 null이면 close()를 호출하지 않고 leave()는 정상 실행된다.")
+        void logout_wsSessionNull_skipsClose_callsLeave() {
+            // given
+            String destination = "/sub/contents/" + contentId + "/watch";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            when(registry.getSession(sessionId)).thenReturn(null);
+
+            // when
+            stompEventListener.handleUserLogout(mockLogoutEvent());
+
+            // then
+            verify(sessionService, times(1)).leave(contentId, userId);
+        }
+
+        @Test
+        @DisplayName("로그아웃 시 웹소켓 세션이 이미 닫혀있으면 close()를 호출하지 않는다.")
+        void logout_wsSessionNotOpen_skipsClose() throws Exception {
+            // given
+            String destination = "/sub/contents/" + contentId + "/watch";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            WebSocketSession mockWsSession = mock(WebSocketSession.class);
+            when(registry.getSession(sessionId)).thenReturn(mockWsSession);
+            when(mockWsSession.isOpen()).thenReturn(false);
+
+            // when
+            stompEventListener.handleUserLogout(mockLogoutEvent());
+
+            // then
+            verify(mockWsSession, never()).close();
+            verify(sessionService, times(1)).leave(contentId, userId);
+        }
+
+        @Test
+        @DisplayName("로그아웃 시 웹소켓 close()에서 예외가 발생해도 catch하고 leave()까지 정상 실행된다.")
+        void logout_wsCloseThrowsException_continuesAndCallsLeave() throws Exception {
+            // given
+            String destination = "/sub/contents/" + contentId + "/watch";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            WebSocketSession mockWsSession = mock(WebSocketSession.class);
+            when(registry.getSession(sessionId)).thenReturn(mockWsSession);
+            when(mockWsSession.isOpen()).thenReturn(true);
+            doThrow(new IOException("강제 종료 실패")).when(mockWsSession).close();
+
+            // when
+            stompEventListener.handleUserLogout(mockLogoutEvent());
+
+            // then
+            verify(sessionService, times(1)).leave(contentId, userId);
+        }
+
+        @Test
+        @DisplayName("로그아웃 시 leave()에서 예외가 발생해도 catch하고 정상 종료된다.")
+        void logout_leaveThrowsException_catchesAndContinues() {
+            // given
+            String destination = "/sub/contents/" + contentId + "/watch";
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, createStompMessage(StompCommand.SUBSCRIBE, destination)));
+
+            when(registry.getSession(sessionId)).thenReturn(null);
+            doThrow(new RuntimeException("DB 오류")).when(sessionService).leave(contentId, userId);
+
+            // when & then
+            assertDoesNotThrow(() -> stompEventListener.handleUserLogout(mockLogoutEvent()));
+            verify(sessionService, times(1)).leave(contentId, userId);
+        }
+
+        @Test
+        @DisplayName("구독 없이 연결만 한 유저가 로그아웃하면 contentIds가 null이어도 예외 없이 정상 종료된다.")
+        void logout_noSubscriptions_contentIdsNull_doesNotCallLeave() {
+            // handleConnect()로 userSessionMap에만 세션 등록
+            // given
+            stompEventListener.handleConnect(new SessionConnectedEvent(this, createStompMessage(StompCommand.CONNECT, null)));
+            when(registry.getSession(sessionId)).thenReturn(null);
+
+            // when
+            stompEventListener.handleUserLogout(mockLogoutEvent());
+
+            // then
+            verifyNoInteractions(sessionService);
         }
     }
 }

@@ -16,6 +16,7 @@ import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionNotFoundExc
 import com.mopl.mopl.domain.watchingSession.mapper.WatchingSessionMapper;
 import com.mopl.mopl.domain.watchingSession.repository.WatchingSessionRepository;
 import com.mopl.mopl.global.component.BadWordFilter;
+import com.mopl.mopl.global.event.BadWordDetectedEvent;
 import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
 import lombok.RequiredArgsConstructor;
@@ -146,6 +147,11 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
             throw new ContentNotFoundException(contentId);
         }
 
+        if (user.isBanned()) {
+            log.info("정지 당한 유저는 실시간 채팅에 참여할 수 없습니다. senderId: {}", senderId);
+            return;
+        }
+
         // 채팅 송신자에 대한 시청 세션 참여 검증
         // 해당 콘텐츠를 시청 중이지 않은 사용자도 임의의 콘텐츠 채팅에 메시지를 보낼 수 있어 권한 경계가 무너질 수 있음.
         if (watchingSessionRepository.findByContentIdAndUserId(contentId, senderId).isEmpty()) {
@@ -158,9 +164,15 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                 user.getProfileImageKey()
         );
 
-        String filteredContent = badWordFilter.maskBadWord(request.content());
+        String originalMessage = request.content();
 
-        ContentChatDto chatDto = sessionMapper.toChatDto(sender, filteredContent);
+        String filteredMessage = badWordFilter.maskBadWord(originalMessage);
+
+        if (!filteredMessage.equals(request.content())) {
+            eventPublisher.publishEvent(new BadWordDetectedEvent(senderId, originalMessage));
+        }
+
+        ContentChatDto chatDto = sessionMapper.toChatDto(sender, filteredMessage);
 
         eventPublisher.publishEvent(new LiveChatEvent(contentId, chatDto));
     }

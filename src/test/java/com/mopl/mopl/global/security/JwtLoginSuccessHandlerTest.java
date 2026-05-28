@@ -48,6 +48,7 @@ class JwtLoginSuccessHandlerTest {
                 "관리자",
                 null,
                 Role.ADMIN,
+                false,
                 false
         );
         MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");
@@ -124,6 +125,7 @@ class JwtLoginSuccessHandlerTest {
                 "일반유저",
                 null,
                 Role.USER,
+                false,
                 false
         );
         MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");

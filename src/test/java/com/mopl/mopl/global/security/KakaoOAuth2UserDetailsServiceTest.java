@@ -502,6 +502,7 @@ class KakaoOAuth2UserDetailsServiceTest {
                 name,
                 null,
                 Role.USER,
+                false,
                 false
         );
     }

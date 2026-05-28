@@ -4,6 +4,8 @@ import com.mopl.mopl.infrastructure.elasticsearch.repository.ContentSearchReposi
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -12,11 +14,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class MoplApplicationTests
 {
 	@MockitoBean
-    ContentSearchRepository contentSearchRepository;
+	ContentSearchRepository contentSearchRepository;
 
 	@MockitoBean
-    ElasticsearchOperations elasticsearchOperations;
+	ElasticsearchOperations elasticsearchOperations;
 
+	@MockitoBean
+	RedisConnectionFactory redisConnectionFactory;
+
+	@MockitoBean
+	RedisMessageListenerContainer redisMessageListenerContainer;
 	@Test
 	void contextLoads() {
 	}

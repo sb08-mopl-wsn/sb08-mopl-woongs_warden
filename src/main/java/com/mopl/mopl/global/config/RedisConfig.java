@@ -1,8 +1,6 @@
 package com.mopl.mopl.global.config;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.redis.service.RedisSubscriber;
@@ -24,7 +22,6 @@ public class RedisConfig
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        // Polymorphic typing 제거 (프론트엔드 연동 및 파싱 에러 방지)
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
 
         redisTemplate.setConnectionFactory(factory);

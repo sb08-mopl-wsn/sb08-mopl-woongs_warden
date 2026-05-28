@@ -10,7 +10,7 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
-import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
+import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
 import com.mopl.mopl.infrastructure.kafka.event.ContentDeleteEvent;
 import com.mopl.mopl.infrastructure.kafka.event.ContentIndexEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
@@ -37,7 +37,7 @@ public class ContentServiceImpl implements ContentService
     private final ContentRepository contentRepository;
     private final ContentMapper contentMapper;
     private final S3ImageStorage s3ImageStorage;
-    private final ContentIndexService contentIndexService;
+    private final ContentSearchQueryService contentSearchQueryService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     /**
@@ -99,8 +99,25 @@ public class ContentServiceImpl implements ContentService
             condition = "#contentSearchRequest.cursor() == null && #contentSearchRequest.idAfter() == null")
     @Override
     public CursorResponseContentDto getContents(ContentSearchRequest contentSearchRequest) {
-        Slice<Content> slice = contentRepository.getContents(contentSearchRequest);
-        long totalCount = contentRepository.countContentsWithKeyword(contentSearchRequest.keywordLike());
+        List<UUID> searchedIds = null;
+
+        if (contentSearchRequest.keywordLike() != null && !contentSearchRequest.keywordLike().isBlank()) {
+            searchedIds = contentSearchQueryService.searchByKeyword(
+                    contentSearchRequest.keywordLike(),
+                    contentSearchRequest.typeEqual());
+
+            if (searchedIds.isEmpty()) {
+                return new CursorResponseContentDto(
+                        List.of(), null, null, false, 0,
+                        contentSearchRequest.sortBy(),
+                        contentSearchRequest.sortDirection());
+            }
+        }
+
+        Slice<Content> slice = contentRepository.getContents(contentSearchRequest, searchedIds);
+        long totalCount = searchedIds != null
+                ? searchedIds.size()
+                : contentRepository.countContentsWithKeyword(null);
 
         List<ContentDto> contents = contentMapper.toContentDtos(slice.getContent());
 
@@ -120,8 +137,7 @@ public class ContentServiceImpl implements ContentService
                 slice.hasNext(),
                 totalCount,
                 contentSearchRequest.sortBy(),
-                contentSearchRequest.keywordLike()
-        );
+                contentSearchRequest.sortDirection());
     }
 
     /**

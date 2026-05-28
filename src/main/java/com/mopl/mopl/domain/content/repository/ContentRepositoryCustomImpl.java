@@ -34,14 +34,14 @@ public class ContentRepositoryCustomImpl implements ContentRepositoryCustom
      * @return 콘텐츠 목록과 다음 페이지 존재 여부 등
      */
     @Override
-    public Slice<Content> getContents(ContentSearchRequest contentSearchRequest) {
+    public Slice<Content> getContents(ContentSearchRequest contentSearchRequest, List<UUID> searchedIds) {
         boolean isAsc = "ASCENDING".equalsIgnoreCase(contentSearchRequest.sortDirection());
 
         List<Content> result = jpaQueryFactory
                 .selectFrom(content)
                 .where(
                         typeCondition(contentSearchRequest.typeEqual()),
-                        keywordCondition(contentSearchRequest.keywordLike()),
+                        searchedIdsCondition(searchedIds),
                         cursorPageCondition(
                                 contentSearchRequest.sortBy(),
                                 contentSearchRequest.cursor(),
@@ -60,6 +60,11 @@ public class ContentRepositoryCustomImpl implements ContentRepositoryCustom
         if (hasNext) result.removeLast();
 
         return new SliceImpl<>(result, Pageable.unpaged(), hasNext);
+    }
+
+    private BooleanExpression searchedIdsCondition(List<UUID> searchedIds) {
+        if (searchedIds == null) return null;
+        return content.id.in(searchedIds);
     }
 
     /**

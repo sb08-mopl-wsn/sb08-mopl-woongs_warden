@@ -21,7 +21,16 @@ public class AsyncConfig implements AsyncConfigurer {
 
     @Bean(name = AI_RECOMMEND_EXECUTOR)
     public Executor aiRecommendExecutor() {
-        return createExecutor(2, 5, 50, "ai-rec-");
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(5);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("ai-rec-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(20);
+        executor.initialize();
+        return executor;
     }
 
     @Bean(name = WATCHING_SESSION_EXECUTOR)

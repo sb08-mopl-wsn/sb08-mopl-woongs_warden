@@ -78,7 +78,7 @@ class DirectMessageStompEventListenerTest {
 
   // 가짜 인증 토큰 생성 헬퍼 메서드
   private UsernamePasswordAuthenticationToken createAuthToken(UUID userId) {
-    UserDto userDto = new UserDto(userId, Instant.now(), "test@test.com", "테스트", null, Role.USER, false);
+    UserDto userDto = new UserDto(userId, Instant.now(), "test@test.com", "테스트", null, Role.USER, false, false);
     MoplUserDetails userDetails = new MoplUserDetails(userDto, "password", Collections.emptyMap());
     return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
   }

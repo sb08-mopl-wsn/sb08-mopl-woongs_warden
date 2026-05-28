@@ -12,6 +12,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.mopl.mopl.global.redis.dto.RedisPubMessage;
+import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.sse.repository.SseEmitterRepository;
 import java.io.IOException;
 import java.util.Collections;
@@ -39,6 +41,9 @@ class SseServiceTest {
   @Mock
   private SseEmitterRepository emitterRepository;
 
+  @Mock
+  private RedisPublisher redisPublisher;
+
   private static final Long EXPECTED_TIMEOUT = 30L * 1000 * 60;
 
   @Test
@@ -58,8 +63,24 @@ class SseServiceTest {
   }
 
   @Test
-  @DisplayName("알림 전송 - 유저의 모든 다중 기기 Emitter를 찾아 전송을 시도한다.")
-  void sendNotification_Success() throws Exception {
+  @DisplayName("알림 전송 - Redis Publisher를 통해 메시지를 발행한다.")
+  void sendNotification_publishesToRedis() {
+
+    // given
+    UUID userId = UUID.randomUUID();
+    Object dummyData = "테스트 알림 데이터";
+
+    // when
+    sseService.sendNotification(userId, dummyData);
+
+    // then
+    verify(redisPublisher).publishSse(any(RedisPubMessage.class));
+    verify(emitterRepository, never()).findAllByUserId(userId);
+  }
+
+  @Test
+  @DisplayName("로컬 알림 전송 - 유저의 모든 다중 기기 Emitter를 찾아 전송을 시도한다.")
+  void sendToLocalClient_Success() throws Exception {
 
     // given
     UUID userId = UUID.randomUUID();
@@ -73,7 +94,7 @@ class SseServiceTest {
     given(emitterRepository.findAllByUserId(userId)).willReturn(emitters);
 
     // when
-    sseService.sendNotification(userId, dummyData);
+    sseService.sendToLocalClient(userId, "notifications", dummyData);
 
     // then
     verify(emitterRepository).findAllByUserId(userId);
@@ -83,8 +104,8 @@ class SseServiceTest {
   }
 
   @Test
-  @DisplayName("알림 전송 - IOException 발생 시 해당 Emitter를 Repository에서 삭제한다.")
-  void sendNotification_IOException_DeletesEmitter() throws Exception {
+  @DisplayName("로컬 알림 전송 - IOException 발생 시 해당 Emitter를 Repository에서 삭제한다.")
+  void sendToLocalClient_IOException_DeletesEmitter() throws Exception {
 
     // given
     UUID userId = UUID.randomUUID();
@@ -100,7 +121,7 @@ class SseServiceTest {
     doThrow(new IOException("강제 에러 발생")).when(failEmitter).send(any(SseEmitter.SseEventBuilder.class));
 
     // when
-    sseService.sendNotification(userId, dummyData);
+    sseService.sendToLocalClient(userId, "notifications", dummyData);
 
     // then
     verify(emitterRepository).delete(userId, failEmitter);
@@ -131,18 +152,17 @@ class SseServiceTest {
   }
 
   @Test
-  @DisplayName("알림 전송 - 연결된 기기가 하나도 없으면 전송 시도를 하지 않고 일찍 종료한다")
-  void sendNotification_NoEmitters_SkipsSending() {
+  @DisplayName("로컬 알림 전송 - 연결된 기기가 하나도 없으면 전송 시도를 하지 않고 일찍 종료한다")
+  void sendToLocalClient_NoEmitters_SkipsSending() {
 
     // given
     UUID userId = UUID.randomUUID();
-    Object dummyData = "테스트 알림 데이터";
 
     // Repo가 빈 리스트 반환
     given(emitterRepository.findAllByUserId(userId)).willReturn(Collections.emptyList());
 
     // when
-    sseService.sendNotification(userId, dummyData);
+    sseService.sendToLocalClient(userId, "notifications", "data");
 
     // then
     verify(emitterRepository).findAllByUserId(userId);

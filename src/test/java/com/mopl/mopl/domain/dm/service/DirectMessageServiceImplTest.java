@@ -339,6 +339,7 @@ class DirectMessageServiceImplTest {
     User mockUser = mock(User.class);
     given(mockUser.getId()).willReturn(currentUserId);
     given(conversation.getSender()).willReturn(mockUser);
+    given(conversation.updateLastReadAt(any(), any())).willReturn(true);
 
     // when
     directMessageService.readMessage(currentUserId, conversationId, messageId);

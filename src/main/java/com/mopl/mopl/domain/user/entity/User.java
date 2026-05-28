@@ -169,7 +169,7 @@ public class User extends BaseEntity {
             int banCount = this.warningCount / 3;
 
             switch (banCount) {
-                case 1 -> this.banExpiresAt = LocalDateTime.now().plusMinutes(1);
+                case 1 -> this.banExpiresAt = LocalDateTime.now().plusMinutes(5);
                 case 2 -> this.banExpiresAt = LocalDateTime.now().plusHours(1);
                 default -> {
                     this.isLocked = true;

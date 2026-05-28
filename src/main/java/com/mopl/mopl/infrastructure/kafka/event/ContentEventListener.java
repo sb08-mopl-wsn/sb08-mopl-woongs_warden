@@ -26,8 +26,16 @@ public class ContentEventListener
             Content content = event.content();
             String message = objectMapper.writeValueAsString(
                     new ContentIndexMessage(content.getId(), ContentIndexMessage.ActionType.INDEX));
-            kafkaTemplate.send("content-index", content.getId().toString(), message);
-            log.info("Kafka 메시지 발행: contentId={}, action={}", content.getId(), ContentIndexMessage.ActionType.INDEX);
+            kafkaTemplate.send("content-index", content.getId().toString(), message)
+                            .whenComplete((result, ex) -> {
+                                if (ex != null) {
+                                    log.error("Kafka 메시지 발행 실패: contentId={}, action={}",
+                                            content.getId(), ContentIndexMessage.ActionType.INDEX, ex);
+                                    return;
+                                }
+                                log.info("Kafka 메시지 발행 성공: contentId={}, action={}",
+                                        content.getId(), ContentIndexMessage.ActionType.INDEX);
+                            });
         } catch (Exception e) {
             log.warn("Kafka 인덱스 메시지 발행 실패: contentId={}", event.content().getId(), e);
         }

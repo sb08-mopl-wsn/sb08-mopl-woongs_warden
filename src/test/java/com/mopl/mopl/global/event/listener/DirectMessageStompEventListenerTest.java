@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
@@ -172,6 +173,7 @@ class DirectMessageStompEventListenerTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   @DisplayName("DM 읽음 처리 이벤트 - RedisPublisher를 통해 읽음 Watermark 신호를 모든 서버로 발행한다.")
   void onDirectMessageRead_BroadcastsWatermarkViaRedis() {
     Instant now = Instant.now();
@@ -185,10 +187,49 @@ class DirectMessageStompEventListenerTest {
 
     RedisPubMessage message = captor.getValue();
     assertThat(message.eventName()).isEqualTo(expectedDestination);
-    
+
     Map<String, Object> payload = (Map<String, Object>) message.data();
     assertThat(payload.get("type")).isEqualTo("READ_WATERMARK");
     assertThat(payload.get("readerId")).isEqualTo(userId);
     assertThat(payload.get("readAt")).isEqualTo(now);
+  }
+
+  @Test
+  @DisplayName("다중 탭 시나리오 - 같은 사용자가 여러 세션으로 접속하면 카운트가 증가하고, 모두 퇴장해야 0이 된다.")
+  void handleSubscribe_MultipleSessions_CountsCorrectly() {
+    when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+    when(valueOperations.increment(redisKey)).thenReturn(1L, 2L);
+
+    String sessionId1 = "session-1";
+    String sessionId2 = "session-2";
+
+    // 첫 번째 탭 입장
+    Message<byte[]> msg1 = createMessage(StompCommand.SUBSCRIBE, validDestination, sessionId1, true);
+    listener.handleSubscribe(new SessionSubscribeEvent(this, msg1, mock(Principal.class)));
+
+    // 두 번째 탭 입장
+    Message<byte[]> msg2 = createMessage(StompCommand.SUBSCRIBE, validDestination, sessionId2, true);
+    listener.handleSubscribe(new SessionSubscribeEvent(this, msg2, mock(Principal.class)));
+
+    verify(valueOperations, times(2)).increment(redisKey);
+  }
+
+  @Test
+  @DisplayName("브라우저 종료 시 handleLeave가 Redis 카운트를 감소시킨다.")
+  void handleLeave_DecrementsRedisCount() {
+    when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+    when(valueOperations.increment(redisKey)).thenReturn(1L);
+    when(valueOperations.decrement(redisKey)).thenReturn(0L);
+
+    // 입장
+    Message<byte[]> subMessage = createMessage(StompCommand.SUBSCRIBE, validDestination, sessionId, true);
+    listener.handleSubscribe(new SessionSubscribeEvent(this, subMessage, mock(Principal.class)));
+
+    // 브라우저 종료
+    Message<byte[]> disconnectMessage = createMessage(StompCommand.DISCONNECT, null, sessionId, false);
+    listener.handleLeave(new SessionDisconnectEvent(this, disconnectMessage, sessionId, null));
+
+    verify(valueOperations).decrement(redisKey);
+    verify(redisTemplate).delete(redisKey);
   }
 }

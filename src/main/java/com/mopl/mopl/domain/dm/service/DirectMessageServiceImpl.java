@@ -177,16 +177,15 @@ public class DirectMessageServiceImpl implements DirectMessageService{
     // 내가 읽은 수위선(watermark) 갱신
     boolean isUpdated = conversation.updateLastReadAt(currentUserId, message.getCreatedAt());
 
-    // 방의 읽음 상태(hasUnread)를 false로 업데이트
-    conversation.updateUnreadStatus(false);
-
     // 수위선이 실제로 갱신되었을 때만 상대방에게 브로드캐스팅 (중복 API 호출 방어)
     if (isUpdated) {
-        eventPublisher.publishEvent(DirectMessageReadEvent.of(
-            conversationId,
-            currentUserId,
-            message.getCreatedAt()
-        ));
+      // 워터마크가 실제로 갱신 됐을 때 읽음 상태 반영
+      conversation.updateUnreadStatus(false);
+      eventPublisher.publishEvent(DirectMessageReadEvent.of(
+          conversationId,
+          currentUserId,
+          message.getCreatedAt()
+      ));
     }
   }
 

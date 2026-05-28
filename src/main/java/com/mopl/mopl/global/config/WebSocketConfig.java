@@ -1,12 +1,16 @@
 package com.mopl.mopl.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.global.component.WebSocketSessionRegistry;
 import com.mopl.mopl.global.interceptor.JwtAuthenticationChannelInterceptor;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.converter.MessageConverter;
 import org.springframework.messaging.handler.invocation.HandlerMethodArgumentResolver;
 import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -22,13 +26,6 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
-import org.springframework.messaging.converter.MessageConverter;
-import org.springframework.messaging.converter.MappingJackson2MessageConverter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
-import java.util.List;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -38,13 +35,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
     private final JwtAuthenticationChannelInterceptor jwtAuthenticationChannelInterceptor;
     private final WebSocketSessionRegistry sessionRegistry;
+    private final ObjectMapper objectMapper;
 
     @Override
     public boolean configureMessageConverters(List<MessageConverter> messageConverters) {
         MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         converter.setObjectMapper(objectMapper);
         messageConverters.add(converter);
         return false;

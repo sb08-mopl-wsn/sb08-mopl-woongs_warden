@@ -2,8 +2,8 @@ package com.mopl.mopl.global.sse.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
@@ -12,6 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.redis.dto.RedisPubMessage;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.sse.repository.SseEmitterRepository;
@@ -20,15 +21,20 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -44,36 +50,77 @@ class SseServiceTest {
   @Mock
   private RedisPublisher redisPublisher;
 
+  @Mock
+  private RedisTemplate<String, Object> redisTemplate;
+
+  @Mock
+  private ZSetOperations<String, Object> zSetOperations;
+
   private static final Long EXPECTED_TIMEOUT = 30L * 1000 * 60;
 
   @Test
-  @DisplayName("SSE 구독 - 정상적으로 Emitter가 생성되고 저장된다.")
+  @DisplayName("SSE 구독 - 최초 접속 시 Emitter가 저장되고 더미 이벤트가 발송된다.")
   void subscribe_Success() {
 
     // given
     UUID userId = UUID.randomUUID();
 
     // when
-    SseEmitter result = sseService.subscribe(userId);
+    SseEmitter result = sseService.subscribe(userId, "");
 
     // then
     assertThat(result).isNotNull();
     verify(emitterRepository).save(eq(userId), any(SseEmitter.class));
     assertThat(result.getTimeout()).isEqualTo(EXPECTED_TIMEOUT);
+    verify(redisTemplate, never()).opsForZSet();
   }
 
   @Test
-  @DisplayName("알림 전송 - Redis Publisher를 통해 메시지를 발행한다.")
-  void sendNotification_publishesToRedis() {
+  @DisplayName("SSE 구독 - 재접속 시 Last-Event-ID가 존재하면 유실된 알림을 복구하여 전송한다.")
+  void subscribe_Reconnect_RecoversMissedEvents() {
+
+    // given
+    UUID userId = UUID.randomUUID();
+    String lastEventId = "1000";
+    String historyKey = "sse_history:" + userId;
+
+    RedisPubMessage missedMessage = new RedisPubMessage(userId, "notifications", "놓친 알림 1");
+    Set<Object> missedEvents = Set.of(missedMessage);
+
+    given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
+    given(zSetOperations.rangeByScore(eq(historyKey), eq(1001.0), eq(Double.MAX_VALUE)))
+        .willReturn(missedEvents);
+
+    // when
+    SseEmitter result = sseService.subscribe(userId, lastEventId);
+
+    // then
+    assertThat(result).isNotNull();
+    verify(zSetOperations).rangeByScore(eq(historyKey), eq(1001.0), eq(Double.MAX_VALUE));
+  }
+
+
+  @Test
+  @DisplayName("알림 전송 - Redis ZSet에 이벤트를 저장하고 Publisher를 통해 브로드캐스팅한다.")
+  void sendNotification_SavesToHistoryAndPublishesToRedis() {
 
     // given
     UUID userId = UUID.randomUUID();
     Object dummyData = "테스트 알림 데이터";
+    String historyKey = "sse_history:" + userId;
+
+    given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
 
     // when
     sseService.sendNotification(userId, dummyData);
 
     // then
+    ArgumentCaptor<RedisPubMessage> captor = ArgumentCaptor.forClass(RedisPubMessage.class);
+
+    // ZSet 히스토리 저장 확인
+    verify(zSetOperations).add(eq(historyKey), any(RedisPubMessage.class), anyDouble());
+    verify(redisTemplate).expire(eq(historyKey), eq(10L), eq(TimeUnit.MINUTES));
+    // 브로드 캐스팅
     verify(redisPublisher).publishSse(any(RedisPubMessage.class));
     verify(emitterRepository, never()).findAllByUserId(userId);
   }
@@ -130,8 +177,9 @@ class SseServiceTest {
   @Test
   @DisplayName("SSE 구독 - 파라미터가 null이면 NullPointerException 발생")
   void subscribe_NullUserId_ThrowsException() {
+    String lastEventId = "1000";
     // when & then
-    assertThatThrownBy(() -> sseService.subscribe(null))
+    assertThatThrownBy(() -> sseService.subscribe(null, lastEventId))
         .isInstanceOf(NullPointerException.class)
         .hasMessageContaining("userId는 null일 수 없습니다.");
   }
@@ -149,6 +197,20 @@ class SseServiceTest {
         .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> sseService.sendNotification(userId, null))
         .isInstanceOf(NullPointerException.class);
+  }
+
+  @Test
+  @DisplayName("알림 전송 - eventName이 빈 문자열이면 BusinessException 발생")
+  void sendCustomNotification_BlankEventName_ThrowsException() {
+    // given
+    UUID userId = UUID.randomUUID();
+    Object data = "test";
+
+    // when & then
+    assertThatThrownBy(() -> sseService.sendCustomNotification(userId, "", data))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(() -> sseService.sendCustomNotification(userId, "   ", data))
+        .isInstanceOf(BusinessException.class);
   }
 
   @Test
@@ -176,7 +238,7 @@ class SseServiceTest {
     UUID userId = UUID.randomUUID();
 
     // when
-    SseEmitter emitter = sseService.subscribe(userId);
+    SseEmitter emitter = sseService.subscribe(userId, "");
 
     // then
     assertThat(emitter).isNotNull();
@@ -188,7 +250,7 @@ class SseServiceTest {
 
     // given
     UUID userId = UUID.randomUUID();
-    SseEmitter emitter = sseService.subscribe(userId);
+    SseEmitter emitter = sseService.subscribe(userId, "");
 
     // SseEmitter 내부에 등록된 private 콜백 객체들 강제 추출
     Runnable completionCallback = (Runnable) ReflectionTestUtils.getField(emitter, "completionCallback");

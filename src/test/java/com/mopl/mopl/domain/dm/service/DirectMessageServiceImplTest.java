@@ -351,6 +351,39 @@ class DirectMessageServiceImplTest {
   }
 
   @Test
+  @DisplayName("메시지 읽음 처리 - Watermark 갱신이 발생하지 않으면 브로드캐스팅 이벤트를 발행하지 않는다.")
+  void readMessage_WatermarkNotUpdated_DoesNotPublishEvent() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    Conversation conversation = mock(Conversation.class);
+    DirectMessage message = mock(DirectMessage.class);
+
+    given(conversation.getId()).willReturn(conversationId);
+    given(message.getConversation()).willReturn(conversation);
+
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+    given(messageRepository.findById(messageId)).willReturn(Optional.of(message));
+    given(message.getCreatedAt()).willReturn(Instant.now());
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    // 워터마크 갱신 실패
+    given(conversation.updateLastReadAt(any(), any())).willReturn(false);
+
+    // when
+    directMessageService.readMessage(currentUserId, conversationId, messageId);
+
+    // then
+    verify(conversation).updateLastReadAt(eq(currentUserId), any(Instant.class));
+    verify(conversation).updateUnreadStatus(false);
+
+    verify(eventPublisher, never()).publishEvent(any(DirectMessageReadEvent.class));
+  }
+
+  @Test
   @DisplayName("메시지 읽음 처리 - 대화방 참여자가 아닌 제 3자가 호출하면 권한 예외 발생")
   void readMessage_AccessDenied_ThrowsException() {
 

@@ -1,7 +1,6 @@
 package com.mopl.mopl.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.redis.service.RedisSubscriber;
 import org.springframework.context.annotation.Bean;
@@ -16,12 +15,9 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 public class RedisConfig
 {
     @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory, ObjectMapper objectMapper) {
         RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
 
         redisTemplate.setConnectionFactory(factory);

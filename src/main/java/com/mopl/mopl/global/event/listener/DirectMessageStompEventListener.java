@@ -7,6 +7,7 @@ import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import com.mopl.mopl.global.redis.dto.RedisPubMessage;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
+import java.text.NumberFormat;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,7 +48,12 @@ public class DirectMessageStompEventListener implements RoomPresenceManager {
     if (value instanceof Number num) {
       return num.intValue() > 0;
     } else if (value instanceof String str) {
-      return Integer.parseInt(str) > 0;
+      try {
+        return Integer.parseInt(str) > 0;
+      } catch (NumberFormatException e) {
+        log.warn("Redis presence 값 파싱 실패 - key: {}, value: {}", redisKey, str);
+        return false;
+      }
     }
     return false;
   }

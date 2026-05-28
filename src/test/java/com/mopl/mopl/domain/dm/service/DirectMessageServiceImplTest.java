@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -378,7 +379,7 @@ class DirectMessageServiceImplTest {
 
     // then
     verify(conversation).updateLastReadAt(eq(currentUserId), any(Instant.class));
-    verify(conversation).updateUnreadStatus(false);
+    verify(conversation, never()).updateUnreadStatus(anyBoolean());
 
     verify(eventPublisher, never()).publishEvent(any(DirectMessageReadEvent.class));
   }

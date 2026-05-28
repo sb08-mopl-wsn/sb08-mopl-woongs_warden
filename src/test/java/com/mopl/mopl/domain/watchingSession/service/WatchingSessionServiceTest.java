@@ -520,7 +520,7 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("프로필 키가 비어있거나 (null/blank) 없으면 S3 조회를 패스하고 null로 전송한다.")
+        @DisplayName("프로필 키가 비어있거나 (null) 없으면 S3 조회를 패스하고 null로 전송한다.")
         void validRequest_withNullProfileKey_skipS3AndPublishesEvent() {
             // given
             ReflectionTestUtils.setField(user, "profileImageKey", null);
@@ -540,6 +540,33 @@ public class WatchingSessionServiceTest {
 
             watchingSessionService.receiveMessage(contentId, userId, request);
 
+            verify(s3ImageStorage, never()).getPublicUrl(anyString());
+            assertThat(userSummaryCaptor.getValue().profileImageUrl()).isNull();
+        }
+
+        @Test
+        @DisplayName("프로필 키가 blank(공백)면 S3 조회를 패스하고 null로 전송한다.")
+        void validRequest_withBlankProfileKey_skipS3AndPublishesEvent() {
+            // given
+            ReflectionTestUtils.setField(user, "profileImageKey", "   ");
+
+            String rawMessage = "안녕하세요?";
+            ContentChatSendRequest request = new ContentChatSendRequest(rawMessage);
+
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(contentRepository.existsById(contentId)).willReturn(true);
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(session));
+            given(badWordFilter.maskBadWord(rawMessage)).willReturn(rawMessage);
+
+            ArgumentCaptor<UserSummary> userSummaryCaptor = ArgumentCaptor.forClass(UserSummary.class);
+            ContentChatDto chatDto = new ContentChatDto(new UserSummary(userId, "테스트 유저", null), rawMessage);
+            given(sessionMapper.toChatDto(userSummaryCaptor.capture(), eq(rawMessage))).willReturn(chatDto);
+
+            // when
+            watchingSessionService.receiveMessage(contentId, userId, request);
+
+            // then
             verify(s3ImageStorage, never()).getPublicUrl(anyString());
             assertThat(userSummaryCaptor.getValue().profileImageUrl()).isNull();
         }

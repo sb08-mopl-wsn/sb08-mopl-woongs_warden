@@ -96,6 +96,7 @@ class JwtAuthenticationFilterTest {
         when(tokenProvider.validateAccessToken(accessToken)).thenReturn(true);
         when(jwtRegistry.hasActiveJwtInformationByAccessToken(accessToken)).thenReturn(true);
         when(tokenProvider.parseAccessToken(accessToken)).thenReturn(userDetails);
+        when(userDetailsService.loadUserByUsername(email)).thenReturn(userDetails);
 
         filter.doFilter(request, response, filterChain);
 

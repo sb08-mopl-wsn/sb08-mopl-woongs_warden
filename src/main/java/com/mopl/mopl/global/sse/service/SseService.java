@@ -3,14 +3,19 @@ package com.mopl.mopl.global.sse.service;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import com.mopl.mopl.global.exception.SseConnectionException;
+import com.mopl.mopl.global.redis.dto.RedisPubMessage;
+import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.sse.repository.SseEmitterRepository;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -21,16 +26,19 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class SseService {
 
   private final SseEmitterRepository emitterRepository;
+  private final RedisPublisher redisPublisher;
 
   // 만료 시간 30분 설정
   private static final Long TIMEOUT = 30L * 1000 * 60;
+  private static final String SSE_HISTORY_PREFIX = "sse_history:";
+  private final RedisTemplate<String, Object> redisTemplate;
 
   /**
    * SSE 연결 요청
    * @param userId 연결을 요청한 유저 ID
    * @return SSE 연결 객체
    */
-  public SseEmitter subscribe(UUID userId) {
+  public SseEmitter subscribe(UUID userId, String lastEventId) {
 
     // null 검증 추가
     Objects.requireNonNull(userId, "userId는 null일 수 없습니다.");
@@ -61,6 +69,11 @@ public class SseService {
       emitter.send(SseEmitter.event()
           .name("connect")
           .data("연결 성공. Event Stream Created"));
+
+      // Last-Event-ID가 존재한다면 (재접속), 유실된 알림 복구 진행
+      if (lastEventId != null && !lastEventId.isEmpty()) {
+        resendMissedEvents(userId, lastEventId, emitter);
+      }
     } catch (IOException e) {
 
       log.warn("SSE 초기 이벤트 전송 실패 - userId: {}", userId);
@@ -96,18 +109,31 @@ public class SseService {
     }
     Objects.requireNonNull(data, "data는 null일 수 없습니다.");
 
+    long currentTime = System.currentTimeMillis();
+    String eventId = String.valueOf(currentTime);
+
+    RedisPubMessage message = new RedisPubMessage(userId, eventName, data);
+
+    // 알림 유실 방지로 Redis ZSet에 알림 내역 임시 저장
+    saveEventToHistory(userId, message, currentTime);
+
+    // 브로드캐스팅 발송
+    redisPublisher.publishSse(message);
+  }
+
+  public void sendToLocalClient(UUID userId, String eventName, Object data) {
+
     List<SseEmitter> emitters = emitterRepository.findAllByUserId(userId);
     if (emitters.isEmpty()) return;
 
-    // 성공 횟수 집계
+    // 수신 시간 기준으로 eventId 생성 (프론트엔드가 보관할 ID)
+    String eventId = String.valueOf(System.currentTimeMillis());
+
     long successCount = emitters.stream()
-            .filter(emitter -> sendToClient(emitter, userId, eventName, data))
-            .count();
+        .filter(emitter -> sendToClient(emitter, userId, eventId, eventName, data))
+        .count();
 
-    // 다중 기기 중 일부라도 실패하거나 전체 성공 현황 info 기록
-    log.info("SSE 알림 전송 완료 - userId: {}, eventName: {}, 성공: {}/{}", userId, eventName, successCount, emitters.size());
-
-    // TODO: 분산 환경 전환 시 위 단일 서버 환경 로직 대신 Redis Pub/Sub 구조 도입 후 메시지 발행하도록 수정
+    log.info("로컬 SSE 알림 전송 완료 - userId: {}, 성공: {}/{}", userId, successCount, emitters.size());
   }
 
   // heartbeat 발송기 (1개 스레드로 30초마다 모든 유저에게 핑 발송)
@@ -138,10 +164,10 @@ public class SseService {
    * @param data 전송할 데이터
    * @return 전송 성공 여부
    */
-  private boolean sendToClient(SseEmitter emitter, UUID userId, String eventName, Object data) {
+  private boolean sendToClient(SseEmitter emitter, UUID userId, String eventId, String eventName, Object data) {
     try {
-      // TODO: Redis 도입 시 프론트엔드 재연결(Last-Event-ID) 처리를 위한 순차적 ID(timestamp+sequence) 저장소와 함께 .id() 구현 예정
       emitter.send(SseEmitter.event()
+          .id(eventId)
           .name(eventName)
           .data(data));
       return true; // 전송 성공
@@ -149,6 +175,57 @@ public class SseService {
       log.info("SSE 연결이 이미 끊어졌거나 전송 실패 - userId: {}", userId);
       emitterRepository.delete(userId, emitter);
       return false; // 전송 실패
+    }
+  }
+
+  /**
+   * 유실된 알림 복구용 Redis 내역 저장
+   * @param userId 연결을 요청한 유저 ID
+   * @param message 알림 데이터
+   * @param score 알림 발송 시간
+   */
+  private void saveEventToHistory(UUID userId, RedisPubMessage message, long score) {
+
+    String historyKey = SSE_HISTORY_PREFIX + userId.toString();
+    try {
+      // ZSet 저장 (데이터, score)
+      redisTemplate.opsForZSet().add(historyKey, message, score);
+      // 저장소 용량 관리 -> 만료 시간 10분 설정
+      redisTemplate.expire(historyKey, 10, TimeUnit.MINUTES);
+    } catch (Exception e) {
+      log.error("알림 히스토리 Redis 저장 실패 - userId: {}", userId, e);
+    }
+  }
+
+  private void resendMissedEvents(UUID userId, String lastEventId, SseEmitter emitter) {
+
+    String historyKey = SSE_HISTORY_PREFIX + userId.toString();
+    try {
+      // 프론트엔드가 제시한 마지막 시간을 넘어간 알림들만 추출
+      long lastEventScore = 0;
+      try {
+        lastEventScore = Long.parseLong(lastEventId);
+      } catch (NumberFormatException e) {
+        log.warn("잘못된 Last-Event-ID 형식 - userId: {}, lastEventId: {}", userId, lastEventId);
+      }
+
+      // score(시간) 범위 검색: lastEventScore + 1 부터 끝까지
+      Set<Object> missedEvents = redisTemplate.opsForZSet().rangeByScore(historyKey, lastEventScore + 1, Double.MAX_VALUE);
+
+      if (missedEvents != null && !missedEvents.isEmpty()) {
+        log.info("유실된 SSE 알림 복구 시작 - userId: {}, 유실 건수: {}", userId, missedEvents.size());
+
+        for (Object obj : missedEvents) {
+          if (obj instanceof RedisPubMessage pubMessage) {
+            // 저장된 객체를 그대로 파싱해서 밀어넣음. 재전송 시 현재시간으로 새로운 id부여 (유실 대비)
+            sendToClient(emitter, userId, String.valueOf(System.currentTimeMillis()), pubMessage.eventName(), pubMessage.data());
+          } else {
+            log.warn("예상치 못한 히스토리 객체 타입 - userId: {}, type: {}", userId, obj.getClass().getName());
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.warn("유실된 SSE 알림 복구 실패 - userId: {}", userId, e);
     }
   }
 }

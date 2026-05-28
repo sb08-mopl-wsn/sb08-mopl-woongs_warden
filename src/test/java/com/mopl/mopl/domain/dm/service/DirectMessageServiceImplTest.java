@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.mopl.mopl.domain.conversation.entity.Conversation;
@@ -339,6 +341,7 @@ class DirectMessageServiceImplTest {
     User mockUser = mock(User.class);
     given(mockUser.getId()).willReturn(currentUserId);
     given(conversation.getSender()).willReturn(mockUser);
+    given(conversation.updateLastReadAt(any(), any())).willReturn(true);
 
     // when
     directMessageService.readMessage(currentUserId, conversationId, messageId);
@@ -347,6 +350,39 @@ class DirectMessageServiceImplTest {
     verify(conversation).updateLastReadAt(eq(currentUserId), any(Instant.class));
     verify(conversation).updateUnreadStatus(false);
     verify(eventPublisher).publishEvent(any(DirectMessageReadEvent.class));
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - Watermark 갱신이 발생하지 않으면 브로드캐스팅 이벤트를 발행하지 않는다.")
+  void readMessage_WatermarkNotUpdated_DoesNotPublishEvent() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    Conversation conversation = mock(Conversation.class);
+    DirectMessage message = mock(DirectMessage.class);
+
+    given(conversation.getId()).willReturn(conversationId);
+    given(message.getConversation()).willReturn(conversation);
+
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+    given(messageRepository.findById(messageId)).willReturn(Optional.of(message));
+    given(message.getCreatedAt()).willReturn(Instant.now());
+
+    User mockUser = mock(User.class);
+    given(mockUser.getId()).willReturn(currentUserId);
+    given(conversation.getSender()).willReturn(mockUser);
+
+    // 워터마크 갱신 실패
+    given(conversation.updateLastReadAt(any(), any())).willReturn(false);
+
+    // when
+    directMessageService.readMessage(currentUserId, conversationId, messageId);
+
+    // then
+    verify(conversation).updateLastReadAt(eq(currentUserId), any(Instant.class));
+    verify(conversation, never()).updateUnreadStatus(anyBoolean());
+
+    verify(eventPublisher, never()).publishEvent(any(DirectMessageReadEvent.class));
   }
 
   @Test
@@ -421,5 +457,28 @@ class DirectMessageServiceImplTest {
     // when & then
     assertThatThrownBy(() -> directMessageService.readMessage(currentUserId, conversationId, messageId))
         .isInstanceOf(BusinessException.class).hasMessageContaining("해당 대화방의 메시지가 아닙니다");
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - 수신자(Receiver)가 읽음 처리 시 상태/이벤트가 정상 반영된다.")
+  void readMessage_Success_WhenReaderIsReceiver() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    DirectMessage message = mock(DirectMessage.class);
+
+    given(message.getConversation()).willReturn(conversation);
+
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+    given(messageRepository.findById(messageId)).willReturn(Optional.of(message));
+    given(message.getCreatedAt()).willReturn(Instant.now());
+
+    // when
+    directMessageService.readMessage(receiverUserId, conversationId, messageId);
+
+    // then
+    assertThat(conversation.getLastReadAtByReceiver()).isNotNull();
+    assertThat(conversation.isHasUnread()).isFalse();
+    verify(eventPublisher, times(1)).publishEvent(any(DirectMessageReadEvent.class));
   }
 }

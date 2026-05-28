@@ -1,6 +1,7 @@
 package com.mopl.mopl.global.event.listener;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -13,6 +14,8 @@ import com.mopl.mopl.domain.dm.service.RoomPresenceManager;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
 import com.mopl.mopl.global.event.DirectMessageSentEvent;
+import com.mopl.mopl.global.redis.dto.RedisPubMessage;
+import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.sse.service.SseService;
 import java.time.Instant;
 import java.util.UUID;
@@ -20,10 +23,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @ExtendWith(MockitoExtension.class)
 class DirectMessageEventListenerTest {
@@ -34,7 +37,7 @@ class DirectMessageEventListenerTest {
   @Mock
   private SseService sseService;
   @Mock
-  private SimpMessagingTemplate messagingTemplate;
+  private RedisPublisher redisPublisher;
   @Mock
   private RoomPresenceManager roomPresenceManager;
 
@@ -97,7 +100,12 @@ class DirectMessageEventListenerTest {
     directMessageEventListener.onDirectMessageSent(event);
 
     // then
-    verify(messagingTemplate).convertAndSend(eq(expectedDestination), eq(messageDto));
+    ArgumentCaptor<RedisPubMessage> captor = ArgumentCaptor.forClass(RedisPubMessage.class);
+    verify(redisPublisher).publishWs(captor.capture());
+
+    RedisPubMessage pubMessage = captor.getValue();
+    assertThat(pubMessage.eventName()).isEqualTo(expectedDestination);
+    assertThat(pubMessage.data()).isEqualTo(messageDto);
   }
 
   @Test
@@ -117,18 +125,17 @@ class DirectMessageEventListenerTest {
   }
 
   @Test
-  @DisplayName("DM 발송 이벤트 - STOMP 브로드캐스팅 중 예외가 발생해도 스레드가 중단되지 않고 예외를 삼킨다.")
-  void onDirectMessageSent_StompException_HandledGracefully() {
+  @DisplayName("DM 발송 이벤트 - Redis 브로드캐스팅 중 예외가 발생해도 스레드가 중단되지 않고 예외를 삼킨다.")
+  void onDirectMessageSent_RedisException_HandledGracefully() {
 
     // given
     DirectMessageSentEvent event = DirectMessageSentEvent.of(conversationId, messageDto);
-    String expectedDestination = "/sub/conversations/" + conversationId + "/direct-messages";
 
-    doThrow(new RuntimeException("STOMP 브로커 다운"))
-        .when(messagingTemplate).convertAndSend(any(String.class), any(Object.class));
+    doThrow(new RuntimeException("Redis 브로커 다운"))
+        .when(redisPublisher).publishWs(any(RedisPubMessage.class));
 
     // when & then
     assertDoesNotThrow(() -> directMessageEventListener.onDirectMessageSent(event));
-    verify(messagingTemplate).convertAndSend(eq(expectedDestination), eq(messageDto));
+    verify(redisPublisher).publishWs(any(RedisPubMessage.class));
   }
 }

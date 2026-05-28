@@ -1,6 +1,7 @@
 package com.mopl.mopl.infrastructure.elasticsearch;
 
 import com.mopl.mopl.infrastructure.elasticsearch.document.ContentDocument;
+import com.mopl.mopl.infrastructure.elasticsearch.dto.ContentSearchResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.opensearch.common.unit.Fuzziness;
@@ -13,6 +14,7 @@ import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.opensearch.index.query.QueryBuilders.boolQuery;
@@ -40,7 +42,7 @@ public class ContentSearchQueryService
      * @param contentType   콘텐츠 타입 필터, null이면 전체 타입 검색
      * @return 매칭된 콘텐츠 ID 목록
      */
-    public List<UUID> searchByKeyword(String keyword, String contentType) {
+    public ContentSearchResult searchByKeyword(String keyword, String contentType) {
         BoolQueryBuilder boolQuery = boolQuery();
 
         if (contentType != null && !contentType.isBlank()) {
@@ -57,9 +59,24 @@ public class ContentSearchQueryService
 
         SearchHits<ContentDocument> hits = elasticsearchOperations.search(query, ContentDocument.class);
 
-        return hits.stream()
-                .map(hit -> UUID.fromString(hit.getContent().getId()))
+        List<UUID> ids = hits.stream()
+                .map(hit -> hit.getContent().getId())
+                .map(id -> {
+                    try {
+                        return UUID.fromString(id);
+                    } catch (IllegalArgumentException e) {
+                        log.warn("[ES] 잘못된 콘텐츠 id: {}", id);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
                 .toList();
+
+        if (ids.size() >= SEARCH_MAX_SIZE) {
+            log.warn("[OpenSearch] 검색 결과 상한 도달: keyword={}, maxSize={}", keyword, SEARCH_MAX_SIZE);
+        }
+
+        return new ContentSearchResult(ids, hits.getTotalHits());
     }
 
     /**

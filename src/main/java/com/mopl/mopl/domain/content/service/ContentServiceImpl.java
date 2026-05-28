@@ -11,6 +11,7 @@ import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
+import com.mopl.mopl.infrastructure.elasticsearch.dto.ContentSearchResult;
 import com.mopl.mopl.infrastructure.kafka.event.ContentDeleteEvent;
 import com.mopl.mopl.infrastructure.kafka.event.ContentIndexEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
@@ -100,24 +101,27 @@ public class ContentServiceImpl implements ContentService
     @Override
     public CursorResponseContentDto getContents(ContentSearchRequest contentSearchRequest) {
         List<UUID> searchedIds = null;
+        long totalCount = 0;
 
         if (contentSearchRequest.keywordLike() != null && !contentSearchRequest.keywordLike().isBlank()) {
-            searchedIds = contentSearchQueryService.searchByKeyword(
+            ContentSearchResult searchResult = contentSearchQueryService.searchByKeyword(
                     contentSearchRequest.keywordLike(),
                     contentSearchRequest.typeEqual());
 
-            if (searchedIds.isEmpty()) {
+            if (searchResult.ids().isEmpty()) {
                 return new CursorResponseContentDto(
                         List.of(), null, null, false, 0,
                         contentSearchRequest.sortBy(),
                         contentSearchRequest.sortDirection());
             }
+
+            searchedIds = searchResult.ids();
+            totalCount = searchResult.totalHits();
+        } else {
+            totalCount = contentRepository.countContentsWithKeyword(null);
         }
 
         Slice<Content> slice = contentRepository.getContents(contentSearchRequest, searchedIds);
-        long totalCount = searchedIds != null
-                ? searchedIds.size()
-                : contentRepository.countContentsWithKeyword(null);
 
         List<ContentDto> contents = contentMapper.toContentDtos(slice.getContent());
 

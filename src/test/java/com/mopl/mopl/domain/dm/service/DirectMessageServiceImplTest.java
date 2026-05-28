@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.mopl.mopl.domain.conversation.entity.Conversation;
@@ -456,5 +457,28 @@ class DirectMessageServiceImplTest {
     // when & then
     assertThatThrownBy(() -> directMessageService.readMessage(currentUserId, conversationId, messageId))
         .isInstanceOf(BusinessException.class).hasMessageContaining("해당 대화방의 메시지가 아닙니다");
+  }
+
+  @Test
+  @DisplayName("메시지 읽음 처리 - 수신자(Receiver)가 읽음 처리 시 상태/이벤트가 정상 반영된다.")
+  void readMessage_Success_WhenReaderIsReceiver() {
+
+    // given
+    UUID messageId = UUID.randomUUID();
+    DirectMessage message = mock(DirectMessage.class);
+
+    given(message.getConversation()).willReturn(conversation);
+
+    given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+    given(messageRepository.findById(messageId)).willReturn(Optional.of(message));
+    given(message.getCreatedAt()).willReturn(Instant.now());
+
+    // when
+    directMessageService.readMessage(receiverUserId, conversationId, messageId);
+
+    // then
+    assertThat(conversation.getLastReadAtByReceiver()).isNotNull();
+    assertThat(conversation.isHasUnread()).isFalse();
+    verify(eventPublisher, times(1)).publishEvent(any(DirectMessageReadEvent.class));
   }
 }

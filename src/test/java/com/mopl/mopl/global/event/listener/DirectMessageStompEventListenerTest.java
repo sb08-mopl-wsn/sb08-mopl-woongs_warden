@@ -232,4 +232,24 @@ class DirectMessageStompEventListenerTest {
     verify(valueOperations).decrement(redisKey);
     verify(redisTemplate).delete(redisKey);
   }
+
+  @Test
+  @DisplayName("브라우저 종료 시 Redis 카운트가 1 이상이면 키를 삭제하지 않는다.")
+  void handleLeave_DoesNotDeleteKey_WhenCountRemainsPositive() {
+
+    // when
+    when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+    when(valueOperations.increment(redisKey)).thenReturn(2L);
+    when(valueOperations.decrement(redisKey)).thenReturn(1L);
+
+    Message<byte[]> subMessage = createMessage(StompCommand.SUBSCRIBE, validDestination, sessionId, true);
+    listener.handleSubscribe(new SessionSubscribeEvent(this, subMessage, mock(Principal.class)));
+
+    Message<byte[]> disconnectMessage = createMessage(StompCommand.DISCONNECT, null, sessionId, false);
+    listener.handleLeave(new SessionDisconnectEvent(this, disconnectMessage, sessionId, null));
+
+    // then
+    verify(valueOperations).decrement(redisKey);
+    verify(redisTemplate, never()).delete(redisKey);
+ }
 }

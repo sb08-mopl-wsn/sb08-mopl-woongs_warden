@@ -71,7 +71,7 @@ public class SseService {
           .data("연결 성공. Event Stream Created"));
 
       // Last-Event-ID가 존재한다면 (재접속), 유실된 알림 복구 진행
-      if (!lastEventId.isEmpty()) {
+      if (lastEventId != null && !lastEventId.isEmpty()) {
         resendMissedEvents(userId, lastEventId, emitter);
       }
     } catch (IOException e) {
@@ -166,7 +166,6 @@ public class SseService {
    */
   private boolean sendToClient(SseEmitter emitter, UUID userId, String eventId, String eventName, Object data) {
     try {
-      // TODO: Redis 도입 시 프론트엔드 재연결(Last-Event-ID) 처리를 위한 순차적 ID(timestamp+sequence) 저장소와 함께 .id() 구현 예정
       emitter.send(SseEmitter.event()
           .id(eventId)
           .name(eventName)
@@ -203,7 +202,12 @@ public class SseService {
     String historyKey = SSE_HISTORY_PREFIX + userId.toString();
     try {
       // 프론트엔드가 제시한 마지막 시간을 넘어간 알림들만 추출
-      long lastEventScore = Long.parseLong(lastEventId);
+      long lastEventScore = 0;
+      try {
+        lastEventScore = Long.parseLong(lastEventId);
+      } catch (NumberFormatException e) {
+        log.warn("잘못된 Last-Event-ID 형식 - userId: {}, lastEventId: {}", userId, lastEventId);
+      }
 
       // score(시간) 범위 검색: lastEventScore + 1 부터 끝까지
       Set<Object> missedEvents = redisTemplate.opsForZSet().rangeByScore(historyKey, lastEventScore + 1, Double.MAX_VALUE);
@@ -215,6 +219,8 @@ public class SseService {
           if (obj instanceof RedisPubMessage pubMessage) {
             // 저장된 객체를 그대로 파싱해서 밀어넣음. 재전송 시 현재시간으로 새로운 id부여 (유실 대비)
             sendToClient(emitter, userId, String.valueOf(System.currentTimeMillis()), pubMessage.eventName(), pubMessage.data());
+          } else {
+            log.warn("예상치 못한 히스토리 객체 타입 - userId: {}, type: {}", userId, obj.getClass().getName());
           }
         }
       }

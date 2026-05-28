@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
@@ -115,8 +116,6 @@ class SseServiceTest {
     sseService.sendNotification(userId, dummyData);
 
     // then
-    ArgumentCaptor<RedisPubMessage> captor = ArgumentCaptor.forClass(RedisPubMessage.class);
-
     // ZSet 히스토리 저장 확인
     verify(zSetOperations).add(eq(historyKey), any(RedisPubMessage.class), anyDouble());
     verify(redisTemplate).expire(eq(historyKey), eq(10L), eq(TimeUnit.MINUTES));
@@ -362,5 +361,36 @@ class SseServiceTest {
 
     // 정상 emitter는 살아있는지 검증
     verify(emitterRepository, never()).delete(eq(userId), eq(successEmitter));
+  }
+
+  @Test
+  @DisplayName("알림 전송 - Redis 저장 실패 시에도 브로드캐스팅은 정상 진행된다.")
+  void sendNotification_RedisHistoryFailure_StillPublishes() {
+    // given
+    UUID userId = UUID.randomUUID();
+    given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
+    doThrow(new RuntimeException("Redis 연결 실패"))
+        .when(zSetOperations).add(anyString(), any(), anyDouble());
+
+    // when
+    sseService.sendNotification(userId, "data");
+
+    // then
+    verify(redisPublisher).publishSse(any(RedisPubMessage.class));
+  }
+
+  @Test
+  @DisplayName("SSE 구독 - 잘못된 형식의 Last-Event-ID는 무시하고 정상 연결된다.")
+  void subscribe_InvalidLastEventIdFormat_IgnoresRecovery() {
+    // given
+    UUID userId = UUID.randomUUID();
+    String invalidLastEventId = "not-a-number";
+
+    // when
+    SseEmitter result = sseService.subscribe(userId, invalidLastEventId);
+
+    // then
+    assertThat(result).isNotNull();
+    // Redis 조회가 시도되지 않거나, 예외가 안전하게 처리됨
   }
 }

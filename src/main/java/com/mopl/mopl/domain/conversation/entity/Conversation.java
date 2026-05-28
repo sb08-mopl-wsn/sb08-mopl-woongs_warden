@@ -69,20 +69,24 @@ public class Conversation extends BaseUpdatableEntity {
         return (id1.compareTo(id2) < 0) ? id1 + ":" + id2 : id2 + ":" + id1;
     }
 
-    public void updateLastReadAt(UUID userId, Instant readAt) {
+    public boolean updateLastReadAt(UUID userId, Instant readAt) {
         if (userId == null || readAt == null ) {
             throw new BusinessException(GlobalErrorCode.INVALID_INPUT, "userId와 readAt은 null일 수 없습니다.");
         }
+        boolean updated = false;
         if (this.sender.getId().equals(userId)) {
             if (this.lastReadAtBySender == null || this.lastReadAtBySender.isBefore(readAt)) {
                 this.lastReadAtBySender = readAt;
+                updated = true;
             }
         } else if (this.receiver.getId().equals(userId)) {
             if (this.lastReadAtByReceiver == null || this.lastReadAtByReceiver.isBefore(readAt)) {
                 this.lastReadAtByReceiver = readAt;
+                updated = true;
             }
         } else {
             throw new ConversationAccessDeniedException();
         }
+        return updated;
     }
 }

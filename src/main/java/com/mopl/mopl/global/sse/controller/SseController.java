@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -20,8 +21,9 @@ public class SseController implements SseApi {
   // 클라이언트-서버 간 실시간 통신 파이프라인 최초 연결 요청 API
   @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public SseEmitter subscribe(
-      @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails
+      @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
+      @RequestHeader(value = "Last-Event-ID", required = false, defaultValue = "") String lastEventId
   ) {
-    return sseService.subscribe(userDetails.getUserDto().id());
+    return sseService.subscribe(userDetails.getUserDto().id(), lastEventId);
   }
 }

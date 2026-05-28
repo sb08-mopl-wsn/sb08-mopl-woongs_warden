@@ -112,6 +112,13 @@ spring:
               - account_email
               - profile_nickname
             client-name: Kakao
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
 
 opensearch:
   uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
@@ -119,7 +126,7 @@ opensearch:
   socket-timeout: 30s
 
 app:
-#  분산 환경용 jwtRegistry 설정, 인메모리는 redis를 memory로 수정하면 됨
+  #  분산 환경용 jwtRegistry 설정, 인메모리는 redis를 memory로 수정하면 됨
   jwt:
     registry: redis
   oauth2:

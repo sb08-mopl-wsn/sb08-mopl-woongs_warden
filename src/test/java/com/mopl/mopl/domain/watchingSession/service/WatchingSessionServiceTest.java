@@ -481,6 +481,40 @@ public class WatchingSessionServiceTest {
             assertThat(published.contentId()).isEqualTo(contentId);
             assertThat(published.chatDto().content()).isEqualTo(maskedMessage);
         }
+
+        @Test
+        @DisplayName("정지된 유저가 채팅을 보내면 이벤트가 발행되지 않는다.")
+        void bannedUser_doesNotPublishEvent() {
+            // given
+            ReflectionTestUtils.setField(user, "isBanned", true);
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(contentRepository.existsById(contentId)).willReturn(true);
+
+            // when
+            watchingSessionService.receiveMessage(contentId, userId, chatRequest);
+
+            // then
+            verifyNoInteractions(eventPublisher);
+            verifyNoInteractions(badWordFilter);
+            verify(watchingSessionRepository, never())
+                    .findByContentIdAndUserId(any(), any());
+        }
+
+        @Test
+        @DisplayName("정지된 유저가 채팅을 보내면 시청 세션 검증을 수행하지 않는다.")
+        void bannedUser_skipsWatchingSessionCheck() {
+            // given
+            ReflectionTestUtils.setField(user, "isBanned", true);
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(contentRepository.existsById(contentId)).willReturn(true);
+
+            // when
+            watchingSessionService.receiveMessage(contentId, userId, chatRequest);
+
+            // then
+            verify(watchingSessionRepository, never())
+                    .findByContentIdAndUserId(contentId, userId);
+        }
     }
 
     @Nested

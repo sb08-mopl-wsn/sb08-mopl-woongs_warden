@@ -1,21 +1,27 @@
 package com.mopl.mopl.global.config;
 
 import com.mopl.mopl.domain.user.entity.Role;
+import com.mopl.mopl.global.component.WebSocketSessionRegistry;
 import com.mopl.mopl.global.interceptor.JwtAuthenticationChannelInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.handler.invocation.HandlerMethodArgumentResolver;
+import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.security.messaging.access.intercept.AuthorizationChannelInterceptor;
 import org.springframework.security.messaging.access.intercept.MessageMatcherDelegatingAuthorizationManager;
 import org.springframework.security.messaging.context.AuthenticationPrincipalArgumentResolver;
 import org.springframework.security.messaging.context.SecurityContextChannelInterceptor;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
+import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
 import org.springframework.messaging.converter.MessageConverter;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +37,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
     private final JwtAuthenticationChannelInterceptor jwtAuthenticationChannelInterceptor;
+    private final WebSocketSessionRegistry sessionRegistry;
 
     @Override
     public boolean configureMessageConverters(List<MessageConverter> messageConverters) {
@@ -46,6 +53,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private AuthorizationChannelInterceptor authorizationChannelInterceptor() {
         return new AuthorizationChannelInterceptor(
                 MessageMatcherDelegatingAuthorizationManager.builder()
+                        .simpTypeMatchers(SimpMessageType.DISCONNECT).permitAll()
                         .anyMessage().hasAnyRole(Role.USER.name(), Role.ADMIN.name())
                         .build()
         );
@@ -92,5 +100,23 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> argumentResolvers) {
         argumentResolvers.add(new AuthenticationPrincipalArgumentResolver());
+    }
+
+    // 웹소켓 연결을 연결/끊기 위한 로직
+    @Override
+    public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+        registration.addDecoratorFactory(handler -> new WebSocketHandlerDecorator(handler) {
+            @Override
+            public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+                sessionRegistry.addSession(session.getId(), session);
+                super.afterConnectionEstablished(session);
+            }
+
+            @Override
+            public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
+                sessionRegistry.removeSession(session.getId());
+                super.afterConnectionClosed(session, closeStatus);
+            }
+        });
     }
 }

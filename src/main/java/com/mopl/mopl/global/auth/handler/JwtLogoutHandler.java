@@ -3,12 +3,14 @@ package com.mopl.mopl.global.auth.handler;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
+import com.mopl.mopl.global.event.UserLogoutEvent;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,7 @@ import java.util.UUID;
 public class JwtLogoutHandler implements LogoutHandler {
     private final JwtTokenProvider tokenProvider;
     private final JwtRegistry jwtRegistry;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public void logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
@@ -61,6 +64,9 @@ public class JwtLogoutHandler implements LogoutHandler {
         // 4. 사용자 ID를 찾았다면 Registry에서 해당 유저의 모든 토큰 무효화
         if (userId != null) {
             jwtRegistry.invalidateJwtInformationByUserId(userId);
+
+            eventPublisher.publishEvent(new UserLogoutEvent(userId));
+
             log.debug("[Logout] 유저 ID: {} 의 모든 JWT 세션이 무효화되었습니다.", userId);
         } else {
             log.warn("[Logout] 로그아웃 요청에서 유저 식별 정보를 찾을 수 없습니다.");

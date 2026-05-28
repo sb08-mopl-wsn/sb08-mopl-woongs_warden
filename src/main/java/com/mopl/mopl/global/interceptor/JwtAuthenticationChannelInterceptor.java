@@ -4,6 +4,7 @@ import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import com.mopl.mopl.global.component.WebSocketSessionRegistry;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.web.socket.WebSocketSession;
 
 import java.util.Optional;
 
@@ -31,6 +33,8 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
     private final RoleHierarchy roleHierarchy;
     private final JwtRegistry jwtRegistry;
 
+    private final WebSocketSessionRegistry sessionRegistry;
+
     private static final String PREFIX = "Bearer ";
     private static final String HEADER_NAME = "ACCESS_TOKEN";
 
@@ -41,9 +45,22 @@ public class JwtAuthenticationChannelInterceptor implements ChannelInterceptor {
         );
 
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-            handleAuthentication(accessor);
-        }
+            try {
+                handleAuthentication(accessor);
+            } catch (BusinessException e) {
+                log.info("[WebSocket] 만료된 토큰의 재연결 시도를 차단합니다. sessionId: {}", accessor.getSessionId());
 
+                try {
+                    WebSocketSession session = sessionRegistry.getSession(accessor.getSessionId());
+                    if (session != null && session.isOpen()) {
+                        session.close();
+                    }
+                } catch (Exception ex) {
+                    log.warn("[WebSocket] 차단된 세션 강제 종료 실패", ex);
+                }
+                return null;
+            }
+        }
         return message;
     }
 

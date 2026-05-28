@@ -2,6 +2,9 @@ spring:
   threads:
     virtual:
       enabled: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
   jpa:
     properties:
       hibernate:
@@ -77,7 +80,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "com.mopl.mopl"
+        spring.json.trusted.packages: "*"
     properties:
       security:
         protocol: SASL_SSL

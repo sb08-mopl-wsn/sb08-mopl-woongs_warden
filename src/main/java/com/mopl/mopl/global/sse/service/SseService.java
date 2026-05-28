@@ -3,6 +3,8 @@ package com.mopl.mopl.global.sse.service;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import com.mopl.mopl.global.exception.SseConnectionException;
+import com.mopl.mopl.global.redis.dto.RedisPubMessage;
+import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.sse.repository.SseEmitterRepository;
 import java.io.IOException;
 import java.util.List;
@@ -21,6 +23,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class SseService {
 
   private final SseEmitterRepository emitterRepository;
+  private final RedisPublisher redisPublisher;
 
   // 만료 시간 30분 설정
   private static final Long TIMEOUT = 30L * 1000 * 60;
@@ -96,18 +99,20 @@ public class SseService {
     }
     Objects.requireNonNull(data, "data는 null일 수 없습니다.");
 
+    RedisPubMessage message = new RedisPubMessage(userId, eventName, data);
+    redisPublisher.publishSse(message);
+  }
+
+  public void sendToLocalClient(UUID userId, String eventName, Object data) {
+
     List<SseEmitter> emitters = emitterRepository.findAllByUserId(userId);
     if (emitters.isEmpty()) return;
 
-    // 성공 횟수 집계
     long successCount = emitters.stream()
-            .filter(emitter -> sendToClient(emitter, userId, eventName, data))
-            .count();
+        .filter(emitter -> sendToClient(emitter, userId, eventName, data))
+        .count();
 
-    // 다중 기기 중 일부라도 실패하거나 전체 성공 현황 info 기록
-    log.info("SSE 알림 전송 완료 - userId: {}, eventName: {}, 성공: {}/{}", userId, eventName, successCount, emitters.size());
-
-    // TODO: 분산 환경 전환 시 위 단일 서버 환경 로직 대신 Redis Pub/Sub 구조 도입 후 메시지 발행하도록 수정
+    log.info("로컬 SSE 알림 전송 완료 - userId: {}, 성공: {}/{}", userId, successCount, emitters.size());
   }
 
   // heartbeat 발송기 (1개 스레드로 30초마다 모든 유저에게 핑 발송)

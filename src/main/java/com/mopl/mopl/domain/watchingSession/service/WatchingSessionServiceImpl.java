@@ -19,6 +19,7 @@ import com.mopl.mopl.global.component.BadWordFilter;
 import com.mopl.mopl.global.event.BadWordDetectedEvent;
 import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
+import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -52,6 +53,9 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
     // filtering
     private final BadWordFilter badWordFilter;
+
+    // S3
+    private final S3ImageStorage s3ImageStorage;
 
     /**
      * 콘텐츠 실시간 웹소켓 접속을 위한 로직
@@ -158,10 +162,15 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
             throw new WatchingSessionNotFoundException(contentId, senderId);
         }
 
+        String imageUrl = null;
+        if (user.getProfileImageKey() != null && !user.getProfileImageKey().isBlank()) {
+            imageUrl = s3ImageStorage.getPublicUrl(user.getProfileImageKey());
+        }
+
         UserSummary sender = new UserSummary(
                 user.getId(),
                 user.getName(),
-                user.getProfileImageKey()
+                imageUrl
         );
 
         String originalMessage = request.content();

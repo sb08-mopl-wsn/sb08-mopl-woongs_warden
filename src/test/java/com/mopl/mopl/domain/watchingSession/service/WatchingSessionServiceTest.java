@@ -24,6 +24,7 @@ import com.mopl.mopl.domain.watchingSession.repository.WatchingSessionRepository
 import com.mopl.mopl.global.component.BadWordFilter;
 import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
+import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -68,6 +69,8 @@ public class WatchingSessionServiceTest {
     private ApplicationEventPublisher eventPublisher;
     @Mock
     private BadWordFilter badWordFilter;
+    @Mock
+    private S3ImageStorage s3ImageStorage;
 
     // common
     private UUID contentId;
@@ -514,6 +517,107 @@ public class WatchingSessionServiceTest {
             // then
             verify(watchingSessionRepository, never())
                     .findByContentIdAndUserId(contentId, userId);
+        }
+
+        @Test
+        @DisplayName("프로필 키가 비어있거나 (null) 없으면 S3 조회를 패스하고 null로 전송한다.")
+        void validRequest_withNullProfileKey_skipS3AndPublishesEvent() {
+            // given
+            ReflectionTestUtils.setField(user, "profileImageKey", null);
+
+            String rawMessage = "안녕하세요?";
+            ContentChatSendRequest request = new ContentChatSendRequest(rawMessage);
+
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(contentRepository.existsById(contentId)).willReturn(true);
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(session));
+            given(badWordFilter.maskBadWord(rawMessage)).willReturn(rawMessage);
+
+            ArgumentCaptor<UserSummary> userSummaryCaptor = ArgumentCaptor.forClass(UserSummary.class);
+            ContentChatDto chatDto = new ContentChatDto(new UserSummary(userId, "테스트 유저", null), rawMessage);
+            given(sessionMapper.toChatDto(userSummaryCaptor.capture(), eq(rawMessage))).willReturn(chatDto);
+
+            watchingSessionService.receiveMessage(contentId, userId, request);
+
+            verify(s3ImageStorage, never()).getPublicUrl(anyString());
+            assertThat(userSummaryCaptor.getValue().profileImageUrl()).isNull();
+        }
+
+        @Test
+        @DisplayName("프로필 키가 blank(공백)면 S3 조회를 패스하고 null로 전송한다.")
+        void validRequest_withBlankProfileKey_skipS3AndPublishesEvent() {
+            // given
+            ReflectionTestUtils.setField(user, "profileImageKey", "   ");
+
+            String rawMessage = "안녕하세요?";
+            ContentChatSendRequest request = new ContentChatSendRequest(rawMessage);
+
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(contentRepository.existsById(contentId)).willReturn(true);
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(session));
+            given(badWordFilter.maskBadWord(rawMessage)).willReturn(rawMessage);
+
+            ArgumentCaptor<UserSummary> userSummaryCaptor = ArgumentCaptor.forClass(UserSummary.class);
+            ContentChatDto chatDto = new ContentChatDto(new UserSummary(userId, "테스트 유저", null), rawMessage);
+            given(sessionMapper.toChatDto(userSummaryCaptor.capture(), eq(rawMessage))).willReturn(chatDto);
+
+            // when
+            watchingSessionService.receiveMessage(contentId, userId, request);
+
+            // then
+            verify(s3ImageStorage, never()).getPublicUrl(anyString());
+            assertThat(userSummaryCaptor.getValue().profileImageUrl()).isNull();
+        }
+
+        @Test
+        @DisplayName("정상 조건이면서 프로필 키가 존재할 때 S3 Public URL을 반영한 LiveChatEvent가 발행된다.")
+        void validRequest_withProfileKey_publishesLiveChatEvent() {
+            // given
+            String rawMessage = "안녕하세요?";
+            String maskedMessage = "안녕하세요?";
+            String expectedCdnUrl = "https://cdn.mopl.com/profile/image.jpg";
+
+            User testUser = User.builder()
+                    .name("테스트 유저")
+                    .email("test@test.com")
+                    .password("test1234!")
+                    .build();
+            ReflectionTestUtils.setField(testUser, "id", userId);
+            ReflectionTestUtils.setField(testUser, "profileImageKey", "profile/image.jpg");
+
+            ContentChatSendRequest request = new ContentChatSendRequest(rawMessage);
+
+            given(userRepository.findById(userId)).willReturn(Optional.of(testUser));
+            given(contentRepository.existsById(contentId)).willReturn(true);
+
+            WatchingSession testSession = WatchingSession.builder()
+                    .content(content)
+                    .user(testUser)
+                    .build();
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(testSession));
+            given(badWordFilter.maskBadWord(rawMessage)).willReturn(maskedMessage);
+
+            given(s3ImageStorage.getPublicUrl(anyString())).willReturn(expectedCdnUrl);
+
+            ArgumentCaptor<UserSummary> userSummaryCaptor = ArgumentCaptor.forClass(UserSummary.class);
+            ContentChatDto chatDto = new ContentChatDto(new UserSummary(userId, "테스트 유저", expectedCdnUrl), maskedMessage);
+
+            given(sessionMapper.toChatDto(userSummaryCaptor.capture(), eq(maskedMessage)))
+                    .willReturn(chatDto);
+
+            // when
+            watchingSessionService.receiveMessage(contentId, userId, request);
+
+            // then
+            verify(s3ImageStorage, times(1)).getPublicUrl("profile/image.jpg");
+            assertThat(userSummaryCaptor.getValue().profileImageUrl()).isEqualTo(expectedCdnUrl);
+
+            ArgumentCaptor<LiveChatEvent> captor = ArgumentCaptor.forClass(LiveChatEvent.class);
+            verify(eventPublisher, times(1)).publishEvent(captor.capture());
+            assertThat(captor.getValue().chatDto().content()).isEqualTo(maskedMessage);
         }
     }
 

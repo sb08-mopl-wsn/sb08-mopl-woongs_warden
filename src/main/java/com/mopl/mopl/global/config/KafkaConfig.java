@@ -1,5 +1,6 @@
 package com.mopl.mopl.global.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -30,7 +31,8 @@ public class KafkaConfig {
 
         // 에러 발생 시 2000ms(2초) 간격으로 최대 3번 재시도 (총 4번 시도) 후, Recoverer 실행
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(2000L, 3L));
-        
+        errorHandler.addNotRetryableExceptions(JsonProcessingException.class);
+
         factory.setCommonErrorHandler(errorHandler);
 
         return factory;

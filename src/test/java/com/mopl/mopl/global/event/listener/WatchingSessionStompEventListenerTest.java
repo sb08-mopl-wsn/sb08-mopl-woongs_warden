@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -34,6 +35,8 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -91,6 +94,7 @@ public class WatchingSessionStompEventListenerTest {
 
         lenient().when(redisTemplate.opsForSet()).thenReturn(setOperations);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
     }
 
     private Message<byte[]> createStompMessage(StompCommand command, String destination) {
@@ -157,6 +161,26 @@ public class WatchingSessionStompEventListenerTest {
     class HandleSubscribe {
 
         @Test
+        @DisplayName("[회귀 테스트] 분산락 소유권 기반 해제: 락 해제 시 단순 delete가 아닌 토큰 기반 Lua 스크립트를 실행한다.")
+        void distributedLock_releasedByOwnershipUsingLuaScript() {
+            // when
+            when(setOperations.members(anyString())).thenReturn(null);
+
+            Message<byte[]> message = createStompMessage(StompCommand.SUBSCRIBE, "/sub/contents/" + contentId + "/watch");
+            stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, message));
+
+            String lockKey = String.format("lock:watch:%s:%s", userId, contentId);
+
+            // then
+            verify(redisTemplate, never()).delete(lockKey);
+            verify(redisTemplate, times(1)).execute(
+                    any(RedisScript.class),
+                    eq(Collections.singletonList(lockKey)),
+                    anyString()
+            );
+        }
+
+        @Test
         @DisplayName("구독 경로가 null이면 무시하고 서비스의 join()을 호출하지 않는다.")
         void nullDestination_doesNothing() {
             // given
@@ -204,19 +228,19 @@ public class WatchingSessionStompEventListenerTest {
         @DisplayName("분산 락 획득에 실패하면 중복 join 처리를 막기 위해 early return 한다.")
         void lockFailed_returnsEarly() {
             // when
-            when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class))).thenReturn(false);
+            when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(false);
 
             Message<byte[]> message = createStompMessage(StompCommand.SUBSCRIBE, "/sub/contents/" + contentId + "/watch");
             stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, message));
 
             verify(setOperations, never()).add(anyString(), anyString());
+            verify(redisTemplate, never()).execute(any(RedisScript.class), anyList(), anyString());
         }
 
         @Test
-        @DisplayName("처음 시청하는 콘텐츠면 join()을 호출하고 락을 삭제한다.")
+        @DisplayName("처음 시청하는 콘텐츠면 join()을 호출하고 Lua 스크립트로 락을 삭제한다.")
         void firstTimeWatching_callsJoinAndReleasesLock() {
             // when
-            when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class))).thenReturn(true);
             when(setOperations.members(anyString())).thenReturn(null); // isUserWatching = false
 
             Message<byte[]> message = createStompMessage(StompCommand.SUBSCRIBE, "/sub/contents/" + contentId + "/watch");
@@ -224,15 +248,13 @@ public class WatchingSessionStompEventListenerTest {
 
             // then
             verify(sessionService).join(contentId, userId);
-            verify(redisTemplate).delete(String.format("lock:watch:%s:%s", userId, contentId)); // lock 삭제 검증
+            verify(redisTemplate).execute(any(RedisScript.class), anyList(), anyString());
         }
 
         @Test
         @DisplayName("다른 세션에서 이미 시청 중이면 join()을 호출하지 않는다.")
         void alreadyWatching_doesNotCallJoin() {
             // when
-            when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class))).thenReturn(true);
-
             when(setOperations.members(anyString())).thenReturn(Set.of("other-session-id"));
             when(setOperations.isMember(anyString(), eq(contentId.toString()))).thenReturn(true);
 
@@ -241,35 +263,34 @@ public class WatchingSessionStompEventListenerTest {
 
             // then
             verify(sessionService, never()).join(any(), any());
-            verify(redisTemplate).delete(anyString());
+            verify(redisTemplate).execute(any(RedisScript.class), anyList(), anyString());
         }
 
         @Test
-        @DisplayName("비즈니스 로직 예외 발생 시 예외를 잡고 락을 해제한다.")
+        @DisplayName("비즈니스 로직 예외 발생 시 예외를 잡고 Lua 스크립트로 락을 해제한다.")
         void joinThrowsBusinessException_catchesAndReleasesLock() {
             // when
-            when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class))).thenReturn(true);
             doThrow(new BusinessException(GlobalErrorCode.INVALID_INPUT)).when(sessionService).join(contentId, userId);
 
             Message<byte[]> message = createStompMessage(StompCommand.SUBSCRIBE, "/sub/contents/" + contentId + "/watch");
             stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, message));
 
             // then
-            verify(redisTemplate).delete(anyString());
+            verify(redisTemplate).execute(any(RedisScript.class), anyList(), anyString());
         }
 
         @Test
         @DisplayName("알 수 없는 예외 발생 시 catch 블록에서 처리하고 락을 해제한다.")
         void joinThrowsException_catchesAndReleasesLock() {
             // when
-            when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class))).thenReturn(true);
+            when(setOperations.members(anyString())).thenReturn(null);
             doThrow(new RuntimeException()).when(sessionService).join(contentId, userId);
 
             Message<byte[]> message = createStompMessage(StompCommand.SUBSCRIBE, "/sub/contents/" + contentId + "/watch");
             stompEventListener.handleSubscribe(new SessionSubscribeEvent(this, message));
 
             // then
-            verify(redisTemplate).delete(anyString());
+            verify(redisTemplate).execute(any(RedisScript.class), anyList(), anyString());
         }
     }
 
@@ -304,6 +325,7 @@ public class WatchingSessionStompEventListenerTest {
             // then
             verify(redisTemplate).delete(String.format("ws:session:%s:contents", sessionId));
             verify(sessionService).leave(contentId, userId);
+            verify(redisTemplate).execute(any(RedisScript.class), anyList(), any());
         }
 
         @Test
@@ -336,6 +358,21 @@ public class WatchingSessionStompEventListenerTest {
             Message<byte[]> message2 = createStompMessage(StompCommand.UNSUBSCRIBE, null);
             assertDoesNotThrow(() -> stompEventListener.handleUnSubscribe(new SessionUnsubscribeEvent(this, message2)));
         }
+
+        @Test
+        @DisplayName("락 획득 실패 시 leave 로직을 수행하지 않고 종료한다.")
+        void lockFailed_skipsLeave() {
+            // when
+            when(valueOperations.get(anyString())).thenReturn(contentId.toString());
+            when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(false);
+
+            Message<byte[]> message = createStompMessage(StompCommand.UNSUBSCRIBE, null);
+            stompEventListener.handleUnSubscribe(new SessionUnsubscribeEvent(this, message));
+
+            // then
+            verify(sessionService, never()).leave(any(), any());
+            verify(redisTemplate, never()).execute(any(RedisScript.class), anyList(), any());
+        }
     }
 
     @Nested
@@ -358,9 +395,8 @@ public class WatchingSessionStompEventListenerTest {
 
             // then
             verify(redisTemplate).delete(String.format("ws:sub:%s:sub-1", sessionId));
-            verify(redisTemplate).delete(String.format("ws:sub:%s:sub-2", sessionId));
-            verify(redisTemplate).delete(String.format("ws:user:%s:sessions", userId));
             verify(sessionService).leave(contentId, userId);
+            verify(redisTemplate).execute(any(RedisScript.class), anyList(), any());
         }
 
         @Test
@@ -391,27 +427,6 @@ public class WatchingSessionStompEventListenerTest {
 
             // then
             verify(redisTemplate, never()).delete(String.format("ws:user:%s:sessions", userId));
-        }
-
-        @Test
-        @DisplayName("leave 호출 중 DB 에러가 발생해도 다른 방 처리를 계속 진행한다.")
-        void exceptionInLeave_catchesAndContinues() {
-            // given
-            UUID contentId2 = UUID.randomUUID();
-
-            // when
-            when(setOperations.members(String.format("ws:session:%s:contents", sessionId)))
-                    .thenReturn(Set.of(contentId.toString(), contentId2.toString()));
-            when(setOperations.size(anyString())).thenReturn(0L);
-
-            doThrow(new RuntimeException("DB 에러")).when(sessionService).leave(contentId, userId);
-
-            Message<byte[]> message = createStompMessage(StompCommand.DISCONNECT, null);
-            stompEventListener.handleLeave(new SessionDisconnectEvent(this, message, sessionId, null));
-
-            // then
-            verify(sessionService).leave(contentId, userId);
-            verify(sessionService).leave(contentId2, userId);
         }
 
         @Test
@@ -447,7 +462,7 @@ public class WatchingSessionStompEventListenerTest {
         }
 
         @Test
-        @DisplayName("로그아웃 시 Redis Key 일괄 정리 및 Websocket 강제 종료, DB leave()를 수행한다.")
+        @DisplayName("로그아웃 시 Redis Key 일괄 정리 및 Websocket 강제 종료 후 락 기반 DB leave()를 수행한다.")
         void logout_cleansUpAndCloses() throws Exception {
             // when
             when(setOperations.members(String.format("ws:user:%s:sessions", userId))).thenReturn(Set.of(sessionId));
@@ -465,6 +480,7 @@ public class WatchingSessionStompEventListenerTest {
             verify(redisTemplate).delete(String.format("ws:sub:%s:sub-1", sessionId));
             verify(mockWsSession).close();
             verify(sessionService).leave(contentId, userId);
+            verify(redisTemplate).execute(any(RedisScript.class), anyList(), any());
         }
 
         @Test

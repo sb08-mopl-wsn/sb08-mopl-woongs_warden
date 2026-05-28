@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
@@ -21,10 +22,7 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * STOMP 프로토콜 이벤트를 수신하여 사용자의 시청 세션(입장/퇴장)을 동기화하고 관리한다.
@@ -52,6 +50,16 @@ public class WatchingSessionStompEventListener {
 
     // Redis TTL 3시간 설정
     private static final Duration SESSION_TTL = Duration.ofHours(3);
+
+    // 원자적 비교 후 삭제를 보장하는 Lua 스크립트 객체 정의
+    // 상태를 검사한 시점과 그 상태를 실제로 사용한 시점 사이에 시차가 존재하여 그 사이에 데이터가 변해버리는 결함을 방지
+    private static final DefaultRedisScript<Long> RELEASE_LOCK_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+                    "return redis.call('del', KEYS[1]) " +
+                    "else return 0 " +
+                    "end",
+            Long.class
+    );
 
     /**
      * 웹 소켓 최초 연결 시 호출. 유저와 세션을 매핑하여 상태 관리를 준비한다.
@@ -88,6 +96,9 @@ public class WatchingSessionStompEventListener {
 
         if (destination == null || !destination.matches("/sub/contents/.+/watch")) return;
 
+        String lockToken = UUID.randomUUID().toString();
+        String lockKey = null;
+
         try {
             String sessionId = accessor.getSessionId();
             String subscriptionId = accessor.getSubscriptionId();
@@ -95,11 +106,16 @@ public class WatchingSessionStompEventListener {
             UUID userId = extractUserId(accessor);
 
             // 분산 락으로 중복 join 방지
-            String lockKey = String.format(KEY_WATCH_LOCK, userId, contentId);
-            Boolean acquired = redisTemplate.opsForValue()
-                    .setIfAbsent(lockKey, "1", Duration.ofSeconds(5));
+            lockKey = String.format(KEY_WATCH_LOCK, userId, contentId);
 
-            if (!Boolean.TRUE.equals(acquired)) return;
+            // 고유 토큰값 기반 분산 락 점유
+            Boolean acquired = redisTemplate.opsForValue()
+                    .setIfAbsent(lockKey, lockToken, Duration.ofSeconds(10));
+
+            if (!Boolean.TRUE.equals(acquired)) {
+                log.info("[Subscribe Lock Failed] 이미 처리 중인 요청입니다. userId={}, contentId={}", userId, contentId);
+                return;
+            }
 
             try {
                 boolean isAlreadyWatching = isUserWatching(userId, contentId);
@@ -111,19 +127,25 @@ public class WatchingSessionStompEventListener {
                 String subMapKey = String.format(KEY_SUB_MAP, sessionId, subscriptionId);
                 redisTemplate.opsForValue().set(subMapKey, contentId.toString(), SESSION_TTL);
 
-                redisTemplate.opsForSet().add(String.format(KEY_USER_SESSIONS, userId), sessionId);
+                String userSessionKey = String.format(KEY_USER_SESSIONS, userId);
+                redisTemplate.opsForSet().add(userSessionKey, sessionId);
+                redisTemplate.expire(userSessionKey, SESSION_TTL);
 
                 // keys() 성능 저하를 막기 위해 세션별 구독 식별자를 전용 셋으로 관리한다.
                 String sessionSubKey = String.format(KEY_SESSION_SUBS, sessionId);
                 redisTemplate.opsForSet().add(sessionSubKey, subscriptionId);
                 redisTemplate.expire(sessionSubKey, SESSION_TTL);
 
-
                 if (!isAlreadyWatching) {
                     watchingSessionService.join(contentId, userId);
                 }
             } finally {
-                redisTemplate.delete(lockKey);
+                // 내 토큰과 일치할 때만 원자적으로 제거하여 TOCTOU 방지
+                redisTemplate.execute(
+                        RELEASE_LOCK_SCRIPT,
+                        Collections.singletonList(lockKey),
+                        lockToken
+                );
             }
 
         } catch (BusinessException e) {
@@ -154,22 +176,40 @@ public class WatchingSessionStompEventListener {
             if (contentIdStr == null) return;
 
             UUID contentId = UUID.fromString(contentIdStr);
-
-            redisTemplate.delete(subKey);
-            redisTemplate.opsForSet().remove(String.format(KEY_SESSION_SUBS, sessionId), subscriptionId);
-
-            String sessionContentKey = String.format(KEY_SESSION_CONTENTS, sessionId);
-            redisTemplate.opsForSet().remove(sessionContentKey, contentIdStr);
-
-            Long remainRoomCount = redisTemplate.opsForSet().size(sessionContentKey);
-            if (remainRoomCount != null && remainRoomCount == 0) {
-                redisTemplate.delete(sessionContentKey);
-            }
-
             UUID userId = extractUserId(accessor);
 
-            if (!isUserWatching(userId, contentId)) {
-                watchingSessionService.leave(contentId, userId);
+            // 명시적 구독 취소 시 동시성 제어를 위한 분산 락 획득
+            String lockToken = UUID.randomUUID().toString();
+            String lockKey = String.format(KEY_WATCH_LOCK, userId, contentId);
+
+            Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockToken, Duration.ofSeconds(10));
+            if (!Boolean.TRUE.equals(acquired)) {
+                log.info("[Unsubscribe Lock Failed] 이미 퇴장 처리 중인 세션입니다. userId={}, contentId={}", userId, contentId);
+                return;
+            }
+
+            try {
+                redisTemplate.delete(subKey);
+                redisTemplate.opsForSet().remove(String.format(KEY_SESSION_SUBS, sessionId), subscriptionId);
+
+                String sessionContentKey = String.format(KEY_SESSION_CONTENTS, sessionId);
+                redisTemplate.opsForSet().remove(sessionContentKey, contentIdStr);
+
+                Long remainRoomCount = redisTemplate.opsForSet().size(sessionContentKey);
+                if (remainRoomCount != null && remainRoomCount == 0) {
+                    redisTemplate.delete(sessionContentKey);
+                }
+
+                if (!isUserWatching(userId, contentId)) {
+                    watchingSessionService.leave(contentId, userId);
+                }
+            } finally {
+                // 원자적 락 제거
+                redisTemplate.execute(
+                        RELEASE_LOCK_SCRIPT,
+                        Collections.singletonList(lockKey),
+                        lockToken
+                );
             }
         } catch (BusinessException e) {
             log.warn("[Unsubscribe FAIL] sessionId={}, code={}, message={}",
@@ -224,12 +264,25 @@ public class WatchingSessionStompEventListener {
             if (contentIdsStr != null) {
                 for (String idStr : contentIdsStr) {
                     UUID contentId = UUID.fromString(idStr);
-                    if (!isUserWatching(userId, contentId)) {
-                        try {
+
+                    String lockToken = UUID.randomUUID().toString();
+                    String lockKey = String.format(KEY_WATCH_LOCK, userId, contentId);
+
+                    // 강제 연결 종료 시 기기 교차 정합성이 무너지지 않도록 병렬 분산 락 획득
+                    Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockToken, Duration.ofSeconds(10));
+                    if (!Boolean.TRUE.equals(acquired)) continue;
+
+                    try {
+                        if (!isUserWatching(userId, contentId)) {
                             watchingSessionService.leave(contentId, userId);
-                        } catch (Exception e) {
-                            log.error("[Disconnect ERROR] DB 접속 에러", e);
                         }
+                    } finally {
+                        // 원자적 락 해제
+                        redisTemplate.execute(
+                                RELEASE_LOCK_SCRIPT,
+                                Collections.singletonList(lockKey),
+                                lockToken
+                        );
                     }
                 }
             }
@@ -284,10 +337,24 @@ public class WatchingSessionStompEventListener {
         }
 
         for (UUID contentId : uniqueContentIdsToLeave) {
+            String lockToken = UUID.randomUUID().toString();
+            String lockKey = String.format(KEY_WATCH_LOCK, userId, contentId);
+
+            // 일괄 로그아웃 시에도 개별 방 퇴장 흐름과 꼬이지 않도록 분산 락 결합
+            Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockToken, Duration.ofSeconds(10));
+            if (!Boolean.TRUE.equals(acquired)) continue;
+
             try {
                 watchingSessionService.leave(contentId, userId);
             } catch (Exception e) {
                 log.error("[UserLogout ERROR] DB 접속 에러", e);
+            } finally {
+                // 원자적 락 해제
+                redisTemplate.execute(
+                        RELEASE_LOCK_SCRIPT,
+                        Collections.singletonList(lockKey),
+                        lockToken
+                );
             }
         }
         log.info("[Logout] Redis 세션 및 DB 일괄 정리 완료. userId={}", userId);

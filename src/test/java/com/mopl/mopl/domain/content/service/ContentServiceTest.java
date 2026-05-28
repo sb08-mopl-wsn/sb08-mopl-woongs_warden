@@ -185,7 +185,7 @@ class ContentServiceTest
 
             Slice<Content> slice = new SliceImpl<>(List.of(content1, content2), Pageable.unpaged(), true);
 
-            given(contentRepository.getContents(contentSearchRequest)).willReturn(slice);
+            given(contentRepository.getContents(contentSearchRequest, null)).willReturn(slice);
             given(contentRepository.countContentsWithKeyword(null)).willReturn(5L);
             given(contentMapper.toContentDtos(slice.getContent())).willReturn(List.of(
                     createContentDto("콘텐츠 1"),
@@ -214,7 +214,7 @@ class ContentServiceTest
             Content content1 = createContent("콘텐츠1", 50);
             Slice<Content> slice = new SliceImpl<>(List.of(content1), Pageable.unpaged(), false);
 
-            given(contentRepository.getContents(request)).willReturn(slice);
+            given(contentRepository.getContents(request, null)).willReturn(slice);
             given(contentRepository.countContentsWithKeyword(null)).willReturn(1L);
             given(contentMapper.toContentDtos(slice.getContent())).willReturn(List.of(
                     createContentDto("콘텐츠1")
@@ -240,7 +240,7 @@ class ContentServiceTest
 
             Slice<Content> slice = new SliceImpl<>(List.of(), Pageable.unpaged(), false);
 
-            given(contentRepository.getContents(request)).willReturn(slice);
+            given(contentRepository.getContents(request, null)).willReturn(slice);
             given(contentRepository.countContentsWithKeyword(null)).willReturn(0L);
             given(contentMapper.toContentDtos(List.of())).willReturn(List.of());
 

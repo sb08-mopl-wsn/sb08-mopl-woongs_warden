@@ -1,8 +1,10 @@
 package com.mopl.mopl.infrastructure.elasticsearch;
 
 import com.mopl.mopl.infrastructure.elasticsearch.document.ContentDocument;
+import com.mopl.mopl.infrastructure.elasticsearch.dto.ContentSearchResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.opensearch.common.unit.Fuzziness;
 import org.opensearch.data.client.orhlc.NativeSearchQueryBuilder;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.springframework.data.domain.PageRequest;
@@ -12,6 +14,8 @@ import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 import static org.opensearch.index.query.QueryBuilders.boolQuery;
 import static org.opensearch.index.query.QueryBuilders.multiMatchQuery;
@@ -23,8 +27,57 @@ import static org.opensearch.index.query.QueryBuilders.termQuery;
 public class ContentSearchQueryService
 {
     private static final int CANDIDATE_SIZE = 30;
+    private static final int SEARCH_MAX_SIZE = 200;
 
     private final ElasticsearchOperations elasticsearchOperations;
+
+    /**
+     * 키워드 기반 콘텐츠 Full Text Search
+     * <p>
+     * nori를 활용한 한국어 검색을 지원하며,
+     * title, description, tags 필드를 균등하게 검색한다.
+     * fuzziness 옵션으로 오타가 있어도 유사한 결과를 반환한다.
+     *
+     * @param keyword       검색 키워드
+     * @param contentType   콘텐츠 타입 필터, null이면 전체 타입 검색
+     * @return 매칭된 콘텐츠 ID 목록
+     */
+    public ContentSearchResult searchByKeyword(String keyword, String contentType) {
+        BoolQueryBuilder boolQuery = boolQuery();
+
+        if (contentType != null && !contentType.isBlank()) {
+            boolQuery.filter(termQuery("contentType", contentType));
+        }
+
+        boolQuery.must(multiMatchQuery(keyword, "title", "description", "tags")
+                .fuzziness(Fuzziness.AUTO));
+
+        Query query = new NativeSearchQueryBuilder()
+                .withQuery(boolQuery)
+                .withPageable(PageRequest.of(0, SEARCH_MAX_SIZE))
+                .build();
+
+        SearchHits<ContentDocument> hits = elasticsearchOperations.search(query, ContentDocument.class);
+
+        List<UUID> ids = hits.stream()
+                .map(hit -> hit.getContent().getId())
+                .map(id -> {
+                    try {
+                        return UUID.fromString(id);
+                    } catch (IllegalArgumentException e) {
+                        log.warn("[ES] 잘못된 콘텐츠 id: {}", id);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (ids.size() >= SEARCH_MAX_SIZE) {
+            log.warn("[OpenSearch] 검색 결과 상한 도달: keyword={}, maxSize={}", keyword, SEARCH_MAX_SIZE);
+        }
+
+        return new ContentSearchResult(ids, hits.getTotalHits());
+    }
 
     /**
      * 의도 분석 결과를 기반으로 Elasticsearch에서 추천 후보 콘텐츠 ID 목록을 검색한다.

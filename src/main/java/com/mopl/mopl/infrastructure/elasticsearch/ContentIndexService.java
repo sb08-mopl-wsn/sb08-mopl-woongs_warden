@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -24,16 +23,6 @@ public class ContentIndexService
         } catch (Exception e) {
             log.warn("[ES] 콘텐츠 색인 실패: id={}", content.getId(), e);
             return false;
-        }
-    }
-
-    public void indexAll(List<Content> contents) {
-        try {
-            contentSearchRepository.saveAll(
-                    contents.stream().map(ContentDocument::from).toList()
-            );
-        } catch (Exception e) {
-            log.warn("[ES] 콘텐츠 일괄 색인 실패: count={}", contents.size(), e);
         }
     }
 

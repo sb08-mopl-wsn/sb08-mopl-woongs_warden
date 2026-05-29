@@ -94,22 +94,16 @@ class ReviewServiceImplTest {
   @DisplayName("리뷰 생성")
   class Create {
     @Test
-    @DisplayName("리뷰를 정상적으로 생성하고 평점을 업데이트한다.")
+    @DisplayName("리뷰를 정상적으로 생성하고 이벤트를 발행한다.")
     void givenValidRequest_whenCreate_thenSuccess() {
       // given
       ReviewCreateRequest request = new ReviewCreateRequest(contentId, "재밌네요!", 4.0);
       ReviewDto reviewDto = new ReviewDto(reviewId, contentId, new UserSummary(userId, "test user", null), "재밌네요!", 4.0);
-      ReviewStatsDto statsDto = new ReviewStatsDto(1L, 4.0);
 
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
       given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
       given(reviewMapper.toEntity(request, user, content)).willReturn(review);
       given(reviewRepository.saveAndFlush(any(Review.class))).willReturn(review);
-
-      // 통계 업데이트 Mocking
-      given(contentRepository.findByIdForUpdate(contentId)).willReturn(Optional.of(content));
-      given(reviewRepository.getReviewStats(contentId)).willReturn(statsDto);
-
       given(reviewMapper.toDto(review)).willReturn(reviewDto);
 
       // when
@@ -120,12 +114,8 @@ class ReviewServiceImplTest {
       assertThat(result.rating()).isEqualTo(4.0);
 
       // 검증
-      then(contentRepository).should().findByIdForUpdate(contentId);
-      then(reviewRepository).should().getReviewStats(contentId);
+      then(reviewRepository).should().saveAndFlush(any(Review.class));
       then(eventPublisher).should().publishEvent(any(ReviewCreatedEvent.class));
-
-      assertThat(content.getAvgRating()).isEqualByComparingTo(new BigDecimal("4.0"));
-      assertThat(content.getReviewCount()).isEqualTo(1);
     }
 
     @Test

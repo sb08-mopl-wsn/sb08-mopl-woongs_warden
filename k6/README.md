@@ -24,7 +24,7 @@ k6/
 ├── tests/
 │   ├── load-test.js            # Load Test (정상 트래픽)
 │   ├── stress-test.js          # Stress Test (한계 탐색)
-│   └── spike-test.js           # Spike Test (급격한 트래픽)
+│   ├── spike-test.js           # Spike Test (급격한 트래픽)
 │   └── soak-test.js            # Soak Test (장시간 안정성)
 └── README.md
 ```
@@ -34,16 +34,16 @@ k6/
 2. **비밀번호에 특수문자가 포함되어 있으면 (' ')로 감싸야 함**
 ```bash
 # Load Test
-K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=k6/results/load-test-report.html k6 run -e TEST_EMAIL=your@email.com -e TEST_PASSWORD='yourpassword' k6/tests/load-test.js
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=k6/results/load-test-report.html k6 run -e BASE_URL=URL -e TEST_EMAIL=your@email.com -e TEST_PASSWORD='yourpassword' k6/tests/load-test.js
 
 # Stress Test
-K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=k6/results/stress-test-report.html k6 run -e TEST_EMAIL=your@email.com -e TEST_PASSWORD='yourpassword' k6/tests/stress-test.js
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=k6/results/stress-test-report.html k6 run -e BASE_URL=URL -e TEST_EMAIL=your@email.com -e TEST_PASSWORD='yourpassword' k6/tests/stress-test.js
 
 # Spike Test
-K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=k6/results/spike-test-report.html k6 run -e TEST_EMAIL=your@email.com -e TEST_PASSWORD='yourpassword' k6/tests/spike-test.js
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=k6/results/spike-test-report.html k6 run -e BASE_URL=URL -e TEST_EMAIL=your@email.com -e TEST_PASSWORD='yourpassword' k6/tests/spike-test.js
 
 # Soak Test
-K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=k6/results/soak-test-report.html k6 run -e TEST_EMAIL=your@email.com -e TEST_PASSWORD='yourpassword' k6/tests/soak-test.js
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=k6/results/soak-test-report.html k6 run -e BASE_URL=URL -e TEST_EMAIL=your@email.com -e TEST_PASSWORD='yourpassword' k6/tests/soak-test.js
 ```
 
 ## 4. 시나리오 추가 가이드

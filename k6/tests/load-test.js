@@ -22,13 +22,13 @@ export const options = {
             executor: 'ramping-vus',
             stages,
             exec: 'contentTest',
-            // ── 팀원 시나리오 추가 위치 ──
-            // review: {
-            //     executor: 'ramping-vus',
-            //     stages,
-            //     exec: 'reviewTest',
-            // },
         },
+        // ── 팀원 시나리오 추가 위치 ──
+        // review: {
+        //     executor: 'ramping-vus',
+        //     stages,
+        //     exec: 'reviewTest',
+        // },
     },
     thresholds: {
         http_req_duration: ['p(95)<500', 'p(99)<1500'],

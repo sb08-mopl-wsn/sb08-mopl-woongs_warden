@@ -2,7 +2,7 @@ import http from 'k6/http';
 import {check, fail} from 'k6';
 
 // ─── 환경변수 ───
-export const BASE_URL = __ENV.BASE_URL || 'https://woongsanam.kro.kr';
+export const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 
 if (!__ENV.TEST_EMAIL || !__ENV.TEST_PASSWORD) {
     throw new Error(

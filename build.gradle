@@ -45,7 +45,8 @@ jacocoTestReport {
 					'**/global/logging/**',
 					'**/exception/**',
 					'**/ai/*Ai*',
-					'**/elasticsearch/**'
+					'**/elasticsearch/**',
+					'**/kafka/event/**'
 			])
 		}))
 	}

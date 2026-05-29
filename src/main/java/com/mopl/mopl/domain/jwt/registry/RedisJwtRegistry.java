@@ -3,17 +3,25 @@ package com.mopl.mopl.domain.jwt.registry;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
+import com.mopl.mopl.domain.jwt.exception.JwtHashGenerationFailedException;
+import com.mopl.mopl.domain.jwt.exception.JwtSerializationFailedException;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
-import java.time.Duration;
-import java.util.Date;
-import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -34,9 +42,9 @@ public class RedisJwtRegistry implements JwtRegistry {
         UUID userId = jwtInformation.getUser().id();
         String userKey = userSetKey(userId);
 
-        Set<String> existingRefreshTokens = redisTemplate.opsForSet().members(userKey);
-        if (existingRefreshTokens != null) {
-            existingRefreshTokens.forEach(this::deleteByRefreshToken);
+        Set<String> existingRefreshTokenHashes = redisTemplate.opsForSet().members(userKey);
+        if (existingRefreshTokenHashes != null) {
+            existingRefreshTokenHashes.forEach(this::deleteByRefreshTokenHash);
         }
 
         saveJwtInformation(jwtInformation);
@@ -46,9 +54,9 @@ public class RedisJwtRegistry implements JwtRegistry {
     @Transactional
     public void invalidateJwtInformationByUserId(UUID userId) {
         String userKey = userSetKey(userId);
-        Set<String> refreshTokens = redisTemplate.opsForSet().members(userKey);
-        if (refreshTokens != null) {
-            refreshTokens.forEach(this::deleteByRefreshToken);
+        Set<String> refreshTokenHashes = redisTemplate.opsForSet().members(userKey);
+        if (refreshTokenHashes != null) {
+            refreshTokenHashes.forEach(this::deleteByRefreshTokenHash);
         }
         redisTemplate.delete(userKey);
     }
@@ -58,7 +66,7 @@ public class RedisJwtRegistry implements JwtRegistry {
         if (accessToken == null) {
             return false;
         }
-        Boolean hasKey = redisTemplate.hasKey(accessActiveKey(accessToken));
+        Boolean hasKey = redisTemplate.hasKey(accessActiveKey(tokenHash(accessToken)));
         return Boolean.TRUE.equals(hasKey);
     }
 
@@ -67,8 +75,14 @@ public class RedisJwtRegistry implements JwtRegistry {
         if (refreshToken == null) {
             return false;
         }
-        Boolean hasKey = redisTemplate.hasKey(refreshInfoKey(refreshToken));
-        return Boolean.TRUE.equals(hasKey);
+        Boolean hasHashedKey = redisTemplate.hasKey(refreshInfoKey(tokenHash(refreshToken)));
+        if (Boolean.TRUE.equals(hasHashedKey)) {
+            return true;
+        }
+
+        // Backward compatibility for legacy keys stored with raw refresh token
+        Boolean hasLegacyKey = redisTemplate.hasKey(refreshInfoKey(refreshToken));
+        return Boolean.TRUE.equals(hasLegacyKey);
     }
 
     @Override
@@ -77,9 +91,10 @@ public class RedisJwtRegistry implements JwtRegistry {
             return null;
         }
 
-        String serialized = redisTemplate.opsForValue().get(refreshInfoKey(refreshToken));
+        String serialized = redisTemplate.opsForValue().get(refreshInfoKey(tokenHash(refreshToken)));
         if (serialized == null) {
-            return null;
+            // Backward compatibility for legacy keys stored with raw refresh token
+            serialized = redisTemplate.opsForValue().get(refreshInfoKey(refreshToken));
         }
 
         try {
@@ -117,10 +132,35 @@ public class RedisJwtRegistry implements JwtRegistry {
         }
     }
 
+    @Transactional
+    public void clearAllJwtKeys() {
+        Set<String> userKeys = redisTemplate.keys(USER_REFRESH_SET_PREFIX + "*");
+        Set<String> refreshKeys = redisTemplate.keys(REFRESH_INFO_PREFIX + "*");
+        Set<String> accessKeys = redisTemplate.keys(ACCESS_ACTIVE_PREFIX + "*");
+
+        List<String> allKeys = new ArrayList<>();
+        if (userKeys != null) {
+            allKeys.addAll(userKeys);
+        }
+        if (refreshKeys != null) {
+            allKeys.addAll(refreshKeys);
+        }
+        if (accessKeys != null) {
+            allKeys.addAll(accessKeys);
+        }
+
+        if (!allKeys.isEmpty()) {
+            redisTemplate.delete(allKeys);
+        }
+    }
+
     private void saveJwtInformation(JwtInformation jwtInformation) {
         UUID userId = jwtInformation.getUser().id();
         String refreshToken = jwtInformation.getRefreshToken();
         String accessToken = jwtInformation.getAccessToken();
+
+        String refreshTokenHash = tokenHash(refreshToken);
+        String accessTokenHash = tokenHash(accessToken);
 
         Date refreshExp = jwtTokenProvider.getExpiration(refreshToken);
         Date accessExp = jwtTokenProvider.getExpiration(accessToken);
@@ -130,22 +170,70 @@ public class RedisJwtRegistry implements JwtRegistry {
 
         try {
             String serialized = objectMapper.writeValueAsString(jwtInformation);
-            redisTemplate.opsForValue().set(refreshInfoKey(refreshToken), serialized, refreshTtl);
-            redisTemplate.opsForValue().set(accessActiveKey(accessToken), "1", accessTtl);
-            redisTemplate.opsForSet().add(userSetKey(userId), refreshToken);
+            redisTemplate.opsForValue().set(refreshInfoKey(refreshTokenHash), serialized, refreshTtl);
+            redisTemplate.opsForValue().set(accessActiveKey(accessTokenHash), "1", accessTtl);
+            redisTemplate.opsForSet().add(userSetKey(userId), refreshTokenHash);
             redisTemplate.expire(userSetKey(userId), refreshTtl);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize JwtInformation", e);
+            throw new JwtSerializationFailedException();
         }
     }
 
     private void deleteByRefreshToken(String refreshToken) {
-        JwtInformation stored = getJwtInformationByRefreshToken(refreshToken);
-        redisTemplate.delete(refreshInfoKey(refreshToken));
+        String refreshTokenHash = tokenHash(refreshToken);
+        JwtInformation stored = getJwtInformationByRefreshTokenHash(refreshTokenHash);
 
         if (stored != null) {
-            redisTemplate.delete(accessActiveKey(stored.getAccessToken()));
-            redisTemplate.opsForSet().remove(userSetKey(stored.getUser().id()), refreshToken);
+            deleteByRefreshTokenHash(refreshTokenHash);
+            return;
+        }
+
+        // Backward compatibility for legacy keys stored with raw refresh token
+        JwtInformation legacyStored = getJwtInformationByRefreshTokenRaw(refreshToken);
+        redisTemplate.delete(refreshInfoKey(refreshToken));
+
+
+        if (legacyStored != null) {
+            redisTemplate.delete(accessActiveKey(legacyStored.getAccessToken()));
+            redisTemplate.opsForSet().remove(userSetKey(legacyStored.getUser().id()), refreshToken);
+        }
+    }
+
+    private JwtInformation getJwtInformationByRefreshTokenRaw(String refreshToken) {
+        String serialized = redisTemplate.opsForValue().get(refreshInfoKey(refreshToken));
+        if (serialized == null) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(serialized, JwtInformation.class);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to deserialize JwtInformation from Redis legacy key. refreshToken={}", refreshToken, e);
+            return null;
+        }
+    }
+
+    private void deleteByRefreshTokenHash(String refreshTokenHash) {
+        JwtInformation stored = getJwtInformationByRefreshTokenHash(refreshTokenHash);
+        redisTemplate.delete(refreshInfoKey(refreshTokenHash));
+
+        if (stored != null) {
+            redisTemplate.delete(accessActiveKey(tokenHash(stored.getAccessToken())));
+            redisTemplate.opsForSet().remove(userSetKey(stored.getUser().id()), refreshTokenHash);
+        }
+    }
+
+    private JwtInformation getJwtInformationByRefreshTokenHash(String refreshTokenHash) {
+        String serialized = redisTemplate.opsForValue().get(refreshInfoKey(refreshTokenHash));
+        if (serialized == null) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(serialized, JwtInformation.class);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to deserialize JwtInformation from Redis. refreshTokenHash={}", refreshTokenHash, e);
+            return null;
         }
     }
 
@@ -164,5 +252,19 @@ public class RedisJwtRegistry implements JwtRegistry {
 
     private String accessActiveKey(String accessToken) {
         return ACCESS_ACTIVE_PREFIX + accessToken;
+    }
+
+    private String tokenHash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new JwtHashGenerationFailedException();
+        }
     }
 }

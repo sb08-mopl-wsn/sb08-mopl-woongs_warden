@@ -1,6 +1,7 @@
 package com.mopl.mopl.global.auth.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mopl.mopl.domain.auth.service.AuthenticationAttemptService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class LoginFailureHandler implements AuthenticationFailureHandler {
 
     private final ObjectMapper objectMapper;
+    private final AuthenticationAttemptService authenticationAttemptService;
 
     @Override
     public void onAuthenticationFailure(
@@ -30,20 +32,32 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
             HttpServletResponse response,
             AuthenticationException exception
     ) throws IOException, ServletException {
-
         log.error("로그인 실패, 원인: {}", exception.getClass().getSimpleName());
+        String username = request.getParameter("username");
+        if (username == null || username.isBlank()) {
+            username = request.getParameter("email");
+        }
+
+        boolean loginAttemptLocked = exception instanceof BadCredentialsException
+                && authenticationAttemptService.recordLoginFailure(username);
 
         String errorMessage;
         String errorCode;
         int status;
 
         if (exception instanceof BadCredentialsException) {
-            errorMessage = "ID/PW가 올바르지 않습니다.";
-            errorCode = "AUTHENTICATION_FAILED";
-            status = HttpServletResponse.SC_UNAUTHORIZED;
+            errorMessage = loginAttemptLocked
+                    ? "비밀번호를 5회 틀려 30분간 로그인이 제한됩니다."
+                    : "ID/PW가 올바르지 않습니다.";
+
+            errorCode = loginAttemptLocked ? "LOGIN_LOCKED" : "AUTHENTICATION_FAILED";
+            status = loginAttemptLocked ? HttpServletResponse.SC_FORBIDDEN : HttpServletResponse.SC_UNAUTHORIZED;
 
         } else if (exception instanceof LockedException) {
-            errorMessage = "잠긴 계정입니다. 관리자에게 문의하세요.";
+            errorMessage = exception.getMessage() == null || exception.getMessage().isBlank()
+                    ? "잠긴 계정입니다. 관리자에게 문의하세요."
+                    : exception.getMessage();
+
             errorCode = "ACCOUNT_LOCKED";
             status = HttpServletResponse.SC_FORBIDDEN;
 

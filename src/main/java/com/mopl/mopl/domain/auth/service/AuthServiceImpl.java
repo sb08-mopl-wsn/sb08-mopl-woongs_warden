@@ -9,6 +9,7 @@ import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
+import com.mopl.mopl.domain.user.exception.UserPasswordResetLockedException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
@@ -43,6 +44,7 @@ public class AuthServiceImpl implements AuthService {
     private final MoplUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuthenticationAttemptService authenticationAttemptService;
 
     // admin이 유저를 초기화할 경우 쓸 비밀번호
     @Value("${password.policy.upper}")
@@ -88,15 +90,15 @@ public class AuthServiceImpl implements AuthService {
         String userEmail = jwtTokenProvider.getUserEmailFromToken(refreshToken);
         JwtInformation oldJwtInfo = jwtRegistry.getJwtInformationByRefreshToken(refreshToken);
 
-
         MoplUserDetails userDetails =
-                (MoplUserDetails) userDetailsService.loadUserByUsername(userEmail);
+                (MoplUserDetails) userDetailsService.loadUserByUsernameWithoutLoginAttemptCheck(userEmail);
 
         String newRefreshToken = null;
 
         try {
+            boolean rememberMe = jwtTokenProvider.isRememberMeRefreshToken(refreshToken);
             String newAccessToken = jwtTokenProvider.generateAccessToken(userDetails);
-            newRefreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
+            newRefreshToken = jwtTokenProvider.generateRefreshToken(userDetails, rememberMe);
             UserDto userDto = userDetails.getUserDto();
 
             JwtInformation newJwtInfo = new JwtInformation(
@@ -106,8 +108,7 @@ public class AuthServiceImpl implements AuthService {
             );
 
             jwtRegistry.rotateJwtInformation(refreshToken, newJwtInfo);
-            jwtTokenProvider.addRefreshCookie(response, newRefreshToken);
-
+            jwtTokenProvider.addRefreshCookie(response, newRefreshToken, rememberMe);
             return new JwtDTO(userDto, newAccessToken);
 
         } catch (Exception e) {
@@ -127,8 +128,16 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void initUserPassword(String email) {
-        User target = userRepository.findByEmail(email).
-                orElseThrow(() -> new UserNotFoundException());
+        if (authenticationAttemptService.isPasswordResetLocked(email)) {
+            throw new UserPasswordResetLockedException();
+        }
+
+        User target = userRepository.findByEmail(email)
+                .orElseThrow(() -> authenticationAttemptService.recordPasswordResetFailure(email)
+                        ? new UserPasswordResetLockedException()
+                        : new UserNotFoundException());
+
+        authenticationAttemptService.resetPasswordResetFailures(email);
 
         String originPassword = target.getPassword();
         String rawPassword = generateInitPassword();
@@ -140,7 +149,7 @@ public class AuthServiceImpl implements AuthService {
         // 임시 비번 적용 및 원본 비번 저장
         target.updateTemporaryPassword(encodedPassword, originPassword, expiredAt);
 
-        eventPublisher.publishEvent(UserPasswordInitEvent.of(target,expiredAt,rawPassword));
+        eventPublisher.publishEvent(UserPasswordInitEvent.of(target, expiredAt, rawPassword));
     }
 
     /**

@@ -1,14 +1,6 @@
 package com.mopl.mopl.global.security;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
+import com.mopl.mopl.domain.auth.service.AuthenticationAttemptService;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
@@ -19,8 +11,6 @@ import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
 import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
 import com.mopl.mopl.global.auth.handler.LoginFailureHandler;
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.Instant;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -41,6 +31,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(
         excludeAutoConfiguration = OAuth2ClientAutoConfiguration.class
@@ -68,10 +69,14 @@ class LoginAndTokenTest {
     @MockitoBean
     private JwtRegistry jwtRegistry;
 
+    @MockitoBean
+    private AuthenticationAttemptService authenticationAttemptService;
+
     @Test
     @DisplayName("/api/auth/sign-in 로그인 성공 시 Access Token 응답과 Refresh Token 쿠키를 발급한다")
     void signInSuccess_IssuesTokens() throws Exception {
         UUID userId = UUID.randomUUID();
+
         UserDto userDto = new UserDto(
                 userId,
                 Instant.parse("2026-05-08T00:00:00Z"),
@@ -82,6 +87,7 @@ class LoginAndTokenTest {
                 false,
                 false
         );
+
         MoplUserDetails userDetails = new MoplUserDetails(
                 userDto,
                 passwordEncoder.encode("Admin1234!")
@@ -91,38 +97,95 @@ class LoginAndTokenTest {
                 .willReturn(userDetails);
         given(jwtTokenProvider.generateAccessToken(userDetails))
                 .willReturn("access.jwt.token");
-        given(jwtTokenProvider.generateRefreshToken(userDetails))
+        given(jwtTokenProvider.generateRefreshToken(userDetails, false))
                 .willReturn("refresh.jwt.token");
+
         org.mockito.Mockito.doAnswer(invocation -> {
                     HttpServletResponse response = invocation.getArgument(0);
                     response.addHeader(
                             HttpHeaders.SET_COOKIE,
-                            "REFRESH-TOKEN=refresh.jwt.token; Path=/; HttpOnly; SameSite=Lax"
+                            "REFRESH_TOKEN=refresh.jwt.token; Path=/; HttpOnly; SameSite=Lax"
                     );
                     return null;
                 })
                 .when(jwtTokenProvider)
-                .addRefreshCookie(any(HttpServletResponse.class), org.mockito.ArgumentMatchers.eq("refresh.jwt.token"));
+                .addRefreshCookie(
+                        any(HttpServletResponse.class),
+                        eq("refresh.jwt.token"),
+                        eq(false)
+                );
 
         mockMvc.perform(post("/api/auth/sign-in")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("username", "admin@admin.com")
                         .param("password", "Admin1234!"))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("REFRESH-TOKEN=refresh.jwt.token")))
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        org.hamcrest.Matchers.containsString("REFRESH_TOKEN=refresh.jwt.token")
+                ))
                 .andExpect(jsonPath("$.accessToken").value("access.jwt.token"))
                 .andExpect(jsonPath("$.userDto.id").value(userId.toString()))
                 .andExpect(jsonPath("$.userDto.email").value("admin@admin.com"))
                 .andExpect(jsonPath("$.userDto.name").value("관리자"))
                 .andExpect(jsonPath("$.userDto.role").value("ADMIN"));
 
-        ArgumentCaptor<JwtInformation> jwtInformationCaptor = ArgumentCaptor.forClass(JwtInformation.class);
+        ArgumentCaptor<JwtInformation> jwtInformationCaptor =
+                ArgumentCaptor.forClass(JwtInformation.class);
+
+        verify(authenticationAttemptService).resetLoginFailures("admin@admin.com");
         verify(jwtRegistry).registerJwtInformation(jwtInformationCaptor.capture());
 
         JwtInformation saved = jwtInformationCaptor.getValue();
         assertThat(saved.getUser().email()).isEqualTo("admin@admin.com");
         assertThat(saved.getAccessToken()).isEqualTo("access.jwt.token");
         assertThat(saved.getRefreshToken()).isEqualTo("refresh.jwt.token");
+    }
+
+    @Test
+    @DisplayName("/api/auth/sign-in 로그인 성공 - rememberMe=true이면 rememberMe Refresh Token 쿠키를 발급한다")
+    void signInSuccess_RememberMe_IssuesRememberMeRefreshToken() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        UserDto userDto = new UserDto(
+                userId,
+                Instant.parse("2026-05-08T00:00:00Z"),
+                "admin@admin.com",
+                "관리자",
+                null,
+                Role.ADMIN,
+                false,
+                false
+        );
+
+        MoplUserDetails userDetails = new MoplUserDetails(
+                userDto,
+                passwordEncoder.encode("Admin1234!")
+        );
+
+        given(userDetailsService.loadUserByUsername("admin@admin.com"))
+                .willReturn(userDetails);
+        given(jwtTokenProvider.generateAccessToken(userDetails))
+                .willReturn("access.jwt.token");
+        given(jwtTokenProvider.generateRefreshToken(userDetails, true))
+                .willReturn("refresh.jwt.token");
+
+        mockMvc.perform(post("/api/auth/sign-in")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("username", "admin@admin.com")
+                        .param("password", "Admin1234!")
+                        .param("rememberMe", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access.jwt.token"))
+                .andExpect(jsonPath("$.userDto.email").value("admin@admin.com"));
+
+        verify(jwtTokenProvider).generateRefreshToken(userDetails, true);
+        verify(jwtTokenProvider).addRefreshCookie(
+                any(HttpServletResponse.class),
+                eq("refresh.jwt.token"),
+                eq(true)
+        );
+        verify(authenticationAttemptService).resetLoginFailures("admin@admin.com");
     }
 
     @Test
@@ -138,6 +201,7 @@ class LoginAndTokenTest {
                 false,
                 false
         );
+
         MoplUserDetails userDetails = new MoplUserDetails(
                 userDto,
                 passwordEncoder.encode("Admin1234!")
@@ -145,6 +209,8 @@ class LoginAndTokenTest {
 
         given(userDetailsService.loadUserByUsername("admin@admin.com"))
                 .willReturn(userDetails);
+        given(authenticationAttemptService.recordLoginFailure("admin@admin.com"))
+                .willReturn(false);
 
         mockMvc.perform(post("/api/auth/sign-in")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -152,14 +218,57 @@ class LoginAndTokenTest {
                         .param("password", "WrongPassword1!"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("AUTHENTICATION_FAILED"));
+                .andExpect(jsonPath("$.error").value("AUTHENTICATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("ID/PW가 올바르지 않습니다."));
+
+        verify(authenticationAttemptService).recordLoginFailure("admin@admin.com");
+    }
+
+    @Test
+    @DisplayName("/api/auth/sign-in 로그인 실패 - 실패 횟수 초과로 로그인 제한")
+    void signInFailure_LoginAttemptLocked() throws Exception {
+        UserDto userDto = new UserDto(
+                UUID.randomUUID(),
+                Instant.parse("2026-05-08T00:00:00Z"),
+                "admin@admin.com",
+                "관리자",
+                null,
+                Role.ADMIN,
+                false,
+                false
+        );
+
+        MoplUserDetails userDetails = new MoplUserDetails(
+                userDto,
+                passwordEncoder.encode("Admin1234!")
+        );
+
+        given(userDetailsService.loadUserByUsername("admin@admin.com"))
+                .willReturn(userDetails);
+        given(authenticationAttemptService.recordLoginFailure("admin@admin.com"))
+                .willReturn(true);
+
+        mockMvc.perform(post("/api/auth/sign-in")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("username", "admin@admin.com")
+                        .param("password", "WrongPassword1!"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error").value("LOGIN_LOCKED"))
+                .andExpect(jsonPath("$.message").value("비밀번호를 5회 틀려 30분간 로그인이 제한됩니다."));
+
+        verify(authenticationAttemptService).recordLoginFailure("admin@admin.com");
     }
 
     @Test
     @DisplayName("/api/auth/sign-in 로그인 실패 - 존재하지 않는 사용자")
     void signInFailure_UserNotFound() throws Exception {
         given(userDetailsService.loadUserByUsername("missing@mopl.com"))
-                .willThrow(new org.springframework.security.core.userdetails.UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+                .willThrow(new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "사용자를 찾을 수 없습니다."
+                ));
+        given(authenticationAttemptService.recordLoginFailure("missing@mopl.com"))
+                .willReturn(false);
 
         mockMvc.perform(post("/api/auth/sign-in")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -168,11 +277,14 @@ class LoginAndTokenTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error").value("AUTHENTICATION_FAILED"));
+
+        verify(authenticationAttemptService).recordLoginFailure("missing@mopl.com");
     }
 
     @Configuration
     @EnableWebSecurity
     static class TestSecurityConfig {
+
         @Bean
         PasswordEncoder passwordEncoder() {
             return new BCryptPasswordEncoder();

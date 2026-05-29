@@ -181,15 +181,14 @@ management:
       enabled: false
 
 
-# 커스텀 프로퍼티 추가
-# jwt사용을 위해 임시로 만들었습니다. 추후 삭제나 변경이 필요합니다
 jwt:
   access-token:
     secret: ${JWT_ACCESS_TOKEN_SECRET}
-    exp: ${JWT_ACCESS_TOKEN_EXP:900000}
+    exp: ${JWT_ACCESS_TOKEN_EXP:3600000} # 기본값 1시간
   refresh-token:
     secret: ${JWT_REFRESH_TOKEN_SECRET}
-    exp: ${JWT_REFRESH_TOKEN_EXP:3600000}
+    exp: ${JWT_REFRESH_TOKEN_EXP:604800000} # 기본값 7일
+    remember-me-exp: ${JWT_REMEMBER_ME_REFRESH_TOKEN_EXP:604800000} # 기본값 7일
     cookie:
       secure: ${JWT_REFRESH_COOKIE_SECURE:true}
       same-site: ${JWT_REFRESH_COOKIE_SAME_SITE:Lax}

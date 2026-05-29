@@ -222,6 +222,7 @@ services:
     profiles:
       - search
       - lb
+      - develop
     ports:
       - "9200:9200"
     environment:
@@ -246,6 +247,8 @@ services:
     restart: unless-stopped
     profiles:
       - search
+      - lb
+      - develop
     ports:
       - "5601:5601"
     environment:

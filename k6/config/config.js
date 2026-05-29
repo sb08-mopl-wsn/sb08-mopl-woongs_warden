@@ -6,8 +6,8 @@ export const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 
 if (!__ENV.TEST_EMAIL || !__ENV.TEST_PASSWORD) {
     throw new Error(
-        '환경변수 TEST_EMAIL, TEST_PASSWORD를 설정하세요.\n' +
-        '예: k6 run -e TEST_EMAIL=xxx -e TEST_PASSWORD=xxx k6/tests/load-test.js'
+        '환경변수 BASE_URL(default: localhost), TEST_EMAIL, TEST_PASSWORD를 설정하세요.\n' +
+        '예: k6 run -e BASE_URL=xxx -e TEST_EMAIL=xxx -e TEST_PASSWORD=xxx k6/tests/load-test.js'
     );
 }
 

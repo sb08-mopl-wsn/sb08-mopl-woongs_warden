@@ -1,8 +1,8 @@
-package com.mopl.mopl.global.event.listener.redis;
+package com.mopl.mopl.global.redis.component;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mopl.mopl.global.event.dto.WebsocketPayload;
+import com.mopl.mopl.global.redis.dto.WebsocketPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
@@ -10,13 +10,15 @@ import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+
 @Slf4j
 @RequiredArgsConstructor
 @Component
 public class WatchingSessionRedisConsumer implements MessageListener {
 
     private final SimpMessagingTemplate messagingTemplate;
-    private final ObjectMapper redisObjectMapper;
+    private final ObjectMapper objectMapper;
 
     private static final String DESTINATION_PREFIX = "/sub/contents/";
     private static final String SESSION_DESTINATION_SUFFIX = "/watch";
@@ -25,11 +27,10 @@ public class WatchingSessionRedisConsumer implements MessageListener {
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
-            String channel = new String(message.getChannel());
+            String channel = new String(message.getChannel(), StandardCharsets.UTF_8);
             log.info("[Redis Consumer] 메시지 수신 채널: {}", channel);
 
-            // byte[] → WebsocketPayload 직접 역직렬화
-            WebsocketPayload<?> payload = redisObjectMapper.readValue(
+            WebsocketPayload<?> payload = objectMapper.readValue(
                     message.getBody(),
                     new TypeReference<WebsocketPayload<Object>>() {
                     }

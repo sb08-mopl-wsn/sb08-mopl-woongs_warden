@@ -10,11 +10,7 @@ import com.mopl.mopl.domain.review.entity.Review;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
-import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
-import com.mopl.mopl.global.event.FollowEvent;
-import com.mopl.mopl.global.event.PlaylistContentAddedEvent;
-import com.mopl.mopl.global.event.PlaylistSubscribedEvent;
-import com.mopl.mopl.global.event.ReviewCreatedEvent;
+import com.mopl.mopl.global.event.*;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import java.time.Instant;
 import java.util.UUID;
@@ -150,5 +146,21 @@ class NotificationKafkaProducerTest {
 
     // then
     verify(kafkaTemplate).send(eq("notification-playlist-content-topic"), eq(playlistId.toString()), eq(event));
+  }
+
+  @Test
+  @DisplayName("비속어 감지 이벤트 발생 시 카프카 해당 토픽으로 메시지를 전송한다.")
+  void produceBadWordDetectedEvent_SendsToKafka() {
+
+    // given
+    UUID userId = UUID.randomUUID();
+    String content = "바보";
+    BadWordDetectedEvent event = new BadWordDetectedEvent(userId, content);
+
+    // when
+    notificationKafkaProducer.produceBadWordDetectedEvent(event);
+
+    // then
+    verify(kafkaTemplate).send(eq("notification-badword-topic"), eq(userId.toString()), eq(event));
   }
 }

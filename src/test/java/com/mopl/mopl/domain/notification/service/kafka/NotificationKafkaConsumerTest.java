@@ -23,11 +23,7 @@ import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
-import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
-import com.mopl.mopl.global.event.FollowEvent;
-import com.mopl.mopl.global.event.PlaylistContentAddedEvent;
-import com.mopl.mopl.global.event.PlaylistSubscribedEvent;
-import com.mopl.mopl.global.event.ReviewCreatedEvent;
+import com.mopl.mopl.global.event.*;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import java.time.Instant;
@@ -63,6 +59,8 @@ class NotificationKafkaConsumerTest {
   private NotificationMapper notificationMapper;
   @Mock
   private RoomPresenceManager roomPresenceManager;
+  @Mock
+  private BadWordNotificationProcessor badWordNotificationProcessor;
 
   private UUID receiverId;
   private User receiver;
@@ -280,5 +278,19 @@ class NotificationKafkaConsumerTest {
     // then
     verify(notificationRepository, never()).saveAll(any());
     verify(sseService, never()).sendNotification(any(), any());
+  }
+
+  @Test
+  @DisplayName("비속어 감지 이벤트 수신 시 알림 프로세서(Processor)를 정상적으로 호출한다.")
+  void handleBadWordDetectedEvent() {
+    // given
+    String testContent = "테스트 메시지";
+    BadWordDetectedEvent event = new BadWordDetectedEvent(receiverId, testContent);
+
+    // when
+    notificationKafkaConsumer.onBadWordDetected(event);
+
+    // then
+    verify(badWordNotificationProcessor).processBadWordDetected(eq(event));
   }
 }

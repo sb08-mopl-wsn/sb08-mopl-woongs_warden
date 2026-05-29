@@ -1,10 +1,6 @@
 package com.mopl.mopl.domain.notification.service.kafka;
 
-import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
-import com.mopl.mopl.global.event.FollowEvent;
-import com.mopl.mopl.global.event.PlaylistContentAddedEvent;
-import com.mopl.mopl.global.event.PlaylistSubscribedEvent;
-import com.mopl.mopl.global.event.ReviewCreatedEvent;
+import com.mopl.mopl.global.event.*;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -91,5 +87,15 @@ public class NotificationKafkaProducer {
     log.info("[Kafka Producer] PlaylistContentAddedEvent 발행 - playlistId: {}", event.playlistId());
 
     kafkaTemplate.send("notification-playlist-content-topic", event.playlistId().toString(), event);
+  }
+
+  /**
+   * 욕설 감지 이벤트 발행
+   * @param event 욕설 감지 이벤트 객체
+   */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void produceBadWordDetectedEvent(BadWordDetectedEvent event) {
+    log.info("[Kafka Producer] BadWordDetectedEvent 발행 - userId: {}", event.userId());
+    kafkaTemplate.send("notification-badword-topic", event.userId().toString(), event);
   }
 }

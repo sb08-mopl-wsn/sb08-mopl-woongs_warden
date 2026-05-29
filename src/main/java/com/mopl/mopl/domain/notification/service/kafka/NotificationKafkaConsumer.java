@@ -11,19 +11,19 @@ import com.mopl.mopl.domain.notification.repository.NotificationRepository;
 import com.mopl.mopl.domain.playlist.entity.PlaylistSubscription;
 import com.mopl.mopl.domain.playlist.repository.PlaylistSubscriptionRepository;
 import com.mopl.mopl.domain.user.entity.User;
+import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
-import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
-import com.mopl.mopl.global.event.FollowEvent;
-import com.mopl.mopl.global.event.PlaylistContentAddedEvent;
-import com.mopl.mopl.global.event.PlaylistSubscribedEvent;
-import com.mopl.mopl.global.event.ReviewCreatedEvent;
+import com.mopl.mopl.global.event.*;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import java.util.List;
+import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -37,6 +37,7 @@ public class NotificationKafkaConsumer {
   private final FollowRepository followRepository;
   private final RoomPresenceManager roomPresenceManager;
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
+  private final BadWordNotificationProcessor badWordNotificationProcessor;
 
   /**
    * 팔로우 이벤트 수신
@@ -222,5 +223,12 @@ public class NotificationKafkaConsumer {
     }
 
     return message.substring(0, maxLength) + "...";
+  }
+
+  @KafkaListener(topics = "notification-badword-topic", groupId = "mopl-group")
+  public void onBadWordDetected(BadWordDetectedEvent event) {
+    log.info("[Kafka Consumer] BadWordDetectedEvent 수신 - userId: {}, content: {}",
+            event.userId(), event.content());
+    badWordNotificationProcessor.processBadWordDetected(event);
   }
 }

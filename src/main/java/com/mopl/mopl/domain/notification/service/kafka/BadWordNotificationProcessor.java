@@ -1,4 +1,4 @@
-package com.mopl.mopl.global.event.listener;
+package com.mopl.mopl.domain.notification.service.kafka;
 
 import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.notification.entity.NotificationLevel;
@@ -7,57 +7,50 @@ import com.mopl.mopl.domain.notification.repository.NotificationRepository;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
-import com.mopl.mopl.global.config.AsyncConfig;
 import com.mopl.mopl.global.event.BadWordDetectedEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.UUID;
 
 @Slf4j
-@RequiredArgsConstructor
 @Component
-public class BadWordDetectedEventListener {
+@RequiredArgsConstructor
+public class BadWordNotificationProcessor {
 
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationMapper notificationMapper;
     private final SseService sseService;
 
-    @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void onBadWordDetected(BadWordDetectedEvent event) {
-
+    public void processBadWordDetected(BadWordDetectedEvent event) {
         UUID userId = event.userId();
-        log.info("[BadWordDetectedEventListener] 욕설 감지 이벤트 수신 userId: {}, content: {}", userId, event.content());
+        log.info("[BadWordDetectedEventListener] 욕설 감지 이벤트 수신 userId: {}, content: {}",
+                userId,
+                event.content()
+        );
 
-        try {
-            User receiver = userRepository.findById(userId)
-                    .orElseThrow(() -> new UserNotFoundException(userId));
+        User receiver = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
 
-            receiver.increaseWarningCount();
+        receiver.increaseWarningCount();
 
-            Notification notification = Notification.builder()
-                    .user(receiver)
-                    .title(resolveTitle(receiver))
-                    .content(resolveContent(receiver))
-                    .level(NotificationLevel.INFO)
-                    .build();
+        Notification notification = Notification.builder()
+                .user(receiver)
+                .title(resolveTitle(receiver))
+                .content(resolveContent(receiver))
+                .level(NotificationLevel.INFO)
+                .build();
 
-            Notification savedNotification = notificationRepository.save(notification);
-            sseService.sendNotification(userId, notificationMapper.toDto(savedNotification));
+        Notification saved = notificationRepository.save(notification);
+        sseService.sendNotification(userId, notificationMapper.toDto(saved));
 
-        } catch (Exception e) {
-            log.error("[BadWordDetectedEventListener] 경고 알림 중 에러 발생 userId: {}", userId, e);
-        }
+        log.info("[BadWordNotificationProcessor] 처리 완료 - userId: {}, warningCount: {}", userId, receiver.getWarningCount());
     }
 
     private String resolveTitle(User receiver) {

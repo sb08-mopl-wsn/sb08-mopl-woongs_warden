@@ -1,13 +1,16 @@
 package com.mopl.mopl.domain.review.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 import com.mopl.mopl.domain.content.entity.Content;
+import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.domain.review.dto.response.ReviewStatsDto;
 import com.mopl.mopl.domain.review.entity.Review;
+import com.mopl.mopl.domain.review.exception.ReviewNotFoundException;
 import com.mopl.mopl.domain.review.repository.ReviewRepository;
 import com.mopl.mopl.domain.review.service.kafka.ReviewStatsKafkaConsumer;
 import com.mopl.mopl.domain.user.entity.User;
@@ -74,5 +77,39 @@ class ReviewStatsKafkaConsumerTest {
 
     assertThat(content.getAvgRating()).isEqualByComparingTo(new BigDecimal("4.5"));
     assertThat(content.getReviewCount()).isEqualTo(10);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 리뷰 ID로 이벤트가 발생하면 ReviewNotFoundException을 던진다.")
+  void consumeReviewEvent_WithNonExistentReview_ThrowsReviewNotFoundException() {
+    // given
+    UUID reviewId = UUID.randomUUID();
+    ReviewCreatedEvent event = new ReviewCreatedEvent(reviewId, UUID.randomUUID(), "작성자");
+
+    given(reviewRepository.findById(reviewId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> reviewStatsKafkaConsumer.consumeReviewEventForStats(event))
+        .isInstanceOf(ReviewNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 콘텐츠 ID로 이벤트가 발생하면 ContentNotFoundException을 던진다.")
+  void consumeReviewEvent_WithNonExistentContent_ThrowsContentNotFoundException() {
+    // given
+    UUID reviewId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+    ReviewCreatedEvent event = new ReviewCreatedEvent(reviewId, UUID.randomUUID(), "작성자");
+
+    Content mockContent = Content.builder().build();
+    ReflectionTestUtils.setField(mockContent, "id", contentId);
+    Review mockReview = Review.builder().content(mockContent).build();
+    given(reviewRepository.findById(reviewId)).willReturn(Optional.of(mockReview));
+
+    given(contentRepository.findByIdForUpdate(contentId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> reviewStatsKafkaConsumer.consumeReviewEventForStats(event))
+        .isInstanceOf(ContentNotFoundException.class);
   }
 }

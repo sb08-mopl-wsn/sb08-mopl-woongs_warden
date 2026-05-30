@@ -1,6 +1,9 @@
 package com.mopl.mopl.domain.review.kafka;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 import com.mopl.mopl.domain.review.entity.Review;
@@ -8,6 +11,7 @@ import com.mopl.mopl.domain.review.service.kafka.ReviewKafkaProducer;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.global.event.ReviewCreatedEvent;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +45,10 @@ class ReviewKafkaProducerTest {
     ReflectionTestUtils.setField(review, "id", reviewId);
 
     ReviewCreatedEvent event = ReviewCreatedEvent.of(review);
+
+    // Mocking: kafkaTemplate.send() 호출 시 CompletableFuture.completedFuture 반환
+    given(kafkaTemplate.send(anyString(), anyString(), any()))
+        .willReturn(CompletableFuture.completedFuture(null));
 
     // when
     reviewKafkaProducer.produceReviewEvent(event);

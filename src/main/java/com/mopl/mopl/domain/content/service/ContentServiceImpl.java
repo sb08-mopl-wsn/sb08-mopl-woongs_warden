@@ -10,6 +10,7 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.ai.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
 import com.mopl.mopl.infrastructure.elasticsearch.dto.ContentSearchResult;
 import com.mopl.mopl.infrastructure.kafka.event.ContentDeleteEvent;
@@ -40,6 +41,7 @@ public class ContentServiceImpl implements ContentService
     private final S3ImageStorage s3ImageStorage;
     private final ContentSearchQueryService contentSearchQueryService;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final ContentEmbeddingService contentEmbeddingService;
 
     /**
      * 콘텐츠를 생성한다.
@@ -70,6 +72,7 @@ public class ContentServiceImpl implements ContentService
         Content savedContent = contentRepository.save(content);
 
         applicationEventPublisher.publishEvent(new ContentIndexEvent(savedContent));
+        contentEmbeddingService.generateAndSave(savedContent);
 
         return contentMapper.toContentDto(savedContent);
     }

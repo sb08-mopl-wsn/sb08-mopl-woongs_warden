@@ -49,9 +49,11 @@ public class ContentRecommendService
     private final AiPerformanceRecorder aiPerformanceRecorder;
     private final IntentAnalysisService intentAnalysisService;
     private final ContentSearchQueryService contentSearchQueryService;
+    private final ContentSimilaritySearchService contentSimilaritySearchService;
+    private final UserTasteProfileService userTasteProfileService;
 
     @Async(AI_RECOMMEND_EXECUTOR)
-    public void recommendStream(String prompt, SseEmitter emitter) {
+    public void recommendStream(String prompt, UUID userId, SseEmitter emitter) {
         try {
             // Stage 1: 의도 분석
             if (!sendStatus(emitter, "intent_analysis", "질문을 분석하고 있습니다...")) return;
@@ -67,7 +69,7 @@ public class ContentRecommendService
 
             // Stage 2: 후보 필터링
             if (!sendStatus(emitter, "candidate_filtering", "맞춤 콘텐츠를 찾고 있습니다...")) return;
-            List<Content> candidates = findCandidates(intentAnalysis);
+            List<Content> candidates = findCandidates(intentAnalysis, userId);
 
             // Stage 3: 텍스트 스트리밍 추천
             if (!sendStatus(emitter, "recommendation", "추천 결과를 생성하고 있습니다...")) return;
@@ -97,9 +99,22 @@ public class ContentRecommendService
      * @param intent 의도 분석 결과
      * @return 후보 콘텐츠 목록
      */
-    private List<Content> findCandidates(IntentAnalysis intent) {
+    private List<Content> findCandidates(IntentAnalysis intent, UUID userId) {
         return aiPerformanceRecorder.record("candidate-retrieval", () -> {
-            List<String> candidateIds = contentSearchQueryService.searchCandidateIds(intent.contentType(), intent.keywords());
+            List<Content> similarContents = contentSimilaritySearchService.findSimilarByUserTaste(userId);
+
+            if (!similarContents.isEmpty()) {
+                log.info("[AI Recommend] 취향 기반 후보 {}건", similarContents.size());
+                return similarContents;
+            }
+
+            List<String> keywords = intent.keywords();
+            if ((keywords == null || keywords.isEmpty()) && userId != null) {
+                keywords = userTasteProfileService.getTopTags(userId);
+                log.info("[AI Recommend] 키워드 없음 — 취향 태그로 대체: {}", keywords);
+            }
+
+            List<String> candidateIds = contentSearchQueryService.searchCandidateIds(intent.contentType(), keywords);
 
             if (candidateIds.isEmpty()) {
                 log.warn("[AI Recommend] ES 후보 0건 — 상위 {}건으로 fallback", FALLBACK_LIMIT);
@@ -130,6 +145,7 @@ public class ContentRecommendService
         String contentContext = buildContentContext(candidates);
         String userMessage = "사용자 의도: %s\n키워드: %s\n\n후보 콘텐츠 목록:\n%s\n\n사용자 질문: %s"
                 .formatted(intent.intent(), intent.keywords(), contentContext, prompt);
+        log.debug("[AI Recommend] userMessage: {}", userMessage);
 
         ChatResponse chatResponse = aiPerformanceRecorder.record("final-recommendation", () -> {
             try {
@@ -149,6 +165,7 @@ public class ContentRecommendService
 
         return aiPerformanceRecorder.record("recommendation-parse", () -> {
             String rawResponse = chatResponse.getResult().getOutput().getText();
+            log.debug("[AI Recommend] raw response: {}", rawResponse);
             try {
                 List<AiRecommendation> result = objectMapper.readValue(
                         rawResponse, new TypeReference<>() {});

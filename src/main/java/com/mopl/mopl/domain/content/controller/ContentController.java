@@ -9,6 +9,7 @@ import com.mopl.mopl.domain.content.service.ContentService;
 import com.mopl.mopl.domain.watchingSession.dto.request.WatchingSessionPageRequest;
 import com.mopl.mopl.domain.watchingSession.dto.response.CursorResponseWatchingSessionDto;
 import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
+import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.infrastructure.ai.ContentRecommendService;
 import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
 import jakarta.validation.Valid;
@@ -19,6 +20,7 @@ import org.springframework.core.task.TaskRejectedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -99,12 +101,15 @@ public class ContentController implements ContentApi
 
     // SSE
     @GetMapping(value = "/recommend", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter recommend(@RequestParam String prompt)
+    public SseEmitter recommend(@RequestParam String prompt,
+                                @AuthenticationPrincipal MoplUserDetails moplUserDetails)
     {
         SseEmitter emitter = new SseEmitter(30_000L);
 
+        UUID userId = moplUserDetails != null ? moplUserDetails.getUserDto().id() : null;
+
         try {
-            contentRecommendService.recommendStream(prompt, emitter);
+            contentRecommendService.recommendStream(prompt, userId, emitter);
         } catch (TaskRejectedException e) {
             try {
                 emitter.send(SseEmitter.event()

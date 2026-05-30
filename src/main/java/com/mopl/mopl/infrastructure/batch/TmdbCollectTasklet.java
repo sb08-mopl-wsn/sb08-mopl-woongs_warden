@@ -2,6 +2,7 @@ package com.mopl.mopl.infrastructure.batch;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.ai.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.mapper.TmdbContentMapper;
@@ -30,6 +31,7 @@ public class TmdbCollectTasklet implements Tasklet
     private final EntityManager entityManager;
     private final MeterRegistry meterRegistry;
     private final ContentIndexService contentIndexService;
+    private final ContentEmbeddingService contentEmbeddingService;
 
     private final int totalPages;
 
@@ -92,6 +94,11 @@ public class TmdbCollectTasklet implements Tasklet
                 } catch (Exception e) {
                     meterRegistry.counter("mopl.batch.tmdb.index.failed").increment();
                     log.warn("TMDB 인덱싱 실패: externalId={}", content.getExternalId(), e);
+                }
+                try {
+                    contentEmbeddingService.generateAndSave(content);
+                } catch (Exception e) {
+                    log.warn("TMDB 임베딩 생성 실패: externalId={}", content.getExternalId(), e);
                 }
                 saved++;
             } catch (DataIntegrityViolationException e) {

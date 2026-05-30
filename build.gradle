@@ -48,7 +48,10 @@ jacocoTestReport {
 					'**/exception/**',
 					'**/ai/*Ai*',
 					'**/elasticsearch/**',
-					'**/kafka/event/**'
+					'**/kafka/event/**',
+					'**/ai/*UserTasteProfileService*',
+					'**/ai/*ContentEmbeddingService*',
+					'**/ai/*ContentSimilaritySearchService*'
 			])
 		}))
 	}

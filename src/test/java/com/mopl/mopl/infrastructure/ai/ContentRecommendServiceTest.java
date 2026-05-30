@@ -68,6 +68,9 @@ class ContentRecommendServiceTest
     @Mock private Generation generation;
     @Mock private AssistantMessage assistantMessage;
     @Mock private ContentSearchQueryService contentSearchQueryService;
+    @Mock private ContentEmbeddingService contentEmbeddingService;
+    @Mock private ContentSimilaritySearchService contentSimilaritySearchService;
+    @Mock private UserTasteProfileService userTasteProfileService;
 
     private List<Content> contentList;
 
@@ -142,7 +145,7 @@ class ContentRecommendServiceTest
         given(objectMapper.readValue(anyString(), any(TypeReference.class))).willReturn(aiResponse);
 
         // when
-        contentRecommendService.recommendStream("액션 영화 추천해줘", emitter);
+        contentRecommendService.recommendStream("액션 영화 추천해줘", UUID.randomUUID(), emitter);
 
         // then
         then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
@@ -162,7 +165,7 @@ class ContentRecommendServiceTest
                 .willReturn(new IntentAnalysis("unrelated", List.of(), null));
 
         // when
-        contentRecommendService.recommendStream("오늘 날씨 어때", emitter);
+        contentRecommendService.recommendStream("오늘 날씨 어때", UUID.randomUUID(), emitter);
 
         // then
         then(contentSearchQueryService).should(never()).searchCandidateIds(any(), any());
@@ -194,7 +197,7 @@ class ContentRecommendServiceTest
         given(objectMapper.readValue(anyString(), any(TypeReference.class))).willReturn(aiResponse);
 
         // when
-        contentRecommendService.recommendStream("존 윅이랑 비슷한 거", emitter);
+        contentRecommendService.recommendStream("존 윅이랑 비슷한 거", UUID.randomUUID(), emitter);
 
         // then
         then(contentSearchQueryService).should().searchCandidateIds("movie", List.of("매칭안됨"));
@@ -227,7 +230,7 @@ class ContentRecommendServiceTest
         given(objectMapper.readValue(anyString(), any(TypeReference.class))).willReturn(aiResponse);
 
         // when
-        contentRecommendService.recommendStream("액션 영화 추천해줘", emitter);
+        contentRecommendService.recommendStream("액션 영화 추천해줘", UUID.randomUUID(), emitter);
 
         // then
         then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
@@ -254,7 +257,7 @@ class ContentRecommendServiceTest
         given(chatClientRequestSpec.call()).willThrow(new ResourceAccessException("timeout"));
 
         // when
-        contentRecommendService.recommendStream("액션 영화 추천해줘", emitter);
+        contentRecommendService.recommendStream("액션 영화 추천해줘", UUID.randomUUID(), emitter);
 
         // then
         ArgumentCaptor<SseEmitter.SseEventBuilder> captor =

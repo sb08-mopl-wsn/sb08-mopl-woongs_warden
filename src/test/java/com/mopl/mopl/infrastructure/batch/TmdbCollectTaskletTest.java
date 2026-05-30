@@ -3,6 +3,7 @@ package com.mopl.mopl.infrastructure.batch;
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.ai.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
 import com.mopl.mopl.infrastructure.external.tmdb.TmdbApiClient;
 import com.mopl.mopl.infrastructure.external.tmdb.dto.TmdbMovie;
@@ -46,12 +47,14 @@ class TmdbCollectTaskletTest
     @Mock private MeterRegistry meterRegistry;
     @Mock private Counter counter;
     @Mock private ContentIndexService contentIndexService;
+    @Mock private ContentEmbeddingService contentEmbeddingService;
 
     private TmdbCollectTasklet tasklet;
 
     @BeforeEach
     void setUp() {
-        tasklet = new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, meterRegistry, contentIndexService, 1);
+        tasklet = new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository,
+                entityManager, meterRegistry, contentIndexService, contentEmbeddingService, 1);
     }
 
     @Test

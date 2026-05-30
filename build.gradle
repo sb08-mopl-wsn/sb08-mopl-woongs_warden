@@ -46,7 +46,8 @@ jacocoTestReport {
 					'**/global/interceptor/**',
 					'**/exception/**',
 					'**/ai/*Ai*',
-					'**/elasticsearch/**'
+					'**/elasticsearch/**',
+					'**/kafka/event/**'
 			])
 		}))
 	}

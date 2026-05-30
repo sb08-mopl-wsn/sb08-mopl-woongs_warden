@@ -5,11 +5,13 @@ import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.entity.Role;
+import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
 import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
 import com.mopl.mopl.global.auth.handler.LoginFailureHandler;
+import com.mopl.mopl.global.exception.oauth2.LoginAttemptLockedException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,13 +35,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -71,6 +74,9 @@ class LoginAndTokenTest {
 
     @MockitoBean
     private AuthenticationAttemptService authenticationAttemptService;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     @Test
     @DisplayName("/api/auth/sign-in 로그인 성공 시 Access Token 응답과 Refresh Token 쿠키를 발급한다")
@@ -247,6 +253,8 @@ class LoginAndTokenTest {
                 .willReturn(userDetails);
         given(authenticationAttemptService.recordLoginFailure("admin@admin.com"))
                 .willReturn(true);
+        given(userRepository.findByEmail("admin@admin.com"))
+                .willReturn(Optional.empty());
 
         mockMvc.perform(post("/api/auth/sign-in")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -258,6 +266,7 @@ class LoginAndTokenTest {
                 .andExpect(jsonPath("$.message").value("비밀번호를 5회 틀려 30분간 로그인이 제한됩니다."));
 
         verify(authenticationAttemptService).recordLoginFailure("admin@admin.com");
+        verify(userRepository).findByEmail("admin@admin.com");
     }
 
     @Test

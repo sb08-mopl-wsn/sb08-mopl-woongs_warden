@@ -70,7 +70,7 @@ class JwtLoginSuccessHandlerTest {
             MockHttpServletResponse response = invocation.getArgument(0);
             response.addHeader(
                     HttpHeaders.SET_COOKIE,
-                    "REFRESH-TOKEN=refresh.jwt.token; Path=/; HttpOnly; SameSite=Lax"
+                    "REFRESH_TOKEN=refresh.jwt.token; Path=/; HttpOnly; SameSite=Lax"
             );
             return null;
         }).when(tokenProvider).addRefreshCookie(any(), eq("refresh.jwt.token"), eq(false));
@@ -83,7 +83,7 @@ class JwtLoginSuccessHandlerTest {
         assertThat(response.getCharacterEncoding()).isEqualTo("UTF-8");
         assertThat(response.getContentType()).contains("application/json");
         assertThat(response.getHeader(HttpHeaders.SET_COOKIE))
-                .contains("REFRESH-TOKEN=refresh.jwt.token");
+                .contains("REFRESH_TOKEN=refresh.jwt.token");
 
         JsonNode body = objectMapper.readTree(response.getContentAsString());
         assertThat(body.get("accessToken").asText()).isEqualTo("access.jwt.token");

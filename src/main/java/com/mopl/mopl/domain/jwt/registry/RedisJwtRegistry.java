@@ -66,8 +66,14 @@ public class RedisJwtRegistry implements JwtRegistry {
         if (accessToken == null) {
             return false;
         }
-        Boolean hasKey = redisTemplate.hasKey(accessActiveKey(tokenHash(accessToken)));
-        return Boolean.TRUE.equals(hasKey);
+
+        Boolean hasHashedKey = redisTemplate.hasKey(accessActiveKey(tokenHash(accessToken)));
+        if (Boolean.TRUE.equals(hasHashedKey)) {
+            return true;
+        }
+
+        Boolean hasLegacyKey = redisTemplate.hasKey(accessActiveKey(accessToken));
+        return Boolean.TRUE.equals(hasLegacyKey);
     }
 
     @Override
@@ -218,7 +224,10 @@ public class RedisJwtRegistry implements JwtRegistry {
         redisTemplate.delete(refreshInfoKey(refreshTokenHash));
 
         if (stored != null) {
-            redisTemplate.delete(accessActiveKey(tokenHash(stored.getAccessToken())));
+            redisTemplate.delete(List.of(
+                    accessActiveKey(stored.getAccessToken()),
+                    accessActiveKey(tokenHash(stored.getAccessToken()))
+            ));
             redisTemplate.opsForSet().remove(userSetKey(stored.getUser().id()), refreshTokenHash);
         }
     }

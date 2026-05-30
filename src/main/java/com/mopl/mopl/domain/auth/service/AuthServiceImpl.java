@@ -91,7 +91,7 @@ public class AuthServiceImpl implements AuthService {
         JwtInformation oldJwtInfo = jwtRegistry.getJwtInformationByRefreshToken(refreshToken);
 
         MoplUserDetails userDetails =
-                (MoplUserDetails) userDetailsService.loadUserByUsernameWithoutLoginAttemptCheck(userEmail);
+                (MoplUserDetails) userDetailsService.loadUserByUsernameForToken(userEmail);
 
         String newRefreshToken = null;
 

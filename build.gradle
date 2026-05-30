@@ -43,6 +43,7 @@ jacocoTestReport {
 					'**/global/base/**',
 					'**/global/exception/**',
 					'**/global/logging/**',
+					'**/global/interceptor/**',
 					'**/exception/**',
 					'**/ai/*Ai*',
 					'**/elasticsearch/**'

@@ -30,6 +30,10 @@ public class MoplUserDetailsService implements UserDetailsService {
         return loadUserDetails(username);
     }
 
+    public UserDetails loadUserByUsernameForToken(String username) {
+        return loadUserDetails(username);
+    }
+
     public UserDetails loadUserByUsernameWithoutLoginAttemptCheck(String username) {
         return loadUserDetails(username);
     }

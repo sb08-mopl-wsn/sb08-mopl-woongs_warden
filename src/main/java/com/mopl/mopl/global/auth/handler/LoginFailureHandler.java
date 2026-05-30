@@ -2,6 +2,9 @@ package com.mopl.mopl.global.auth.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.auth.service.AuthenticationAttemptService;
+import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
+import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.exception.oauth2.LoginAttemptLockedException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,9 +25,10 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class LoginFailureHandler implements AuthenticationFailureHandler {
-
     private final ObjectMapper objectMapper;
     private final AuthenticationAttemptService authenticationAttemptService;
+    private final UserRepository userRepository;
+    private final JwtRegistry jwtRegistry;
 
     @Override
     public void onAuthenticationFailure(
@@ -33,6 +37,7 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
             AuthenticationException exception
     ) throws IOException, ServletException {
         log.error("로그인 실패, 원인: {}", exception.getClass().getSimpleName());
+
         String username = request.getParameter("username");
         if (username == null || username.isBlank()) {
             username = request.getParameter("email");
@@ -40,6 +45,10 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 
         boolean loginAttemptLocked = exception instanceof BadCredentialsException
                 && authenticationAttemptService.recordLoginFailure(username);
+
+        if (loginAttemptLocked) {
+            invalidateJwtInformation(username);
+        }
 
         String errorMessage;
         String errorCode;
@@ -49,15 +58,18 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
             errorMessage = loginAttemptLocked
                     ? "비밀번호를 5회 틀려 30분간 로그인이 제한됩니다."
                     : "ID/PW가 올바르지 않습니다.";
-
             errorCode = loginAttemptLocked ? "LOGIN_LOCKED" : "AUTHENTICATION_FAILED";
             status = loginAttemptLocked ? HttpServletResponse.SC_FORBIDDEN : HttpServletResponse.SC_UNAUTHORIZED;
+
+        } else if (exception instanceof LoginAttemptLockedException) {
+            errorMessage = exception.getMessage();
+            errorCode = "LOGIN_LOCKED";
+            status = HttpServletResponse.SC_FORBIDDEN;
 
         } else if (exception instanceof LockedException) {
             errorMessage = exception.getMessage() == null || exception.getMessage().isBlank()
                     ? "잠긴 계정입니다. 관리자에게 문의하세요."
                     : exception.getMessage();
-
             errorCode = "ACCOUNT_LOCKED";
             status = HttpServletResponse.SC_FORBIDDEN;
 
@@ -78,10 +90,19 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
         errorResponse.put("message", errorMessage);
 
         response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
+        response.setCharacterEncoding("UTF8");
         response.setStatus(status);
 
         String responseBody = objectMapper.writeValueAsString(errorResponse);
         response.getWriter().write(responseBody);
+    }
+
+    private void invalidateJwtInformation(String username) {
+        if (username == null || username.isBlank()) {
+            return;
+        }
+
+        userRepository.findByEmail(username.trim())
+                .ifPresent(user -> jwtRegistry.invalidateJwtInformationByUserId(user.getId()));
     }
 }

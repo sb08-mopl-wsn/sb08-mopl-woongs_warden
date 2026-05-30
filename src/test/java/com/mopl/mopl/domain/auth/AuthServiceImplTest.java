@@ -185,7 +185,7 @@ class AuthServiceImplTest {
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
             when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
-            when(userDetailsService.loadUserByUsernameWithoutLoginAttemptCheck("admin@admin.com"))
+            when(userDetailsService.loadUserByUsernameForToken("admin@admin.com"))
                     .thenReturn(userDetails);
             when(jwtTokenProvider.isRememberMeRefreshToken(oldRefreshToken)).thenReturn(rememberMe);
             when(jwtTokenProvider.generateAccessToken(userDetails)).thenReturn(newAccessToken);
@@ -276,7 +276,7 @@ class AuthServiceImplTest {
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
             when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
-            when(userDetailsService.loadUserByUsernameWithoutLoginAttemptCheck("admin@admin.com"))
+            when(userDetailsService.loadUserByUsernameForToken("admin@admin.com"))
                     .thenReturn(userDetails);
             when(jwtTokenProvider.isRememberMeRefreshToken(oldRefreshToken)).thenReturn(rememberMe);
             when(jwtTokenProvider.generateAccessToken(userDetails))
@@ -325,7 +325,7 @@ class AuthServiceImplTest {
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
             when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
-            when(userDetailsService.loadUserByUsernameWithoutLoginAttemptCheck("admin@admin.com"))
+            when(userDetailsService.loadUserByUsernameForToken("admin@admin.com"))
                     .thenReturn(userDetails);
             when(jwtTokenProvider.isRememberMeRefreshToken(oldRefreshToken)).thenReturn(rememberMe);
             when(jwtTokenProvider.generateAccessToken(userDetails)).thenReturn(newAccessToken);

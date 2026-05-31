@@ -187,7 +187,7 @@ jwt:
     exp: ${JWT_ACCESS_TOKEN_EXP:3600000} # 기본값 1시간
   refresh-token:
     secret: ${JWT_REFRESH_TOKEN_SECRET}
-    exp: ${JWT_REFRESH_TOKEN_EXP:604800000} # 기본값 7일
+    exp: ${JWT_REFRESH_TOKEN_EXP:259200000} # 기본값 3일
     remember-me-exp: ${JWT_REMEMBER_ME_REFRESH_TOKEN_EXP:604800000} # 기본값 7일
     cookie:
       secure: ${JWT_REFRESH_COOKIE_SECURE:true}

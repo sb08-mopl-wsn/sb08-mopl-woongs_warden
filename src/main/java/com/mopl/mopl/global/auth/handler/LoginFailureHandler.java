@@ -38,16 +38,16 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
     ) throws IOException, ServletException {
         log.error("로그인 실패, 원인: {}", exception.getClass().getSimpleName());
 
-        String username = request.getParameter("username");
-        if (username == null || username.isBlank()) {
-            username = request.getParameter("email");
+        String principal = request.getParameter("username");
+        if (principal == null || principal.isBlank()) {
+            principal = request.getParameter("email");
         }
 
         boolean loginAttemptLocked = exception instanceof BadCredentialsException
-                && authenticationAttemptService.recordLoginFailure(username);
+                && authenticationAttemptService.recordLoginFailure(principal);
 
         if (loginAttemptLocked) {
-            invalidateJwtInformation(username);
+            invalidateJwtInformation(principal);
         }
 
         String errorMessage;
@@ -97,12 +97,12 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
         response.getWriter().write(responseBody);
     }
 
-    private void invalidateJwtInformation(String username) {
-        if (username == null || username.isBlank()) {
+    private void invalidateJwtInformation(String principal) {
+        if (principal == null || principal.isBlank()) {
             return;
         }
 
-        userRepository.findByEmail(username.trim())
+        userRepository.findByEmail(principal.trim())
                 .ifPresent(user -> jwtRegistry.invalidateJwtInformationByUserId(user.getId()));
     }
 }

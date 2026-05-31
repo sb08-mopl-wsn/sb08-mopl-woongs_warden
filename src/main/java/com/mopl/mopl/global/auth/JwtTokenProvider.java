@@ -66,7 +66,7 @@ public class JwtTokenProvider {
     }
 
     public String generateAccessToken(MoplUserDetails userDetails) throws JOSEException {
-        return generateToken(userDetails, accessTokenExpirationMs, accessTokenSigner, "access");
+        return createAccessToken(userDetails, accessTokenExpirationMs, accessTokenSigner, "access");
     }
 
     public String generateRefreshToken(MoplUserDetails userDetails) throws JOSEException {
@@ -75,18 +75,18 @@ public class JwtTokenProvider {
 
     public String generateRefreshToken(MoplUserDetails userDetails, boolean rememberMe) throws JOSEException {
         long expirationMs = rememberMe ? rememberMeRefreshTokenExpirationMs : refreshTokenExpirationMs;
-        return generateToken(userDetails, expirationMs, refreshTokenSigner, "refresh", rememberMe);
+        return createRefreshToken(userDetails, expirationMs, refreshTokenSigner, "refresh", rememberMe);
     }
 
-    private String generateToken(
+    private String createAccessToken(
             MoplUserDetails userDetails,
             long expirationMs, JWSSigner signer,
             String tokenType
     ) throws JOSEException {
-        return generateToken(userDetails, expirationMs, signer, tokenType, false);
+        return createRefreshToken(userDetails, expirationMs, signer, tokenType, false);
     }
 
-    private String generateToken(
+    private String createRefreshToken(
             MoplUserDetails userDetails,
             long expirationMs, JWSSigner signer,
             String tokenType,

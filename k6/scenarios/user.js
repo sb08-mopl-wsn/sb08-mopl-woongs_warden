@@ -1,82 +1,88 @@
 import http from 'k6/http';
 import {check, sleep} from 'k6';
-import encoding from 'k6/encoding';
-import {__ITER, __VU} from 'k6';
-import {BASE_URL, getHeaders} from '../config/config.js';
+import {BASE_URL, getHeaders} from '../config/user_config.js';
 
-/**
- * 사용자 도메인 시나리오
- *
- * 흐름:
- * 1. Access Token의 userId 클레임으로 사용자 상세 조회
- * 2. 같은 사용자 이름 변경
- */
-export function userScenario(token, csrfToken) {
-    const userId = getUserIdFromToken(token);
+export function userScenario(auth) {
+    const userId = auth.userId;
+    const newName = `k6-user-${Date.now()}`;
 
-    if (!userId) {
-        console.error('[에러] Access Token에서 userId를 찾을 수 없습니다.');
-        return;
-    }
-
-    const headers = getHeaders(token, csrfToken);
-
-    const detailRes = http.get(`${BASE_URL}/api/users/${userId}`, {
-        headers,
-        tags: {name: 'GET /api/users/{userId}'},
-    });
-
-    check(detailRes, {
-        '사용자 상세 조회 성공': (r) => r.status === 200,
-        '사용자 상세 조회 응답에 userId 포함': (r) => r.json('id') === userId,
-    });
-
-    if (detailRes.status !== 200) {
-        console.log(`[사용자 상세 조회 실패] status=${detailRes.status}, body=${detailRes.body}`);
-        return;
-    }
-
-    sleep(1);
-
-    const newName = `k6-user-${__VU}-${__ITER}-${Date.now()}`;
-    const updatePayload = {
-        request: http.file(JSON.stringify({name: newName}), 'request.json', 'application/json'),
+    const payload = {
+        request: http.file(
+            JSON.stringify({
+                name: newName,
+            }),
+            'request.json',
+            'application/json'
+        ),
     };
-    const updateHeaders = {...headers};
-    delete updateHeaders['Content-Type'];
 
-    const updateRes = http.patch(`${BASE_URL}/api/users/${userId}`, updatePayload, {
-        headers: updateHeaders,
-        tags: {name: 'PATCH /api/users/{userId}'},
-    });
+    const headers = getHeaders(
+        auth.accessToken,
+        auth.csrfToken
+    );
+
+    delete headers['Content-Type'];
+
+    const updateRes = http.patch(
+        `${BASE_URL}/api/users/${userId}`,
+        payload,
+        {
+            headers,
+            tags: {
+                name: 'PATCH /api/users/{userId}',
+            },
+        }
+    );
 
     check(updateRes, {
         '사용자 이름 변경 성공': (r) => r.status === 200,
-        '사용자 이름 변경 응답에 변경된 이름 포함': (r) => r.json('name') === newName,
+        '사용자 이름 변경 응답 이름 일치': (r) => {
+            try {
+                return JSON.parse(r.body).name === newName;
+            } catch {
+                return false;
+            }
+        },
     });
 
     if (updateRes.status !== 200) {
-        console.log(`[사용자 이름 변경 실패] status=${updateRes.status}, body=${updateRes.body}`);
+        console.log(
+            `[사용자 이름 변경 실패] status=${updateRes.status}, body=${updateRes.body}`
+        );
     }
 
     sleep(1);
 }
 
-function getUserIdFromToken(token) {
-    if (!token) {
-        return null;
+function requestUserDetail(auth, userId) {
+    return http.get(`${BASE_URL}/api/users/${userId}`, {
+        headers: getHeaders(auth.accessToken, auth.csrfToken),
+        tags: {name: 'GET /api/users/{userId}'},
+    });
+}
+
+function requestUserNameUpdate(auth, updatePayload) {
+    const headers = getHeaders(auth.accessToken, auth.csrfToken);
+    delete headers['Content-Type'];
+
+    return http.patch(`${BASE_URL}/api/users/${auth.userId}`, updatePayload, {
+        headers,
+        tags: {name: 'PATCH /api/users/{userId}'},
+    });
+}
+
+function refreshAuth(auth) {
+    const refreshedAuth = renewAuth(auth);
+    if (!refreshedAuth) {
+        return false;
     }
 
-    try {
-        const payload = token.split('.')[1];
-        const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
-        const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
-        const decodedPayload = encoding.b64decode(paddedPayload, 's');
-        const claims = JSON.parse(decodedPayload);
-
-        return claims.userId || null;
-    } catch (error) {
-        console.error(`[에러] Access Token 파싱 실패: ${error}`);
-        return null;
-    }
+    auth.accessToken = refreshedAuth.accessToken;
+    auth.userId = refreshedAuth.userId;
+    auth.csrfToken = refreshedAuth.csrfToken;
+    auth.refreshToken = refreshedAuth.refreshToken;
+    auth.targetUserId = refreshedAuth.targetUserId;
+    auth.email = refreshedAuth.email;
+    auth.password = refreshedAuth.password;
+    return true;
 }

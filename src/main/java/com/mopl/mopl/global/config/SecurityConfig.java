@@ -174,10 +174,7 @@ public class SecurityConfig {
 
         // CORS 요청을 허용할 주소
         configuration.setAllowedOrigins(List.of(
-                // 여기는 예시입니다. 프론트 서버만 연결해보면 될것 같습니다.
-                "http://localhost:5173",
-                "http://localhost:3000",
-                "https://mopl.site"
+                "https://woongsanam.kro.kr"
         ));
 
         // CORS 요청에서 허용할 HTTP 메서드

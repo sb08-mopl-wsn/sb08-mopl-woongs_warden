@@ -1,6 +1,6 @@
-import {sleep} from 'k6';
-import {login} from '../../config/config.js';
-import {userScenario} from '../../scenarios/user.js';
+import { sleep } from 'k6';
+import { login } from '../../config/user_config.js';
+import { userScenario } from '../../scenarios/user.js';
 
 /**
  * User Soak Test — 장시간 낮은 부하에서 사용자 상세 조회/이름 변경 안정성 확인
@@ -43,6 +43,6 @@ export function setup() {
 }
 
 export function userTest(data) {
-    userScenario(data.accessToken, data.csrfToken);
+    userScenario(data);
     sleep(1);
 }

@@ -1,14 +1,6 @@
-import {sleep} from 'k6';
-import {login} from '../../config/config.js';
-import {userScenario} from '../../scenarios/user.js';
-
-/**
- * User Load Test — 예상 트래픽 수준에서 사용자 상세 조회/이름 변경 확인
- *
- * 1. Ramp-up:  0 → 30 VU (1분)
- * 2. Steady:  30 VU 유지  (5분)
- * 3. Ramp-down: 30 → 0 VU (30초)
- */
+import { sleep } from 'k6';
+import { login } from '../../config/user_config.js';
+import { userScenario } from '../../scenarios/user.js';
 
 const stages = [
     { duration: '1m', target: 30 },
@@ -38,6 +30,6 @@ export function setup() {
 }
 
 export function userTest(data) {
-    userScenario(data.accessToken, data.csrfToken);
+    userScenario(data);
     sleep(1);
 }

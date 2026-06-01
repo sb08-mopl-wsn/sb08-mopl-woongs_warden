@@ -68,6 +68,6 @@ export function login() {
     return {
         accessToken: body.accessToken,
         csrfToken: csrfToken,
-        refreshToken: refreshToken,
+        refreshToken: refreshToken
     };
 }

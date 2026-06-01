@@ -1,5 +1,5 @@
 import {sleep} from 'k6';
-import {login} from '../../config/config.js';
+import { login } from '../../config/user_config.js';
 import {userScenario} from '../../scenarios/user.js';
 
 /**
@@ -46,6 +46,6 @@ export function setup() {
 }
 
 export function userTest(data) {
-    userScenario(data.accessToken, data.csrfToken);
+    userScenario(data);
     sleep(1);
 }

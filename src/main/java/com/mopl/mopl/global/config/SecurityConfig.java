@@ -10,6 +10,7 @@ import com.mopl.mopl.global.auth.handler.LoginFailureHandler;
 import com.mopl.mopl.global.auth.handler.OAuth2LoginFailureHandler;
 import com.mopl.mopl.global.auth.handler.OAuth2LoginSuccessHandler;
 import com.mopl.mopl.global.auth.handler.SpaCsrfTokenRequestHandler;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -64,13 +65,14 @@ public class SecurityConfig {
             OAuth2LoginFailureHandler oauth2LoginFailureHandler
     ) throws Exception {
         http
-//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))  // 분산환경에서 활성화
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))  // 분산환경에서 활성화
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                         .ignoringRequestMatchers("/api/auth/sign-in")
                 )
                 .authorizeHttpRequests(auth -> auth
+                                .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                                 // 문서 관련
                                 .requestMatchers("/", "/index.html").permitAll()
                                 .requestMatchers("/ws/**").permitAll()

@@ -128,7 +128,7 @@ opensearch:
 app:
   #  분산 환경용 jwtRegistry 설정, 인메모리는 redis를 memory로 수정하면 됨
   jwt:
-    registry: memory
+    registry: redis
   oauth2:
     success-redirect-url: ${baseUrl}
     failure-redirect-url: ${OAUTH2_FAILURE_REDIRECT_URL}

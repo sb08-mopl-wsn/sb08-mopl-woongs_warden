@@ -17,6 +17,7 @@ import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.event.user.UserEvent;
 import com.mopl.mopl.global.event.user.UserUpdateLockEvent;
+import com.mopl.mopl.global.event.user.UserUpdateProfileEvent;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
@@ -192,7 +193,7 @@ public class UserServiceImpl implements UserService {
             user.updateName(request.name());
         }
 
-        eventPublisher.publishEvent(UserEvent.of(user));
+        eventPublisher.publishEvent(UserUpdateProfileEvent.of(user));
         return userMapper.toDto(user);
     }
 }

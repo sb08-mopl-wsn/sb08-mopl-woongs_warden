@@ -119,6 +119,8 @@ public class User extends BaseEntity {
 
     public User updatePassword(String encryptedPassword) {
         this.password = encryptedPassword;
+        this.temporaryPassword = null;
+        this.temporaryPasswordExpiredAt = null;
         this.initPassword = false;
         return this;
     }

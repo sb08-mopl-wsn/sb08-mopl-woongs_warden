@@ -3,7 +3,7 @@ package com.mopl.mopl.global.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.mopl.mopl.global.event.listener.redis.WatchingSessionRedisConsumer;
+import com.mopl.mopl.global.redis.component.WatchingSessionRedisConsumer;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.redis.service.RedisSubscriber;
 import org.springframework.context.annotation.Bean;
@@ -26,25 +26,6 @@ public class RedisConfig
     @Bean
     public ChannelTopic chatTopic() {
         return new ChannelTopic("mopl-contents-chat-channel");
-    }
-
-    @Bean
-    public ObjectMapper redisObjectMapper() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        return objectMapper;
-    }
-
-    @Bean
-    public RedisTemplate<String, Object> redisPubSubTemplate(RedisConnectionFactory connectionFactory, ObjectMapper redisObjectMapper) {
-
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(connectionFactory);
-        template.setKeySerializer(new StringRedisSerializer());
-
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer(redisObjectMapper));
-        return template;
     }
 
     @Bean

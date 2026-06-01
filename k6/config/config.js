@@ -61,6 +61,9 @@ export function login() {
         refreshToken = res.cookies['REFRESH_TOKEN'][0].value;
     }
 
+
+    console.log(`[로그인 응답] status=${res.status}, body=${res.body}`);
+
     const body = JSON.parse(res.body);
     return {
         accessToken: body.accessToken,

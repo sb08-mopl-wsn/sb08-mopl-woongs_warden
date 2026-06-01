@@ -1,9 +1,9 @@
-import { sleep } from 'k6';
-import { login } from '../../config/config.js';
-import { userScenario } from '../../scenarios/user.js';
+import {sleep} from 'k6';
+import {login} from '../../config/config.js';
+import {userScenario} from '../../scenarios/user.js';
 
 /**
- * Soak Test — 장시간 낮은 부하에서 안정성 확인
+ * User Soak Test — 장시간 낮은 부하에서 사용자 상세 조회/이름 변경 안정성 확인
  *
  * 목적:
  * - 메모리 누수 감지
@@ -27,14 +27,14 @@ export const options = {
             executor: 'ramping-vus',
             stages,
             exec: 'userTest',
-        }
+        },
     },
     thresholds: {
         http_req_duration: ['p(95)<500', 'p(99)<1500'],
         http_req_failed: ['rate<0.01'],
 
-        'http_req_duration{name:GET /api/users}': ['p(95)<500'],
-        'http_req_duration{name:GET /api/users/{userId}}': ['p(95)<300']
+        'http_req_duration{name:GET /api/users/{userId}}': ['p(95)<300'],
+        'http_req_duration{name:PATCH /api/users/{userId}}': ['p(95)<500'],
     },
 };
 

@@ -1,9 +1,9 @@
-import { sleep } from 'k6';
-import { login } from '../../config/config.js';
-import { userScenario } from '../../scenarios/user.js';
+import {sleep} from 'k6';
+import {login} from '../../config/config.js';
+import {userScenario} from '../../scenarios/user.js';
 
 /**
- * Stress Test — 한계점까지 점진적으로 올려서 어디서 깨지는지 확인
+ * User Stress Test — 사용자 상세 조회/이름 변경의 한계점 확인
  *
  * 1. Warm-up:    0 → 30 VU   (1분)
  * 2. Normal:    30 VU        (3분)
@@ -30,14 +30,14 @@ export const options = {
             executor: 'ramping-vus',
             stages,
             exec: 'userTest',
-        }
+        },
     },
     thresholds: {
         http_req_duration: ['p(95)<500', 'p(99)<1500'],
         http_req_failed: ['rate<0.01'],
 
-        'http_req_duration{name:GET /api/users}': ['p(95)<500'],
-        'http_req_duration{name:GET /api/users/{userId}}': ['p(95)<300']
+        'http_req_duration{name:GET /api/users/{userId}}': ['p(95)<300'],
+        'http_req_duration{name:PATCH /api/users/{userId}}': ['p(95)<500'],
     },
 };
 

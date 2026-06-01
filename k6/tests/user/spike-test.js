@@ -1,9 +1,9 @@
-import { sleep } from 'k6';
-import { login } from '../../config/config.js';
-import { userScenario } from '../../scenarios/user.js';
+import {sleep} from 'k6';
+import {login} from '../../config/config.js';
+import {userScenario} from '../../scenarios/user.js';
 
 /**
- * Spike Test — 급격한 트래픽 증가 대응 확인
+ * User Spike Test — 사용자 상세 조회/이름 변경의 급격한 트래픽 대응 확인
  *
  * 1. Baseline:  0 → 10 VU   (1분)
  * 2. Spike:     10 → 200 VU (30초)
@@ -28,14 +28,14 @@ export const options = {
             executor: 'ramping-vus',
             stages,
             exec: 'userTest',
-        }
+        },
     },
     thresholds: {
         http_req_duration: ['p(95)<500', 'p(99)<1500'],
         http_req_failed: ['rate<0.01'],
 
-        'http_req_duration{name:GET /api/users}': ['p(95)<500'],
-        'http_req_duration{name:GET /api/users/{userId}}': ['p(95)<300']
+        'http_req_duration{name:GET /api/users/{userId}}': ['p(95)<300'],
+        'http_req_duration{name:PATCH /api/users/{userId}}': ['p(95)<500'],
     },
 };
 

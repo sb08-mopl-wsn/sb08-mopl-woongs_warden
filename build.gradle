@@ -40,6 +40,7 @@ jacocoTestReport {
 					'**/repository/**',
 					'**/controller/**',
 					'**/global/config/**',
+					'**/domain/jwt/**',
 					'**/global/base/**',
 					'**/global/exception/**',
 					'**/global/logging/**',

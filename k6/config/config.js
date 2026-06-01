@@ -22,6 +22,7 @@ export function getHeaders(token, csrfToken) {
     }
     if (csrfToken) {
         headers['X-XSRF-TOKEN'] = csrfToken;
+        headers['Cookie'] = `XSRF-TOKEN=${csrfToken}`;
     }
     return headers;
 }
@@ -30,7 +31,7 @@ export function getHeaders(token, csrfToken) {
 export function login() {
     const res = http.post(
         `${BASE_URL}/api/auth/sign-in`,
-        { username: TEST_EMAIL, password: TEST_PASSWORD },
+        { username: TEST_EMAIL, password: TEST_PASSWORD }
     );
 
     const success = check(res, {
@@ -48,18 +49,15 @@ export function login() {
         fail(`로그인 실패: status=${res.status}, body=${res.body}`);
     }
 
-    // Set-Cookie에서 XSRF-TOKEN, REFRESH_TOKEN 추출
+    // 💡 이 아래 쿠키 파싱 부분만 k6 내장 객체를 사용하도록 유지
     let csrfToken = null;
+    if (res.cookies['XSRF-TOKEN'] && res.cookies['XSRF-TOKEN'].length > 0) {
+        csrfToken = res.cookies['XSRF-TOKEN'][0].value;
+    }
+
     let refreshToken = null;
-    const cookies = res.headers['Set-Cookie'];
-    if (cookies) {
-        const cookieArr = Array.isArray(cookies) ? cookies : [cookies];
-        for (const c of cookieArr) {
-            const xsrf = c.match(/XSRF-TOKEN=([^;]+)/);
-            if (xsrf && xsrf[1]) csrfToken = xsrf[1];
-            const refresh = c.match(/REFRESH_TOKEN=([^;]+)/);
-            if (refresh && refresh[1]) refreshToken = refresh[1];
-        }
+    if (res.cookies['REFRESH_TOKEN'] && res.cookies['REFRESH_TOKEN'].length > 0) {
+        refreshToken = res.cookies['REFRESH_TOKEN'][0].value;
     }
 
     const body = JSON.parse(res.body);

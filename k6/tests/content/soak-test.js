@@ -1,7 +1,6 @@
 import {sleep} from 'k6';
-import {login} from '../config/config.js';
-import {contentScenario} from '../scenarios/content.js';
-import {watchingSessionScenario} from "../scenarios/watchingSession.js";
+import {login} from '../../config/config.js';
+import {contentScenario} from '../../scenarios/content.js';
 
 /**
  * Soak Test — 장시간 낮은 부하에서 안정성 확인
@@ -28,12 +27,7 @@ export const options = {
             executor: 'ramping-vus',
             stages,
             exec: 'contentTest',
-        },
-        watchingSession: {
-            executor: 'ramping-vus',
-            stages,
-            exec: 'watchingSessionTest',
-        },
+        }
     },
     thresholds: {
         http_req_duration: ['p(95)<500', 'p(99)<1500'],
@@ -51,10 +45,5 @@ export function setup() {
 
 export function contentTest(data) {
     contentScenario(data.accessToken, data.csrfToken);
-    sleep(1);
-}
-
-export function watchingSessionTest(data) {
-    watchingSessionScenario(data.accessToken, data.csrfToken);
     sleep(1);
 }

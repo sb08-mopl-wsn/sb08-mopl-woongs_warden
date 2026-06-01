@@ -33,6 +33,6 @@ public interface PlaylistRepository extends JpaRepository<Playlist, UUID>, Playl
   int decreaseSubscriberCount(@Param("id") UUID id);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("SELECT p FROM Playlist p JOIN FETCH p.user WHERE p.id = :id")
-  Optional<Playlist> findByIdWithUserForUpdate(@Param("id") UUID id);
+  @Query("SELECT p FROM Playlist p WHERE p.id = :id")
+  Optional<Playlist> findByIdForUpdate(@Param("id") UUID id);
 }

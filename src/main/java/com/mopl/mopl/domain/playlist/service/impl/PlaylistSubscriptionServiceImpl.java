@@ -34,7 +34,7 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
   @Override
   @Transactional
   public void subscribeToPlaylist(UUID playlistId, UUID userId) {
-    Playlist playlist = playlistRepository.findByIdWithUserForUpdate(playlistId)
+    Playlist playlist = playlistRepository.findByIdForUpdate(playlistId)
         .orElseThrow(() -> new PlaylistNotFoundException(playlistId));
     User user = userRepository.findById(userId)
         .orElseThrow(UserNotFoundException::new);
@@ -61,7 +61,7 @@ public class PlaylistSubscriptionServiceImpl implements PlaylistSubscriptionServ
   @Override
   @Transactional
   public void unsubscribeFromPlaylist(UUID playlistId, UUID userId) {
-    Playlist playlist = playlistRepository.findByIdWithUserForUpdate(playlistId)
+    Playlist playlist = playlistRepository.findByIdForUpdate(playlistId)
         .orElseThrow(() -> new PlaylistNotFoundException(playlistId));
     User user = userRepository.findById(userId)
         .orElseThrow(UserNotFoundException::new);

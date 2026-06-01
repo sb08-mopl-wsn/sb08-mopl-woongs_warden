@@ -68,7 +68,7 @@ public class PlaylistContentServiceImpl implements PlaylistContentService {
   }
 
   private Playlist findPlaylistAndCheckOwner(UUID playlistId, UUID userId) {
-    Playlist playlist = playlistRepository.findByIdWithUser(playlistId)
+    Playlist playlist = playlistRepository.findByIdWithUserForUpdate(playlistId)
         .orElseThrow(() -> new PlaylistNotFoundException(playlistId));
     if (!playlist.getUser().getId().equals(userId)) {
       throw new PlaylistForbiddenException();

@@ -79,7 +79,7 @@ class PlaylistSubscriptionServiceImplTest {
     @DisplayName("정상적으로 플레이리스트를 구독하고 카운트를 증가시킨다.")
     void givenValidRequest_whenSubscribe_thenSuccess() {
       // given
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
       given(playlistRepository.increaseSubscriberCount(playlistId)).willReturn(1);
 
@@ -96,7 +96,7 @@ class PlaylistSubscriptionServiceImplTest {
     @DisplayName("자신의 플레이리스트를 구독하면 예외가 발생한다.")
     void givenOwnPlaylist_whenSubscribe_thenThrowsException() {
       // given
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(userRepository.findById(ownerId)).willReturn(Optional.of(owner));
 
       // when & then
@@ -108,7 +108,7 @@ class PlaylistSubscriptionServiceImplTest {
     @DisplayName("이미 구독한 플레이리스트를 다시 구독하면 예외가 발생한다.")
     void givenAlreadySubscribed_whenSubscribe_thenThrowsException() {
       // given
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
       given(playlistSubscriptionRepository.saveAndFlush(any(PlaylistSubscription.class)))
           .willThrow(new DataIntegrityViolationException("duplicate"));
@@ -123,7 +123,7 @@ class PlaylistSubscriptionServiceImplTest {
     @DisplayName("존재하지 않는 플레이리스트를 구독하려 하면 예외가 발생한다.")
     void givenNonExistingPlaylist_whenSubscribe_thenThrowsException() {
       // given
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.empty());
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.empty());
 
       // when & then
       assertThatThrownBy(
@@ -135,7 +135,7 @@ class PlaylistSubscriptionServiceImplTest {
     @DisplayName("카운트 증가 쿼리가 실패하면 예외가 발생한다.")
     void givenIncreaseCountFails_whenSubscribe_thenThrowsException() {
       // given
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
 
       given(playlistRepository.increaseSubscriberCount(playlistId)).willReturn(0);
@@ -157,7 +157,7 @@ class PlaylistSubscriptionServiceImplTest {
       // given
       PlaylistSubscription subscription = new PlaylistSubscription(subscriber, playlist);
 
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
       given(playlistSubscriptionRepository.findByUserAndPlaylist(subscriber, playlist))
           .willReturn(Optional.of(subscription));
@@ -176,7 +176,7 @@ class PlaylistSubscriptionServiceImplTest {
     @DisplayName("구독 내역이 존재하지 않으면 예외가 발생한다.")
     void givenNotSubscribed_whenUnsubscribe_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
       given(playlistSubscriptionRepository.findByUserAndPlaylist(subscriber, playlist))
           .willReturn(Optional.empty());
@@ -191,7 +191,7 @@ class PlaylistSubscriptionServiceImplTest {
     @DisplayName("존재하지 않는 플레이리스트의 구독을 취소하려 하면 예외가 발생한다.")
     void givenNonExistingPlaylist_whenUnsubscribe_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.empty());
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.empty());
 
       // when & then
       assertThatThrownBy(
@@ -205,7 +205,7 @@ class PlaylistSubscriptionServiceImplTest {
       // given
       PlaylistSubscription subscription = new PlaylistSubscription(subscriber, playlist);
 
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
       given(playlistSubscriptionRepository.findByUserAndPlaylist(subscriber, playlist))
           .willReturn(Optional.of(subscription));

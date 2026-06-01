@@ -89,7 +89,7 @@ class PlaylistContentServiceImplTest {
     @DisplayName("정상적으로 콘텐츠를 추가하고 카운트를 증가시킨다.")
     void givenValidRequest_whenAddContent_thenSuccess() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
       given(playlistRepository.increaseContentCount(playlistId)).willReturn(1);
 
@@ -106,7 +106,7 @@ class PlaylistContentServiceImplTest {
     @DisplayName("플레이리스트 주인이 아니면 예외가 발생한다.")
     void givenNotOwner_whenAddContent_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
 
       // when & then
       assertThatThrownBy(() -> playlistContentService.addContentToPlaylist(playlistId, contentId, otherUserId))
@@ -117,7 +117,7 @@ class PlaylistContentServiceImplTest {
     @DisplayName("콘텐츠가 존재하지 않으면 예외가 발생한다.")
     void givenNonExistingContent_whenAddContent_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(contentRepository.findById(contentId)).willReturn(Optional.empty());
 
       // when & then
@@ -129,7 +129,7 @@ class PlaylistContentServiceImplTest {
     @DisplayName("이미 플레이리스트에 있는 콘텐츠를 추가하면 예외가 발생한다.")
     void givenAlreadyAddedContent_whenAddContent_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
       given(playlistContentRepository.saveAndFlush(any(PlaylistContent.class)))
           .willThrow(new DataIntegrityViolationException("duplicate"));
@@ -143,7 +143,7 @@ class PlaylistContentServiceImplTest {
     @DisplayName("존재하지 않는 플레이리스트에 콘텐츠를 추가하려 하면 예외가 발생한다.")
     void givenNonExistingPlaylist_whenAddContent_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.empty());
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.empty());
 
       // when & then
       assertThatThrownBy(() -> playlistContentService.addContentToPlaylist(playlistId, contentId, ownerId))
@@ -154,7 +154,7 @@ class PlaylistContentServiceImplTest {
     @DisplayName("카운트 증가 쿼리가 실패하면 예외가 발생한다.")
     void givenIncreaseCountFails_whenAddContent_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
 
       given(playlistRepository.increaseContentCount(playlistId)).willReturn(0);
@@ -174,7 +174,7 @@ class PlaylistContentServiceImplTest {
     void givenValidRequest_whenRemoveContent_thenSuccess() {
       // given
       PlaylistContent playlistContent = new PlaylistContent(playlist, content);
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(playlistContentRepository.findByPlaylistAndContentId(playlist, contentId))
           .willReturn(Optional.of(playlistContent));
 
@@ -191,7 +191,7 @@ class PlaylistContentServiceImplTest {
     @DisplayName("플레이리스트에 없는 콘텐츠를 삭제하려 하면 예외가 발생한다.")
     void givenContentNotInPlaylist_whenRemoveContent_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.of(playlist));
       given(playlistContentRepository.findByPlaylistAndContentId(playlist, contentId))
           .willReturn(Optional.empty());
 
@@ -204,7 +204,7 @@ class PlaylistContentServiceImplTest {
     @DisplayName("존재하지 않는 플레이리스트에서 콘텐츠를 삭제하려 하면 예외가 발생한다.")
     void givenNonExistingPlaylist_whenRemoveContent_thenThrowsException() {
       // given
-      given(playlistRepository.findByIdWithUser(playlistId)).willReturn(Optional.empty());
+      given(playlistRepository.findByIdWithUserForUpdate(playlistId)).willReturn(Optional.empty());
 
       // when & then
       assertThatThrownBy(() -> playlistContentService.removeContentFromPlaylist(playlistId, contentId, ownerId))

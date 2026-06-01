@@ -1,7 +1,6 @@
 import {sleep} from 'k6';
-import {login} from '../config/config.js';
-import {contentScenario} from '../scenarios/content.js';
-import {watchingSessionScenario} from "../scenarios/watchingSession.js";
+import {watchingSessionScenario} from "../../scenarios/watchingSession.js";
+import {login} from "../../config/config.js";
 
 /**
  * Stress Test — 한계점까지 점진적으로 올려서 어디서 깨지는지 확인
@@ -27,11 +26,6 @@ const stages = [
 
 export const options = {
     scenarios: {
-        content: {
-            executor: 'ramping-vus',
-            stages,
-            exec: 'contentTest',
-        },
         watchingSession: {
             executor: 'ramping-vus',
             stages,
@@ -50,11 +44,6 @@ export const options = {
 
 export function setup() {
     return login();
-}
-
-export function contentTest(data) {
-    contentScenario(data.accessToken, data.csrfToken);
-    sleep(1);
 }
 
 export function watchingSessionTest(data) {

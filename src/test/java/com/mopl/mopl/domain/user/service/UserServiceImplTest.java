@@ -214,8 +214,8 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("조회 결과가 limit보다 많으면 hasNext가 true이고 마지막 요소를 제거한다")
-    void getAllUsers_hasNext_success() {
+    @DisplayName("DESC 조회 결과가 limit보다 많으면 hasNext가 true이고 마지막 요소를 제거한다")
+    void getAllUsers_hasNext_desc_success() {
         CursorUserRequest request = new CursorUserRequest(
                 null,
                 null,
@@ -259,6 +259,55 @@ class UserServiceImplTest {
         assertThat(result.nextCursor()).isEqualTo(firstCreatedAt.toString());
         assertThat(result.nextIdAfter()).isEqualTo(firstUserId);
         assertThat(result.totalCount()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("ASC 조회 결과가 limit보다 많으면 hasNext가 true이고 마지막 요소를 제거한다")
+    void getAllUsers_hasNext_asc_success() {
+        CursorUserRequest request = new CursorUserRequest(
+                null,
+                null,
+                null,
+                null,
+                1,
+                SortDirection.ASCENDING,
+                SortBy.createdAt
+        );
+
+        User firstUser = createUser();
+        UUID firstUserId = UUID.randomUUID();
+        Instant firstCreatedAt = Instant.parse("2026-05-10T04:36:08Z");
+        ReflectionTestUtils.setField(firstUser, "id", firstUserId);
+        ReflectionTestUtils.setField(firstUser, "createdAt", firstCreatedAt);
+
+        User extraUser = createUser();
+        ReflectionTestUtils.setField(extraUser, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(extraUser, "createdAt", Instant.parse("2026-05-11T04:36:08Z"));
+
+        UserDto firstUserDto = createUserDto(firstUserId, firstUser);
+
+        given(userRepository.findUsersByCursor(
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(SortDirection.ASCENDING),
+                any(Pageable.class)
+        )).willReturn(new ArrayList<>(List.of(firstUser, extraUser)));
+
+        given(userRepository.countUsersByEmailAndRole(nullable(String.class), nullable(Role.class)))
+                .willReturn(2L);
+
+        given(userMapper.toDto(firstUser)).willReturn(firstUserDto);
+
+        CursorResponseUserDto result = userService.getAllUsers(request);
+
+        assertThat(result.data()).containsExactly(firstUserDto);
+        assertThat(result.hasNext()).isTrue();
+        assertThat(result.nextCursor()).isEqualTo(firstCreatedAt.toString());
+        assertThat(result.nextIdAfter()).isEqualTo(firstUserId);
+        assertThat(result.totalCount()).isEqualTo(2L);
+        assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
     }
 
     @Test

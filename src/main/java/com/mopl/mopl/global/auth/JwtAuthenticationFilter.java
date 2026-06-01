@@ -28,13 +28,10 @@ import java.util.Arrays;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
     // 토큰 검증 및 claims 추출 유틸리티
     private final JwtTokenProvider tokenProvider;
     // 사용자 로딩 서비스
     private final MoplUserDetailsService userDetailsService;
-    // 에러 응답 작성용
-    private final ObjectMapper objectMapper;
     // 토큰 폐기 여부 확인용 저장소
     private final JwtRegistry jwtRegistry;
 
@@ -70,7 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
 
                     MoplUserDetails userDetails = tokenProvider.parseAccessToken(token);
-                    UserDetails currentUserDetails = userDetailsService.loadUserByUsername(userDetails.getUsername());
+                    UserDetails currentUserDetails = userDetailsService.loadUserByUsernameForToken(userDetails.getUsername());
 
                     if (!currentUserDetails.isAccountNonLocked()) {
                         jwtRegistry.invalidateJwtInformationByUserId(userDetails.getUserDto().id());

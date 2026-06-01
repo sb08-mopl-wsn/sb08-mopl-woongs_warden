@@ -4,14 +4,18 @@ import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JwtTokenProviderTest {
 
@@ -20,6 +24,7 @@ class JwtTokenProviderTest {
             900_000,
             "refresh-secret-key-must-be-at-least-32-bytes-1234567890",
             3_600_000,
+            604_800_000,
             false,
             "Lax"
     );
@@ -57,6 +62,22 @@ class JwtTokenProviderTest {
         assertThat(tokenProvider.getUserIdFromToken(refreshToken)).isEqualTo(userId);
         assertThat(tokenProvider.getTokenId(refreshToken)).isNotBlank();
         assertThat(tokenProvider.getExpiration(refreshToken)).isNotNull();
+        assertThat(tokenProvider.isRememberMeRefreshToken(refreshToken)).isFalse();
+    }
+
+    @Test
+    @DisplayName("RememberMe Refresh Token 발급 시 rememberMe claim이 true로 들어간다")
+    void generateRefreshToken_rememberMe_true() throws Exception {
+        UUID userId = UUID.randomUUID();
+        MoplUserDetails userDetails = userDetails(userId, "admin@admin.com", "관리자", Role.ADMIN);
+
+        String refreshToken = tokenProvider.generateRefreshToken(userDetails, true);
+
+        assertThat(tokenProvider.validateRefreshToken(refreshToken)).isTrue();
+        assertThat(tokenProvider.validateAccessToken(refreshToken)).isFalse();
+        assertThat(tokenProvider.isRememberMeRefreshToken(refreshToken)).isTrue();
+        assertThat(tokenProvider.getUserEmailFromToken(refreshToken)).isEqualTo("admin@admin.com");
+        assertThat(tokenProvider.getUserIdFromToken(refreshToken)).isEqualTo(userId);
     }
 
     @Test
@@ -119,6 +140,13 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    @DisplayName("잘못된 토큰에서 rememberMe claim 조회 시 IllegalArgumentException이 발생한다")
+    void invalidToken_isRememberMeRefreshToken_throwIllegalArgumentException() {
+        assertThatThrownBy(() -> tokenProvider.isRememberMeRefreshToken("invalid-token"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     @DisplayName("Refresh Token 쿠키를 생성한다")
     void generateRefreshTokenCookie_success() {
         String refreshToken = "refresh.token.value";
@@ -135,6 +163,22 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    @DisplayName("RememberMe Refresh Token 쿠키를 생성하면 maxAge가 rememberMe 만료 시간으로 설정된다")
+    void generateRefreshTokenCookie_rememberMe_success() {
+        String refreshToken = "refresh.token.value";
+
+        ResponseCookie cookie = tokenProvider.generateRefreshTokenCookie(refreshToken, true);
+
+        assertThat(cookie.getName()).isEqualTo(JwtTokenProvider.REFRESH_TOKEN_COOKIE_NAME);
+        assertThat(cookie.getValue()).isEqualTo(refreshToken);
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.isSecure()).isFalse();
+        assertThat(cookie.getPath()).isEqualTo("/");
+        assertThat(cookie.getMaxAge().getSeconds()).isEqualTo(604_800);
+        assertThat(cookie.toString()).contains("SameSite=Lax");
+    }
+
+    @Test
     @DisplayName("Refresh Token 만료 쿠키를 생성한다")
     void generateRefreshTokenExpirationCookie_success() {
         ResponseCookie cookie = tokenProvider.generateRefreshTokenExpirationCookie();
@@ -146,6 +190,38 @@ class JwtTokenProviderTest {
         assertThat(cookie.getPath()).isEqualTo("/");
         assertThat(cookie.getMaxAge().getSeconds()).isZero();
         assertThat(cookie.toString()).contains("SameSite=Lax");
+    }
+
+    @Test
+    @DisplayName("addRefreshCookie는 Set-Cookie 헤더를 추가한다")
+    void addRefreshCookie_success() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        tokenProvider.addRefreshCookie(response, "refresh.token.value");
+
+        String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+
+        assertThat(setCookie).contains(JwtTokenProvider.REFRESH_TOKEN_COOKIE_NAME);
+        assertThat(setCookie).contains("refresh.token.value");
+        assertThat(setCookie).contains("HttpOnly");
+        assertThat(setCookie).contains("Path=/");
+        assertThat(setCookie).contains("SameSite=Lax");
+    }
+
+    @Test
+    @DisplayName("expireRefreshCookie는 maxAge 0인 Set-Cookie 헤더를 추가한다")
+    void expireRefreshCookie_success() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        tokenProvider.expireRefreshCookie(response);
+
+        String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+
+        assertThat(setCookie).contains(JwtTokenProvider.REFRESH_TOKEN_COOKIE_NAME);
+        assertThat(setCookie).contains("Max-Age=0");
+        assertThat(setCookie).contains("HttpOnly");
+        assertThat(setCookie).contains("Path=/");
+        assertThat(setCookie).contains("SameSite=Lax");
     }
 
     private MoplUserDetails userDetails(UUID userId, String email, String name, Role role) {

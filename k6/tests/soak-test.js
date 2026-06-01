@@ -1,6 +1,7 @@
 import {sleep} from 'k6';
 import {login} from '../config/config.js';
 import {contentScenario} from '../scenarios/content.js';
+import {watchingSessionScenario} from "../scenarios/watchingSession.js";
 
 /**
  * Soak Test — 장시간 낮은 부하에서 안정성 확인
@@ -28,12 +29,11 @@ export const options = {
             stages,
             exec: 'contentTest',
         },
-        // ── 팀원 시나리오 추가 위치 ──
-        // review: {
-        //     executor: 'ramping-vus',
-        //     stages,
-        //     exec: 'reviewTest',
-        // },
+        watchingSession: {
+            executor: 'ramping-vus',
+            stages,
+            exec: 'watchingSessionTest',
+        },
     },
     thresholds: {
         http_req_duration: ['p(95)<500', 'p(99)<1500'],
@@ -54,8 +54,7 @@ export function contentTest(data) {
     sleep(1);
 }
 
-// ── 팀원 시나리오 추가 위치 ──
-// export function reviewTest(data) {
-//     reviewScenario(data.accessToken, data.csrfToken);
-//     sleep(1);
-// }
+export function watchingSessionTest(data) {
+    watchingSessionScenario(data.accessToken, data.csrfToken);
+    sleep(1);
+}

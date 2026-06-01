@@ -1,8 +1,8 @@
-package com.mopl.mopl.global.event.listener.redis;
+package com.mopl.mopl.global.redis.component;
 
 import com.mopl.mopl.global.event.LiveChatEvent;
 import com.mopl.mopl.global.event.WatchingSessionEvent;
-import com.mopl.mopl.global.event.dto.WebsocketPayload;
+import com.mopl.mopl.global.redis.dto.WebsocketPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -17,7 +17,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Component
 public class WatchingSessionRedisPublisher {
 
-    private final RedisTemplate<String, Object> redisPubSubTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final ChannelTopic watchTopic;
     private final ChannelTopic chatTopic;
 
@@ -33,7 +33,7 @@ public class WatchingSessionRedisPublisher {
                 event.change()
         );
 
-        redisPubSubTemplate.convertAndSend(watchTopic.getTopic(), payload);
+        redisTemplate.convertAndSend(watchTopic.getTopic(), payload);
     }
 
     @Async("watchingSessionExecutor")
@@ -47,6 +47,6 @@ public class WatchingSessionRedisPublisher {
                 event.chatDto()
         );
 
-        redisPubSubTemplate.convertAndSend(chatTopic.getTopic(), payload);
+        redisTemplate.convertAndSend(chatTopic.getTopic(), payload);
     }
 }

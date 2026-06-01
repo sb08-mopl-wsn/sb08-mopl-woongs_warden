@@ -1,21 +1,22 @@
 package com.mopl.mopl.global.auth;
 
-import com.mopl.mopl.domain.jwt.entity.Jwt;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.entity.Role;
-import com.mopl.mopl.domain.user.entity.User;
-import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
-import com.nimbusds.jose.*;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
@@ -28,8 +29,9 @@ import java.util.UUID;
 @Component
 public class JwtTokenProvider {
     public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
-    private final int accessTokenExpirationMs;
-    private final int refreshTokenExpirationMs;
+    private final long accessTokenExpirationMs;
+    private final long refreshTokenExpirationMs;
+    private final long rememberMeRefreshTokenExpirationMs;
 
     private final JWSSigner accessTokenSigner;
     private final JWSVerifier accessTokenVerifier;
@@ -41,14 +43,16 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(
             @Value("${jwt.access-token.secret}") String accessTokenSecret,
-            @Value("${jwt.access-token.exp}") int accessTokenExpirationMs,
+            @Value("${jwt.access-token.exp}") long accessTokenExpirationMs,
             @Value("${jwt.refresh-token.secret}") String refreshTokenSecret,
-            @Value("${jwt.refresh-token.exp}") int refreshTokenExpirationMs,
+            @Value("${jwt.refresh-token.exp}") long refreshTokenExpirationMs,
+            @Value("${jwt.refresh-token.remember-me-exp}") long rememberMeRefreshTokenExpirationMs,
             @Value("${jwt.refresh-token.cookie.secure:false}") boolean refreshCookieSecure,
             @Value("${jwt.refresh-token.cookie.same-site:Lax}") String refreshCookieSameSite
     ) throws JOSEException {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
+        this.rememberMeRefreshTokenExpirationMs = rememberMeRefreshTokenExpirationMs;
         this.refreshCookieSecure = refreshCookieSecure;
         this.refreshCookieSameSite = refreshCookieSameSite;
 
@@ -62,17 +66,31 @@ public class JwtTokenProvider {
     }
 
     public String generateAccessToken(MoplUserDetails userDetails) throws JOSEException {
-        return generateToken(userDetails, accessTokenExpirationMs, accessTokenSigner, "access");
+        return createAccessToken(userDetails, accessTokenExpirationMs, accessTokenSigner, "access");
     }
 
     public String generateRefreshToken(MoplUserDetails userDetails) throws JOSEException {
-        return generateToken(userDetails, refreshTokenExpirationMs, refreshTokenSigner, "refresh");
+        return generateRefreshToken(userDetails, false);
     }
 
-    private String generateToken(
+    public String generateRefreshToken(MoplUserDetails userDetails, boolean rememberMe) throws JOSEException {
+        long expirationMs = rememberMe ? rememberMeRefreshTokenExpirationMs : refreshTokenExpirationMs;
+        return createRefreshToken(userDetails, expirationMs, refreshTokenSigner, "refresh", rememberMe);
+    }
+
+    private String createAccessToken(
             MoplUserDetails userDetails,
-            int expirationMs, JWSSigner signer,
+            long expirationMs, JWSSigner signer,
             String tokenType
+    ) throws JOSEException {
+        return createRefreshToken(userDetails, expirationMs, signer, tokenType, false);
+    }
+
+    private String createRefreshToken(
+            MoplUserDetails userDetails,
+            long expirationMs, JWSSigner signer,
+            String tokenType,
+            boolean rememberMe
     ) throws JOSEException {
 
         String tokenId = UUID.randomUUID().toString();
@@ -91,6 +109,8 @@ public class JwtTokenProvider {
                 .claim("name", userDetails.getUserDto().name())
                 // 토큰 타입(type)
                 .claim("type", tokenType)
+                // 로그인 유지 여부(remember-me)
+                .claim("rememberMe", rememberMe)
                 // 사용자 권한(roles)
                 .claim("roles",
                         userDetails.getAuthorities()
@@ -111,11 +131,16 @@ public class JwtTokenProvider {
     }
 
     public ResponseCookie generateRefreshTokenCookie(String refreshToken) {
+        return generateRefreshTokenCookie(refreshToken, false);
+    }
+
+    public ResponseCookie generateRefreshTokenCookie(String refreshToken, boolean rememberMe) {
+        long maxAgeSeconds = (rememberMe ? rememberMeRefreshTokenExpirationMs : refreshTokenExpirationMs) / 1000;
         return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
                 .httpOnly(true)
                 .secure(refreshCookieSecure)
                 .path("/")
-                .maxAge(refreshTokenExpirationMs / 1000)
+                .maxAge(maxAgeSeconds)
                 .sameSite(refreshCookieSameSite)
                 .build();
     }
@@ -131,7 +156,11 @@ public class JwtTokenProvider {
     }
 
     public void addRefreshCookie(HttpServletResponse response, String refreshToken) {
-        ResponseCookie cookie = generateRefreshTokenCookie(refreshToken);
+        addRefreshCookie(response, refreshToken, false);
+    }
+
+    public void addRefreshCookie(HttpServletResponse response, String refreshToken, boolean rememberMe) {
+        ResponseCookie cookie = generateRefreshTokenCookie(refreshToken, rememberMe);
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
@@ -169,6 +198,25 @@ public class JwtTokenProvider {
 
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    public boolean isRememberMeRefreshToken(String token) {
+        try {
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            if (!signedJWT.verify(refreshTokenVerifier)) {
+                throw new IllegalArgumentException("Invalid refresh token signature");
+            }
+
+            String tokenType = (String) signedJWT.getJWTClaimsSet().getClaim("type");
+            if (!"refresh".equals(tokenType)) {
+                throw new IllegalArgumentException("Not a refresh token");
+            }
+
+            Boolean rememberMe = signedJWT.getJWTClaimsSet().getBooleanClaim("rememberMe");
+            return Boolean.TRUE.equals(rememberMe);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid JWT token", e);
         }
     }
 

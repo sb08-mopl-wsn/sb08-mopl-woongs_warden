@@ -1,14 +1,9 @@
 package com.mopl.mopl.global.security;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.mopl.mopl.domain.auth.service.AuthenticationAttemptService;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
@@ -17,24 +12,33 @@ import com.mopl.mopl.global.auth.JwtTokenProvider;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.handler.JwtLoginSuccessHandler;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.Instant;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.core.Authentication;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.Authentication;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 class JwtLoginSuccessHandlerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private final JwtTokenProvider tokenProvider = mock(JwtTokenProvider.class);
     private final JwtRegistry jwtRegistry = mock(JwtRegistry.class);
+    private final AuthenticationAttemptService authenticationAttemptService = mock(AuthenticationAttemptService.class);
+
     private final JwtLoginSuccessHandler handler = new JwtLoginSuccessHandler(
             objectMapper,
             tokenProvider,
-            jwtRegistry
+            jwtRegistry,
+            authenticationAttemptService
     );
 
     @Test
@@ -51,35 +55,35 @@ class JwtLoginSuccessHandlerTest {
                 false,
                 false
         );
+
         MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");
 
         Authentication authentication = mock(Authentication.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+
         when(authentication.getPrincipal()).thenReturn(principal);
+        when(request.getParameter("rememberMe")).thenReturn(null);
         when(tokenProvider.generateAccessToken(principal)).thenReturn("access.jwt.token");
-        when(tokenProvider.generateRefreshToken(principal)).thenReturn("refresh.jwt.token");
-        org.mockito.Mockito.doAnswer(invocation -> {
-                    MockHttpServletResponse response = invocation.getArgument(0);
-                    response.addHeader(
-                            HttpHeaders.SET_COOKIE,
-                            "REFRESH-TOKEN=refresh.jwt.token; Path=/; HttpOnly; SameSite=Lax"
-                    );
-                    return null;
-                })
-                .when(tokenProvider)
-                .addRefreshCookie(any(), org.mockito.ArgumentMatchers.eq("refresh.jwt.token"));
+        when(tokenProvider.generateRefreshToken(principal, false)).thenReturn("refresh.jwt.token");
+
+        doAnswer(invocation -> {
+            MockHttpServletResponse response = invocation.getArgument(0);
+            response.addHeader(
+                    HttpHeaders.SET_COOKIE,
+                    "REFRESH_TOKEN=refresh.jwt.token; Path=/; HttpOnly; SameSite=Lax"
+            );
+            return null;
+        }).when(tokenProvider).addRefreshCookie(any(), eq("refresh.jwt.token"), eq(false));
 
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        handler.onAuthenticationSuccess(
-                mock(HttpServletRequest.class),
-                response,
-                authentication
-        );
+        handler.onAuthenticationSuccess(request, response, authentication);
 
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(response.getCharacterEncoding()).isEqualTo("UTF-8");
         assertThat(response.getContentType()).contains("application/json");
-        assertThat(response.getHeader(HttpHeaders.SET_COOKIE)).contains("REFRESH-TOKEN=refresh.jwt.token");
+        assertThat(response.getHeader(HttpHeaders.SET_COOKIE))
+                .contains("REFRESH_TOKEN=refresh.jwt.token");
 
         JsonNode body = objectMapper.readTree(response.getContentAsString());
         assertThat(body.get("accessToken").asText()).isEqualTo("access.jwt.token");
@@ -88,16 +92,57 @@ class JwtLoginSuccessHandlerTest {
         assertThat(body.get("userDto").get("name").asText()).isEqualTo("관리자");
 
         ArgumentCaptor<JwtInformation> captor = ArgumentCaptor.forClass(JwtInformation.class);
+
+        verify(authenticationAttemptService).resetLoginFailures("admin@admin.com");
         verify(jwtRegistry).registerJwtInformation(captor.capture());
+
         assertThat(captor.getValue().getUser()).isEqualTo(userDto);
         assertThat(captor.getValue().getAccessToken()).isEqualTo("access.jwt.token");
         assertThat(captor.getValue().getRefreshToken()).isEqualTo("refresh.jwt.token");
+
+        verify(tokenProvider).addRefreshCookie(response, "refresh.jwt.token", false);
+    }
+
+    @Test
+    @DisplayName("rememberMe=true 요청이면 rememberMe refreshToken과 쿠키를 발급한다")
+    void onAuthenticationSuccess_RememberMeTrue_IssuesRememberMeRefreshToken() throws Exception {
+        UserDto userDto = new UserDto(
+                UUID.randomUUID(),
+                Instant.parse("2026-05-08T00:00:00Z"),
+                "admin@admin.com",
+                "관리자",
+                null,
+                Role.ADMIN,
+                false,
+                false
+        );
+
+        MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");
+
+        Authentication authentication = mock(Authentication.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+
+        when(authentication.getPrincipal()).thenReturn(principal);
+        when(request.getParameter("rememberMe")).thenReturn("true");
+        when(tokenProvider.generateAccessToken(principal)).thenReturn("access.jwt.token");
+        when(tokenProvider.generateRefreshToken(principal, true)).thenReturn("refresh.jwt.token");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+
+        verify(tokenProvider).generateRefreshToken(principal, true);
+        verify(tokenProvider).addRefreshCookie(response, "refresh.jwt.token", true);
+        verify(authenticationAttemptService).resetLoginFailures("admin@admin.com");
     }
 
     @Test
     @DisplayName("principal이 MoplUserDetails가 아니면 401을 반환한다")
     void onAuthenticationSuccess_InvalidPrincipal_ReturnsUnauthorized() throws Exception {
         Authentication authentication = mock(Authentication.class);
+
         when(authentication.getPrincipal()).thenReturn("not-user-details");
 
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -109,10 +154,13 @@ class JwtLoginSuccessHandlerTest {
         );
 
         assertThat(response.getStatus()).isEqualTo(401);
+
         JsonNode body = objectMapper.readTree(response.getContentAsString());
         assertThat(body.get("success").asBoolean()).isFalse();
         assertThat(body.get("message").asText()).isEqualTo("Invalid principal");
+
         verifyNoInteractions(jwtRegistry);
+        verifyNoInteractions(authenticationAttemptService);
     }
 
     @Test
@@ -128,9 +176,11 @@ class JwtLoginSuccessHandlerTest {
                 false,
                 false
         );
+
         MoplUserDetails principal = new MoplUserDetails(userDto, "encoded-password");
 
         Authentication authentication = mock(Authentication.class);
+
         when(authentication.getPrincipal()).thenReturn(principal);
         when(tokenProvider.generateAccessToken(principal))
                 .thenThrow(new com.nimbusds.jose.JOSEException("sign failed"));
@@ -144,9 +194,12 @@ class JwtLoginSuccessHandlerTest {
         );
 
         assertThat(response.getStatus()).isEqualTo(500);
+
         JsonNode body = objectMapper.readTree(response.getContentAsString());
         assertThat(body.get("success").asBoolean()).isFalse();
         assertThat(body.get("message").asText()).isEqualTo("Token generation failed");
+
+        verify(authenticationAttemptService).resetLoginFailures("user@test.com");
         verifyNoInteractions(jwtRegistry);
     }
 }

@@ -1,6 +1,5 @@
 package com.mopl.mopl.global.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.entity.Role;
@@ -19,14 +18,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
-
 import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,7 +57,6 @@ class JwtAuthenticationFilterTest {
         return new JwtAuthenticationFilter(
                 tokenProvider,
                 userDetailsService,
-                new ObjectMapper(),
                 jwtRegistry,
                 authenticationEntryPoint
         );
@@ -96,7 +94,7 @@ class JwtAuthenticationFilterTest {
         when(tokenProvider.validateAccessToken(accessToken)).thenReturn(true);
         when(jwtRegistry.hasActiveJwtInformationByAccessToken(accessToken)).thenReturn(true);
         when(tokenProvider.parseAccessToken(accessToken)).thenReturn(userDetails);
-        when(userDetailsService.loadUserByUsername(email)).thenReturn(userDetails);
+        when(userDetailsService.loadUserByUsernameForToken(email)).thenReturn(userDetails);
 
         filter.doFilter(request, response, filterChain);
 
@@ -166,5 +164,69 @@ class JwtAuthenticationFilterTest {
 
         assertThat(captor.getValue().getMessage()).isEqualTo("만료된 토큰입니다.");
         verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("잠긴 계정이면 JWT를 무효화하고 AuthenticationEntryPoint를 호출한다")
+    void lockedUser_callsAuthenticationEntryPoint() throws Exception {
+
+        JwtAuthenticationFilter filter = createFilter();
+
+        String accessToken = "valid-token";
+        String email = "user@test.com";
+
+        UserDto userDto = new UserDto(
+                UUID.randomUUID(),
+                null,
+                email,
+                "사용자",
+                null,
+                Role.USER,
+                true,
+                false
+        );
+
+        MoplUserDetails tokenUser =
+                new MoplUserDetails(userDto, "password");
+
+        MoplUserDetails lockedUser =
+                mock(MoplUserDetails.class);
+
+        when(lockedUser.isAccountNonLocked()).thenReturn(false);
+
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("GET", "/api/users/me");
+
+        request.addHeader("Authorization", "Bearer " + accessToken);
+
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+
+        when(tokenProvider.validateAccessToken(accessToken))
+                .thenReturn(true);
+
+        when(jwtRegistry.hasActiveJwtInformationByAccessToken(accessToken))
+                .thenReturn(true);
+
+        when(tokenProvider.parseAccessToken(accessToken))
+                .thenReturn(tokenUser);
+
+        when(userDetailsService.loadUserByUsernameForToken(email))
+                .thenReturn(lockedUser);
+
+        filter.doFilter(request, response, filterChain);
+
+        verify(jwtRegistry)
+                .invalidateJwtInformationByUserId(userDto.id());
+
+        verify(authenticationEntryPoint)
+                .commence(
+                        any(),
+                        any(),
+                        any(LockedException.class)
+                );
+
+        verify(filterChain, never())
+                .doFilter(any(), any());
     }
 }

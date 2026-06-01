@@ -12,7 +12,8 @@ public enum UserErrorCode implements ErrorCode {
     USER_DUPLICATE(2002, "DUPLICATE", HttpStatus.CONFLICT, "이미 존재하는 사용자입니다."),
     USER_LOGIN_FAILED(2003,"LOGIN_FAILED", HttpStatus.UNAUTHORIZED,"아이디 또는 비밀번호가 일치하지 않습니다."),
     USER_UNAUTHORIZED(2004, "UNAUTHORIZED",HttpStatus.FORBIDDEN,"해당 요청에 대한 권한이 없습니다."),
-    USER_INVALID_SOCIAL_INFO(2005, "INVALID_SOCIAL_INFO", HttpStatus.BAD_REQUEST, "socialType과 socialId는 함께 유효해야 합니다.");
+    USER_INVALID_SOCIAL_INFO(2005, "INVALID_SOCIAL_INFO", HttpStatus.BAD_REQUEST, "socialType과 socialId는 함께 유효해야 합니다."),
+    USER_PASSWORD_RESET_LOCKED(2006, "PASSWORD_RESET_LOCKED", HttpStatus.TOO_MANY_REQUESTS, "비밀번호 초기화에 5회 실패하여 30분간 비밀번호 초기화를 요청할 수 없습니다.");
 
     private final int numeric;
     private final String errorKey;

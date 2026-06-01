@@ -5,7 +5,6 @@ import com.mopl.mopl.global.exception.GlobalErrorCode;
 
 public class CursorUserException extends BusinessException {
     public CursorUserException() {
-        super(GlobalErrorCode.INVALID_INPUT,"cursor와 idAfter는 함께 전달되어야 합니다.");
+        super(GlobalErrorCode.INVALID_INPUT, "cursor와 idAfter는 함께 전달되어야 합니다.");
     }
-
 }

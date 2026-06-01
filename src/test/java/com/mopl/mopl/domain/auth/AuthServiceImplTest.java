@@ -4,6 +4,7 @@ import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
 import com.mopl.mopl.domain.auth.exception.AuthFailedRefreshToken;
 import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
 import com.mopl.mopl.domain.auth.service.AuthServiceImpl;
+import com.mopl.mopl.domain.auth.service.AuthenticationAttemptService;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
@@ -11,6 +12,7 @@ import com.mopl.mopl.domain.user.dto.UserDto;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
+import com.mopl.mopl.domain.user.exception.UserPasswordResetLockedException;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.auth.JwtTokenProvider;
@@ -63,13 +65,16 @@ class AuthServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private AuthenticationAttemptService authenticationAttemptService;
+
+    @Mock
     private HttpServletResponse response;
 
     @InjectMocks
     private AuthServiceImpl authService;
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
 
     @BeforeEach
     void setUp() {
@@ -95,6 +100,7 @@ class AuthServiceImplTest {
                     "tester",
                     null,
                     Role.USER,
+                    false,
                     false
             );
 
@@ -131,6 +137,7 @@ class AuthServiceImplTest {
                     null,
                     Role.USER,
                     false
+                    ,false
             );
 
             MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
@@ -153,6 +160,7 @@ class AuthServiceImplTest {
             String oldAccessToken = "old.access.token";
             String newAccessToken = "new.access.token";
             String newRefreshToken = "new.refresh.token";
+            boolean rememberMe = false;
 
             UserDto userDto = new UserDto(
                     UUID.randomUUID(),
@@ -161,6 +169,7 @@ class AuthServiceImplTest {
                     "관리자",
                     null,
                     Role.ADMIN,
+                    false,
                     false
             );
 
@@ -176,9 +185,11 @@ class AuthServiceImplTest {
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
             when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
-            when(userDetailsService.loadUserByUsername("admin@admin.com")).thenReturn(userDetails);
+            when(userDetailsService.loadUserByUsernameForToken("admin@admin.com"))
+                    .thenReturn(userDetails);
+            when(jwtTokenProvider.isRememberMeRefreshToken(oldRefreshToken)).thenReturn(rememberMe);
             when(jwtTokenProvider.generateAccessToken(userDetails)).thenReturn(newAccessToken);
-            when(jwtTokenProvider.generateRefreshToken(userDetails)).thenReturn(newRefreshToken);
+            when(jwtTokenProvider.generateRefreshToken(userDetails, rememberMe)).thenReturn(newRefreshToken);
 
             JwtDTO result = authService.refresh(oldRefreshToken, response);
 
@@ -192,7 +203,7 @@ class AuthServiceImplTest {
             assertThat(captor.getValue().getAccessToken()).isEqualTo(newAccessToken);
             assertThat(captor.getValue().getRefreshToken()).isEqualTo(newRefreshToken);
 
-            verify(jwtTokenProvider).addRefreshCookie(response, newRefreshToken);
+            verify(jwtTokenProvider).addRefreshCookie(response, newRefreshToken, rememberMe);
             verify(jwtRegistry, never()).rollbackRotateJwtInformation(any(), any(), any());
         }
 
@@ -240,6 +251,7 @@ class AuthServiceImplTest {
         void refresh_fail_tokenGenerationException() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
+            boolean rememberMe = false;
 
             UserDto userDto = new UserDto(
                     UUID.randomUUID(),
@@ -248,6 +260,7 @@ class AuthServiceImplTest {
                     "관리자",
                     null,
                     Role.ADMIN,
+                    false,
                     false
             );
 
@@ -263,7 +276,9 @@ class AuthServiceImplTest {
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
             when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
-            when(userDetailsService.loadUserByUsername("admin@admin.com")).thenReturn(userDetails);
+            when(userDetailsService.loadUserByUsernameForToken("admin@admin.com"))
+                    .thenReturn(userDetails);
+            when(jwtTokenProvider.isRememberMeRefreshToken(oldRefreshToken)).thenReturn(rememberMe);
             when(jwtTokenProvider.generateAccessToken(userDetails))
                     .thenThrow(new RuntimeException("access token fail"));
 
@@ -285,6 +300,7 @@ class AuthServiceImplTest {
             String oldAccessToken = "old.access.token";
             String newAccessToken = "new.access.token";
             String newRefreshToken = "new.refresh.token";
+            boolean rememberMe = true;
 
             UserDto userDto = new UserDto(
                     UUID.randomUUID(),
@@ -293,6 +309,7 @@ class AuthServiceImplTest {
                     "관리자",
                     null,
                     Role.ADMIN,
+                    false,
                     false
             );
 
@@ -308,13 +325,15 @@ class AuthServiceImplTest {
             when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
             when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
             when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("admin@admin.com");
-            when(userDetailsService.loadUserByUsername("admin@admin.com")).thenReturn(userDetails);
+            when(userDetailsService.loadUserByUsernameForToken("admin@admin.com"))
+                    .thenReturn(userDetails);
+            when(jwtTokenProvider.isRememberMeRefreshToken(oldRefreshToken)).thenReturn(rememberMe);
             when(jwtTokenProvider.generateAccessToken(userDetails)).thenReturn(newAccessToken);
-            when(jwtTokenProvider.generateRefreshToken(userDetails)).thenReturn(newRefreshToken);
+            when(jwtTokenProvider.generateRefreshToken(userDetails, rememberMe)).thenReturn(newRefreshToken);
 
             doThrow(new RuntimeException("cookie fail"))
                     .when(jwtTokenProvider)
-                    .addRefreshCookie(response, newRefreshToken);
+                    .addRefreshCookie(response, newRefreshToken, rememberMe);
 
             assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
                     .isInstanceOf(AuthFailedRefreshToken.class);
@@ -341,6 +360,7 @@ class AuthServiceImplTest {
 
             User user = mock(User.class);
 
+            when(authenticationAttemptService.isPasswordResetLocked(email)).thenReturn(false);
             when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
             when(user.getPassword()).thenReturn(originPassword);
             when(user.getEmail()).thenReturn(email);
@@ -359,6 +379,8 @@ class AuthServiceImplTest {
 
             assertThat(rawPassword).hasSize(8);
 
+            verify(authenticationAttemptService).resetPasswordResetFailures(email);
+
             verify(user).updateTemporaryPassword(
                     eq(encodedTempPassword),
                     eq(originPassword),
@@ -371,15 +393,50 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("사용자가 없으면 UserNotFoundException")
+        @DisplayName("비밀번호 초기화가 잠긴 이메일이면 UserPasswordResetLockedException")
+        void initUserPassword_locked_throwUserPasswordResetLockedException() {
+            String email = "locked@test.com";
+
+            when(authenticationAttemptService.isPasswordResetLocked(email)).thenReturn(true);
+
+            assertThatThrownBy(() -> authService.initUserPassword(email))
+                    .isInstanceOf(UserPasswordResetLockedException.class);
+
+            verify(userRepository, never()).findByEmail(anyString());
+            verifyNoInteractions(passwordEncoder, eventPublisher);
+        }
+
+        @Test
+        @DisplayName("사용자가 없으면 실패 횟수 기록 후 UserNotFoundException")
         void initUserPassword_userNotFound() {
             String email = "missing@test.com";
 
+            when(authenticationAttemptService.isPasswordResetLocked(email)).thenReturn(false);
             when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+            when(authenticationAttemptService.recordPasswordResetFailure(email)).thenReturn(false);
 
             assertThatThrownBy(() -> authService.initUserPassword(email))
                     .isInstanceOf(UserNotFoundException.class);
 
+            verify(authenticationAttemptService).recordPasswordResetFailure(email);
+            verify(authenticationAttemptService, never()).resetPasswordResetFailures(email);
+            verifyNoInteractions(passwordEncoder, eventPublisher);
+        }
+
+        @Test
+        @DisplayName("사용자가 없고 실패 횟수 초과 시 UserPasswordResetLockedException")
+        void initUserPassword_userNotFoundAndLocked_throwUserPasswordResetLockedException() {
+            String email = "missing@test.com";
+
+            when(authenticationAttemptService.isPasswordResetLocked(email)).thenReturn(false);
+            when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+            when(authenticationAttemptService.recordPasswordResetFailure(email)).thenReturn(true);
+
+            assertThatThrownBy(() -> authService.initUserPassword(email))
+                    .isInstanceOf(UserPasswordResetLockedException.class);
+
+            verify(authenticationAttemptService).recordPasswordResetFailure(email);
+            verify(authenticationAttemptService, never()).resetPasswordResetFailures(email);
             verifyNoInteractions(passwordEncoder, eventPublisher);
         }
     }

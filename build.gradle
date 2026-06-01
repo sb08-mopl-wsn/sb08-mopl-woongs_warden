@@ -43,9 +43,11 @@ jacocoTestReport {
 					'**/global/base/**',
 					'**/global/exception/**',
 					'**/global/logging/**',
+					'**/global/interceptor/**',
 					'**/exception/**',
 					'**/ai/*Ai*',
-					'**/elasticsearch/**'
+					'**/elasticsearch/**',
+					'**/kafka/event/**'
 			])
 		}))
 	}
@@ -73,6 +75,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'org.springframework.security:spring-security-messaging'
+	implementation 'net.javacrumbs.shedlock:shedlock-spring:7.7.0'
+	implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.7.0'
 
 	// security
 	implementation 'com.nimbusds:nimbus-jose-jwt:10.3'

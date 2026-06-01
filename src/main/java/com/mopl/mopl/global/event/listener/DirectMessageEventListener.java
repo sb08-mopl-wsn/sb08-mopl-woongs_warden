@@ -4,10 +4,11 @@ import com.mopl.mopl.domain.dm.service.RoomPresenceManager;
 import com.mopl.mopl.global.config.AsyncConfig;
 import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
 import com.mopl.mopl.global.event.DirectMessageSentEvent;
+import com.mopl.mopl.global.redis.dto.RedisPubMessage;
+import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.sse.service.SseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -21,7 +22,7 @@ import java.util.UUID;
 public class DirectMessageEventListener {
 
   private final SseService sseService;
-  private final SimpMessagingTemplate messagingTemplate;
+  private final RedisPublisher redisPublisher; // SimpMessagingTemplate 대신 RedisPublisher 사용
 
   private final RoomPresenceManager roomPresenceManager;
 
@@ -59,14 +60,16 @@ public class DirectMessageEventListener {
   @Async(AsyncConfig.DIRECT_MESSAGE_EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onDirectMessageSent(DirectMessageSentEvent event) {
-    log.debug("DM Websocket 전송 - conversationId: {}", event.conversationId());
+    log.debug("DM Websocket 전송 (Redis 발행) - conversationId: {}", event.conversationId());
 
     String destination = createDirectMessageDestination(event.conversationId());
 
     try {
-      messagingTemplate.convertAndSend(destination, event.messageDto());
+      // 기존 로컬 발송(messagingTemplate.convertAndSend) 대신 Redis로 발행하여 모든 서버가 받게 함
+      RedisPubMessage pubMessage = new RedisPubMessage(null, destination, event.messageDto());
+      redisPublisher.publishWs(pubMessage);
     } catch (Exception e) {
-      log.warn("DM WebSocket 전송 실패 - conversationId: {}, destination: {}", event.conversationId(), destination, e);
+      log.warn("DM WebSocket Redis 전송 실패 - conversationId: {}, destination: {}", event.conversationId(), destination, e);
     }
   }
 

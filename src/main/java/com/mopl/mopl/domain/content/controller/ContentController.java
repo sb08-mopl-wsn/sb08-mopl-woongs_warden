@@ -10,10 +10,12 @@ import com.mopl.mopl.domain.watchingSession.dto.request.WatchingSessionPageReque
 import com.mopl.mopl.domain.watchingSession.dto.response.CursorResponseWatchingSessionDto;
 import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
 import com.mopl.mopl.infrastructure.ai.ContentRecommendService;
+import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -99,7 +102,17 @@ public class ContentController implements ContentApi
     public SseEmitter recommend(@RequestParam String prompt)
     {
         SseEmitter emitter = new SseEmitter(30_000L);
-        contentRecommendService.recommendStream(prompt, emitter);
+
+        try {
+            contentRecommendService.recommendStream(prompt, emitter);
+        } catch (TaskRejectedException e) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(new SseErrorEvent("OVERLOADED", "요청이 많아 처리할 수 없습니다. 잠시 후 다시 시도해주세요.")));
+                emitter.complete();
+            } catch (IOException ignored) {}
+        }
 
         return emitter;
     }

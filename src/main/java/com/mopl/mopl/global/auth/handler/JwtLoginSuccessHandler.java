@@ -1,6 +1,7 @@
 package com.mopl.mopl.global.auth.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mopl.mopl.domain.auth.service.AuthenticationAttemptService;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
@@ -24,6 +25,7 @@ public class JwtLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final ObjectMapper objectMapper;
     private final JwtTokenProvider tokenProvider;
     private final JwtRegistry jwtRegistry;
+    private final AuthenticationAttemptService authenticationAttemptService;
 
     @Override
     public void onAuthenticationSuccess(
@@ -40,10 +42,12 @@ public class JwtLoginSuccessHandler implements AuthenticationSuccessHandler {
         if (authentication.getPrincipal() instanceof MoplUserDetails customUserDetails) {
             try {// 사용자 DTO 구성
                 UserDto userDto = customUserDetails.getUserDto();
+                authenticationAttemptService.resetLoginFailures(userDto.email());
 
                 // 1. 새 Access/Refresh 토큰 발급
+                boolean rememberMe = isRememberMeRequested(request);
                 String accessToken = tokenProvider.generateAccessToken(customUserDetails);
-                String refreshToken = tokenProvider.generateRefreshToken(customUserDetails);
+                String refreshToken = tokenProvider.generateRefreshToken(customUserDetails, rememberMe);
 
                 // 2. JwtRegistry에 등록
                 // (이 메서드 내부에서 기존 토큰 무효화, 동시 로그인 제한, 새 토큰 DB/메모리 저장이 모두 자동으로 처리됩니다)
@@ -51,7 +55,7 @@ public class JwtLoginSuccessHandler implements AuthenticationSuccessHandler {
                 jwtRegistry.registerJwtInformation(jwtInformation);
 
                 // 3. 리프레시 쿠키 설정
-                tokenProvider.addRefreshCookie(response, refreshToken);
+                tokenProvider.addRefreshCookie(response, refreshToken, rememberMe);
 
                 // 4. JwtDto 바디 전송 (Access Token 응답)
                 JwtDTO jwtDto = new JwtDTO(userDto, accessToken);
@@ -74,5 +78,13 @@ public class JwtLoginSuccessHandler implements AuthenticationSuccessHandler {
                     .put("message", "Invalid principal")
                     .toString());
         }
+    }
+
+    private boolean isRememberMeRequested(HttpServletRequest request) {
+        String rememberMe = request.getParameter("rememberMe");
+        return "true".equalsIgnoreCase(rememberMe)
+                || "on".equalsIgnoreCase(rememberMe)
+                || "1".equals(rememberMe)
+                || "yes".equalsIgnoreCase(rememberMe);
     }
 }

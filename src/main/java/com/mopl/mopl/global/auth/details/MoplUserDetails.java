@@ -1,6 +1,7 @@
 package com.mopl.mopl.global.auth.details;
 
 import com.mopl.mopl.domain.user.dto.UserDto;
+import com.mopl.mopl.domain.user.entity.Role;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
@@ -52,6 +53,9 @@ public class MoplUserDetails implements UserDetails, OAuth2User {
 
     @Override
     public boolean isAccountNonLocked() {
+        if (userDto.role() == Role.ADMIN) {
+            return true;
+        }
         return !userDto.locked();
     }
 }

@@ -214,8 +214,8 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("조회 결과가 limit보다 많으면 hasNext가 true이고 마지막 요소를 제거한다")
-    void getAllUsers_hasNext_success() {
+    @DisplayName("DESC 조회 결과가 limit보다 많으면 hasNext가 true이고 마지막 요소를 제거한다")
+    void getAllUsers_hasNext_desc_success() {
         CursorUserRequest request = new CursorUserRequest(
                 null,
                 null,
@@ -262,6 +262,55 @@ class UserServiceImplTest {
     }
 
     @Test
+    @DisplayName("ASC 조회 결과가 limit보다 많으면 hasNext가 true이고 마지막 요소를 제거한다")
+    void getAllUsers_hasNext_asc_success() {
+        CursorUserRequest request = new CursorUserRequest(
+                null,
+                null,
+                null,
+                null,
+                1,
+                SortDirection.ASCENDING,
+                SortBy.createdAt
+        );
+
+        User firstUser = createUser();
+        UUID firstUserId = UUID.randomUUID();
+        Instant firstCreatedAt = Instant.parse("2026-05-10T04:36:08Z");
+        ReflectionTestUtils.setField(firstUser, "id", firstUserId);
+        ReflectionTestUtils.setField(firstUser, "createdAt", firstCreatedAt);
+
+        User extraUser = createUser();
+        ReflectionTestUtils.setField(extraUser, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(extraUser, "createdAt", Instant.parse("2026-05-11T04:36:08Z"));
+
+        UserDto firstUserDto = createUserDto(firstUserId, firstUser);
+
+        given(userRepository.findUsersByCursor(
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(SortDirection.ASCENDING),
+                any(Pageable.class)
+        )).willReturn(new ArrayList<>(List.of(firstUser, extraUser)));
+
+        given(userRepository.countUsersByEmailAndRole(nullable(String.class), nullable(Role.class)))
+                .willReturn(2L);
+
+        given(userMapper.toDto(firstUser)).willReturn(firstUserDto);
+
+        CursorResponseUserDto result = userService.getAllUsers(request);
+
+        assertThat(result.data()).containsExactly(firstUserDto);
+        assertThat(result.hasNext()).isTrue();
+        assertThat(result.nextCursor()).isEqualTo(firstCreatedAt.toString());
+        assertThat(result.nextIdAfter()).isEqualTo(firstUserId);
+        assertThat(result.totalCount()).isEqualTo(2L);
+        assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
+    }
+
+    @Test
     @DisplayName("회원 생성에 성공한다")
     void createUser_success() {
         UserCreateRequest request = new UserCreateRequest(
@@ -278,6 +327,7 @@ class UserServiceImplTest {
                 request.name(),
                 null,
                 Role.USER,
+                false,
                 false
         );
 
@@ -369,6 +419,7 @@ class UserServiceImplTest {
                 user.getName(),
                 null,
                 Role.ADMIN,
+                false,
                 false
         );
 
@@ -415,8 +466,6 @@ class UserServiceImplTest {
 
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("new-encoded-password");
-        assertThat(user.getTemporaryPassword()).isNull();
-        assertThat(user.getTemporaryPasswordExpiredAt()).isNull();
 
         verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
         verifyNoInteractions(eventPublisher);
@@ -451,7 +500,8 @@ class UserServiceImplTest {
                 user.getName(),
                 null,
                 user.getRole(),
-                true
+                true,
+                false
         );
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
@@ -482,6 +532,7 @@ class UserServiceImplTest {
                 user.getName(),
                 null,
                 user.getRole(),
+                false,
                 false
         );
 
@@ -536,6 +587,7 @@ class UserServiceImplTest {
                 "변경된이름",
                 "https://cdn.example.com/profile/test-profile.png",
                 user.getRole(),
+                false,
                 false
         );
 
@@ -580,6 +632,7 @@ class UserServiceImplTest {
                 "변경된이름",
                 "https://cdn.example.com/profile/test-profile.png",
                 user.getRole(),
+                false,
                 false
         );
 
@@ -617,6 +670,7 @@ class UserServiceImplTest {
                 "이름만수정",
                 null,
                 user.getRole(),
+                false,
                 false
         );
 
@@ -659,6 +713,7 @@ class UserServiceImplTest {
                 user.getName(),
                 "https://cdn.example.com/profile/test-profile.jpg",
                 user.getRole(),
+                false,
                 false
         );
 
@@ -699,6 +754,7 @@ class UserServiceImplTest {
                 "변경된이름",
                 null,
                 user.getRole(),
+                false,
                 false
         );
 
@@ -754,7 +810,8 @@ class UserServiceImplTest {
                 user.getName(),
                 null,
                 user.getRole(),
-                user.isLocked()
+                user.isLocked(),
+                false
         );
     }
 }

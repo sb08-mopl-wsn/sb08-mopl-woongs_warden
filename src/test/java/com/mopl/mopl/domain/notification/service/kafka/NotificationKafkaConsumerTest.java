@@ -1,6 +1,5 @@
-package com.mopl.mopl.domain.notification.service.listener;
+package com.mopl.mopl.domain.notification.service.kafka;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -24,11 +23,7 @@ import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
-import com.mopl.mopl.global.event.DirectMessageCreatedEvent;
-import com.mopl.mopl.global.event.FollowEvent;
-import com.mopl.mopl.global.event.PlaylistContentAddedEvent;
-import com.mopl.mopl.global.event.PlaylistSubscribedEvent;
-import com.mopl.mopl.global.event.ReviewCreatedEvent;
+import com.mopl.mopl.global.event.*;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import java.time.Instant;
@@ -45,10 +40,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-class NotificationEventListenerTest {
+class NotificationKafkaConsumerTest {
 
   @InjectMocks
-  private NotificationEventListener notificationEventListener;
+  private NotificationKafkaConsumer notificationKafkaConsumer;
 
   @Mock
   private NotificationRepository notificationRepository;
@@ -64,6 +59,8 @@ class NotificationEventListenerTest {
   private NotificationMapper notificationMapper;
   @Mock
   private RoomPresenceManager roomPresenceManager;
+  @Mock
+  private BadWordNotificationProcessor badWordNotificationProcessor;
 
   private UUID receiverId;
   private User receiver;
@@ -95,7 +92,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handleFollowEvent(event);
+    notificationKafkaConsumer.consumeFollowEvent(event);
 
     // then
     verify(notificationRepository).save(any(Notification.class));
@@ -119,7 +116,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handleDirectMessageEvent(event);
+    notificationKafkaConsumer.consumeDirectMessageEvent(event);
 
     // then
     verify(notificationRepository).save(any(Notification.class));
@@ -137,7 +134,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handleUserUpdateRoleEvent(event);
+    notificationKafkaConsumer.consumeUserUpdateRoleEvent(event);
 
     // then
     verify(notificationRepository).save(any(Notification.class));
@@ -164,7 +161,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handleReviewCreatedEvent(event);
+    notificationKafkaConsumer.consumeReviewEvent(event);
 
     // then
     verify(notificationRepository).saveAll(any());
@@ -187,7 +184,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handlePlaylistSubscribedEvent(event);
+    notificationKafkaConsumer.consumePlaylistSubscribedEvent(event);
 
     // then
     verify(notificationRepository).save(any(Notification.class));
@@ -211,7 +208,7 @@ class NotificationEventListenerTest {
     given(notificationMapper.toDto(any())).willReturn(mockDto);
 
     // when
-    notificationEventListener.handlePlaylistContentAddedEvent(event);
+    notificationKafkaConsumer.consumePlaylistContentAddedEvent(event);
 
     // then
     verify(notificationRepository).saveAll(any());
@@ -231,7 +228,7 @@ class NotificationEventListenerTest {
     given(roomPresenceManager.isUserInRoom(receiverId, convId)).willReturn(true);
 
     // when
-    notificationEventListener.handleDirectMessageEvent(event);
+    notificationKafkaConsumer.consumeDirectMessageEvent(event);
 
     // then
     verify(notificationRepository, never()).save(any(Notification.class));
@@ -255,7 +252,7 @@ class NotificationEventListenerTest {
     given(followRepository.findAllByFolloweeIdWithFollower(writerId)).willReturn(Collections.emptyList());
 
     // when
-    notificationEventListener.handleReviewCreatedEvent(event);
+    notificationKafkaConsumer.consumeReviewEvent(event);
 
     // then
     verify(notificationRepository, never()).saveAll(any());
@@ -276,10 +273,24 @@ class NotificationEventListenerTest {
     given(playlistSubscriptionRepository.findAllByPlaylistIdWithUser(playlistId)).willReturn(Collections.emptyList());
 
     // when
-    notificationEventListener.handlePlaylistContentAddedEvent(event);
+    notificationKafkaConsumer.consumePlaylistContentAddedEvent(event);
 
     // then
     verify(notificationRepository, never()).saveAll(any());
     verify(sseService, never()).sendNotification(any(), any());
+  }
+
+  @Test
+  @DisplayName("비속어 감지 이벤트 수신 시 알림 프로세서(Processor)를 정상적으로 호출한다.")
+  void handleBadWordDetectedEvent() {
+    // given
+    String testContent = "테스트 메시지";
+    BadWordDetectedEvent event = new BadWordDetectedEvent(receiverId, testContent);
+
+    // when
+    notificationKafkaConsumer.onBadWordDetected(event);
+
+    // then
+    verify(badWordNotificationProcessor).processBadWordDetected(eq(event));
   }
 }

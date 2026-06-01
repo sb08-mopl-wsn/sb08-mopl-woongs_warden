@@ -2,6 +2,7 @@ package com.mopl.mopl.global.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
+import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import com.mopl.mopl.global.auth.details.MoplUserDetailsService;
 import jakarta.servlet.FilterChain;
@@ -10,10 +11,11 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -26,13 +28,10 @@ import java.util.Arrays;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
     // 토큰 검증 및 claims 추출 유틸리티
     private final JwtTokenProvider tokenProvider;
     // 사용자 로딩 서비스
     private final MoplUserDetailsService userDetailsService;
-    // 에러 응답 작성용
-    private final ObjectMapper objectMapper;
     // 토큰 폐기 여부 확인용 저장소
     private final JwtRegistry jwtRegistry;
 
@@ -68,12 +67,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
 
                     MoplUserDetails userDetails = tokenProvider.parseAccessToken(token);
+                    UserDetails currentUserDetails = userDetailsService.loadUserByUsernameForToken(userDetails.getUsername());
+
+                    if (!currentUserDetails.isAccountNonLocked()) {
+                        jwtRegistry.invalidateJwtInformationByUserId(userDetails.getUserDto().id());
+                        authenticationEntryPoint.commence(
+                                request,
+                                response,
+                                new LockedException("잠긴 계정입니다.")
+                        );
+                        return;
+                    }
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails,
+                                    currentUserDetails,
                                     null,
-                                    userDetails.getAuthorities()
+                                    currentUserDetails.getAuthorities()
                             );
 
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

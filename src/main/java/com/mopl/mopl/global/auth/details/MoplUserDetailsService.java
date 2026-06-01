@@ -1,5 +1,6 @@
 package com.mopl.mopl.global.auth.details;
 
+import com.mopl.mopl.domain.auth.service.AuthenticationAttemptService;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
@@ -20,10 +21,24 @@ import java.time.Instant;
 public class MoplUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final AuthenticationAttemptService authenticationAttemptService;
 
     @Override
     @Transactional(noRollbackFor = CredentialsExpiredException.class)
     public UserDetails loadUserByUsername(String username) {
+        authenticationAttemptService.validateLoginAvailable(username);
+        return loadUserDetails(username);
+    }
+
+    public UserDetails loadUserByUsernameForToken(String username) {
+        return loadUserDetails(username);
+    }
+
+    public UserDetails loadUserByUsernameWithoutLoginAttemptCheck(String username) {
+        return loadUserDetails(username);
+    }
+
+    private UserDetails loadUserDetails(String username) {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 

@@ -10,8 +10,10 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
-import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
-import com.mopl.mopl.infrastructure.elasticsearch.event.ContentIndexEvent;
+import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
+import com.mopl.mopl.infrastructure.elasticsearch.dto.ContentSearchResult;
+import com.mopl.mopl.infrastructure.kafka.event.ContentDeleteEvent;
+import com.mopl.mopl.infrastructure.kafka.event.ContentIndexEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +24,6 @@ import org.springframework.data.domain.Slice;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -38,7 +38,7 @@ public class ContentServiceImpl implements ContentService
     private final ContentRepository contentRepository;
     private final ContentMapper contentMapper;
     private final S3ImageStorage s3ImageStorage;
-    private final ContentIndexService contentIndexService;
+    private final ContentSearchQueryService contentSearchQueryService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     /**
@@ -100,8 +100,28 @@ public class ContentServiceImpl implements ContentService
             condition = "#contentSearchRequest.cursor() == null && #contentSearchRequest.idAfter() == null")
     @Override
     public CursorResponseContentDto getContents(ContentSearchRequest contentSearchRequest) {
-        Slice<Content> slice = contentRepository.getContents(contentSearchRequest);
-        long totalCount = contentRepository.countContentsWithKeyword(contentSearchRequest.keywordLike());
+        List<UUID> searchedIds = null;
+        long totalCount = 0;
+
+        if (contentSearchRequest.keywordLike() != null && !contentSearchRequest.keywordLike().isBlank()) {
+            ContentSearchResult searchResult = contentSearchQueryService.searchByKeyword(
+                    contentSearchRequest.keywordLike(),
+                    contentSearchRequest.typeEqual());
+
+            if (searchResult.ids().isEmpty()) {
+                return new CursorResponseContentDto(
+                        List.of(), null, null, false, 0,
+                        contentSearchRequest.sortBy(),
+                        contentSearchRequest.sortDirection());
+            }
+
+            searchedIds = searchResult.ids();
+            totalCount = searchResult.totalHits();
+        } else {
+            totalCount = contentRepository.countContentsWithKeyword(null);
+        }
+
+        Slice<Content> slice = contentRepository.getContents(contentSearchRequest, searchedIds);
 
         List<ContentDto> contents = contentMapper.toContentDtos(slice.getContent());
 
@@ -121,8 +141,7 @@ public class ContentServiceImpl implements ContentService
                 slice.hasNext(),
                 totalCount,
                 contentSearchRequest.sortBy(),
-                contentSearchRequest.keywordLike()
-        );
+                contentSearchRequest.sortDirection());
     }
 
     /**
@@ -176,22 +195,7 @@ public class ContentServiceImpl implements ContentService
 
         contentRepository.delete(content);
 
-        // S3는 무조건 DB 트랜잭션 이후에 실행되어야 함.
-        // 추후 이벤트 기반으로 변경(@TransactionalEventListener)
-        String thumbnailKey = content.getThumbnailKey();
-        if (thumbnailKey != null) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        s3ImageStorage.delete(thumbnailKey);
-                    } catch (Exception e) {
-                        log.warn("S3 이미지 삭제 실패: key={}", thumbnailKey, e);
-                    }
-                    contentIndexService.delete(contentId);
-                }
-            });
-        }
+        applicationEventPublisher.publishEvent(new ContentDeleteEvent(contentId, content.getThumbnailKey()));
     }
 
     private String extractCursor(Content content, String sortBy) {

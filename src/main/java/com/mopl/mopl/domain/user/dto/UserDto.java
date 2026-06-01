@@ -12,7 +12,8 @@ public record UserDto(
     String name,
     String profileImageUrl,
     Role role,
-    Boolean locked
+    Boolean locked,
+    Boolean banned
 ) {
 
 }

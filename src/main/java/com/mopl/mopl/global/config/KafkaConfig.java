@@ -1,9 +1,14 @@
 package com.mopl.mopl.global.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
+import com.mopl.mopl.domain.review.exception.ReviewNotFoundException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
 
@@ -17,16 +22,23 @@ public class KafkaConfig {
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory) {
+            ConsumerFactory<String, Object> consumerFactory,
+        KafkaTemplate<String, Object> kafkaTemplate) {
 
         ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
 
-        // 에러 발생 시 2000ms(2초) 간격으로 최대 3번 재시도 (총 4번 시도)
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(new FixedBackOff(2000L, 3L));
-        
-        // TODO: 재시도마저 3번 다 실패했을 때, 에러 기록용 토픽(Dead Letter Queue)으로 메시지를 피신시키는 Recoverer 로직을 추후 여기에 추가 가능
-        
+        // Recoverer 생성. 재시도 실패 시 해당 메시지를 원본토픽명.DLT로 발행
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
+
+        // 에러 발생 시 2000ms(2초) 간격으로 최대 3번 재시도 (총 4번 시도) 후, Recoverer 실행
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(2000L, 3L));
+        errorHandler.addNotRetryableExceptions(
+            JsonProcessingException.class,
+            ReviewNotFoundException.class,
+            ContentNotFoundException.class
+        );
+
         factory.setCommonErrorHandler(errorHandler);
 
         return factory;

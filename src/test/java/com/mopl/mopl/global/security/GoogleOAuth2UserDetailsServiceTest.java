@@ -524,6 +524,7 @@ class GoogleOAuth2UserDetailsServiceTest {
                 name,
                 null,
                 Role.USER,
+                false,
                 false
         );
     }

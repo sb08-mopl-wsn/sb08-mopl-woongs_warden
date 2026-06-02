@@ -26,12 +26,14 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -56,6 +58,11 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
     // S3
     private final S3ImageStorage s3ImageStorage;
+
+    // redis
+    private final StringRedisTemplate redisTemplate;
+
+    private static final String REDIS_KEY_PREFIX = "content:watcher:count:";
 
     /**
      * 콘텐츠 실시간 웹소켓 접속을 위한 로직
@@ -88,6 +95,11 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
         if (isNew.get()) {
             content.updateWatcherCount(content.getWatcherCount() + 1);
+
+            // Redis 분산 카운터 증가 (Atomic INCR)
+            String redisKey = REDIS_KEY_PREFIX + contentId;
+            redisTemplate.opsForValue().increment(redisKey);
+            redisTemplate.expire(redisKey, 1, TimeUnit.DAYS);
         }
 
         WatchingSessionDto sessionDto = sessionMapper.toDto(
@@ -127,6 +139,14 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                     Content content = session.getContent();
                     // 음수 방지
                     content.updateWatcherCount(Math.max(0, content.getWatcherCount() - 1));
+
+                    // Redis 분산 카운터 감소 (Atomic DECR)
+                    String redisKey = REDIS_KEY_PREFIX + contentId;
+                    Long currentCount = redisTemplate.opsForValue().decrement(redisKey);
+                    // 음수 방지
+                    if (currentCount != null && currentCount < 0) {
+                        redisTemplate.opsForValue().set(redisKey, "0");
+                    }
 
                     publishSessionEvent(contentId, ChangeType.LEAVE, sessionDto, content.getWatcherCount());
                 });
@@ -232,8 +252,18 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                 .map(sessionMapper::toDto)
                 .toList();
 
-        // TODO: 잦은 조회로 성능 문제 발생하므로 캐싱 처리하겠습니다.
-        long totalCount = watchingSessionRepository.countByContentId(contentId);
+        String redisKey = REDIS_KEY_PREFIX + contentId;
+        String cachedCount = redisTemplate.opsForValue().get(redisKey);
+
+        long totalCount;
+        if (cachedCount != null) {
+            totalCount = Long.parseLong(cachedCount);
+        } else {
+            log.debug("캐시가 만료되어 RDB fallback이 진행됩니다.");
+            // 서버 분산 환경이나 Redis 재시작 등으로 캐시가 만료되었을 때만 RDB fallback 수행
+            totalCount = watchingSessionRepository.countByContentId(contentId);
+            redisTemplate.opsForValue().set(redisKey, String.valueOf(totalCount), 1, TimeUnit.DAYS);
+        }
 
         return new CursorResponseWatchingSessionDto(
                 data,

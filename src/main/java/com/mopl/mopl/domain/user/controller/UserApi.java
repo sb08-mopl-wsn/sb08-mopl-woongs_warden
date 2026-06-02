@@ -104,7 +104,6 @@ public interface UserApi {
             @ApiResponse(responseCode = "401", description = "인증 필요")
     })
     ResponseEntity<WatchingSessionDto> findCurrentWatchingSession(
-            UUID watcherId,
-            MoplUserDetails userDetails
+            UUID watcherId
     );
 }

@@ -37,7 +37,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -444,6 +443,30 @@ public class WatchingSessionServiceTest {
             watchingSessionService.leave(contentId, userId);
 
             verify(valueOperations).set(redisKey, "0");
+        }
+
+        @Test
+        @DisplayName("Redis 카운트 값이 숫자가 아닌 형태로 오염되어 있으면 NumberFormatException을 캐치하고, RDB 리카운트 후 캐시를 자가 복구(Self-Heal)한다.")
+        void cacheCorrupted_fallbackToRdbAndHealsCache() {
+            // given
+            WatchingSessionPageRequest request = new WatchingSessionPageRequest(
+                    null, null, null, 10, SortDirection.DESCENDING, "createdAt"
+            );
+
+            given(watchingSessionRepository.findAllByCursor(any(WatchingSessionSearchCondition.class), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
+
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn("오염된데이터값");
+            given(watchingSessionRepository.countByContentId(contentId)).willReturn(7L);
+
+            // when
+            CursorResponseWatchingSessionDto result = watchingSessionService.findByContentInWatchingSession(contentId, request);
+
+            // then
+            assertThat(result.totalCount()).isEqualTo(7L);
+            verify(valueOperations, times(1)).set(redisKey, "7", 1, TimeUnit.DAYS);
+            assertThat(result.data()).isEmpty();
         }
     }
 
@@ -888,7 +911,7 @@ public class WatchingSessionServiceTest {
 
             // when
             Optional<WatchingSessionDto> result =
-                    watchingSessionService.findCurrentWatchingSessionByUserId(userId, currentUserId);
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
 
             // then
             assertThat(result).isEmpty();
@@ -910,7 +933,7 @@ public class WatchingSessionServiceTest {
 
             // when
             Optional<WatchingSessionDto> result =
-                    watchingSessionService.findCurrentWatchingSessionByUserId(userId, currentUserId);
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
 
             // then
             assertThat(result).isEmpty();
@@ -936,7 +959,7 @@ public class WatchingSessionServiceTest {
 
             // when
             Optional<WatchingSessionDto> result =
-                    watchingSessionService.findCurrentWatchingSessionByUserId(userId, currentUserId);
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
 
             // then
             assertThat(result).isPresent();
@@ -946,7 +969,6 @@ public class WatchingSessionServiceTest {
         @Test
         @DisplayName("레디스 추적엔 성공했으나 RDB 상에 정합성이 깨져 세션 데이터가 없으면 empty를 반환한다.")
         void redisSessionHitButRdbMiss_returnsEmpty() {
-            UUID currentUserId = UUID.randomUUID();
             String userSessionKey = "ws:user:" + userId + ":sessions";
             String mockSessionId = "mock-stomp-session-id";
             String sessionContentKey = "ws:session:" + mockSessionId + ":contents";
@@ -961,7 +983,7 @@ public class WatchingSessionServiceTest {
 
             // when
             Optional<WatchingSessionDto> result =
-                    watchingSessionService.findCurrentWatchingSessionByUserId(userId, currentUserId);
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
 
             // then
             assertThat(result).isEmpty();

@@ -258,10 +258,16 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
         long totalCount;
         if (cachedCount != null) {
-            totalCount = Long.parseLong(cachedCount);
+            try {
+                // 파싱 예외 발생 시 방어 로직
+                totalCount = Long.parseLong(cachedCount);
+            } catch(NumberFormatException e) {
+                log.error("Redis 오염이 발생하여 캐시 파싱 실패로 RDB 리카운트 및 캐시 회복을 진행한다. Key: {}", redisKey);
+                totalCount = watchingSessionRepository.countByContentId(contentId);
+                redisTemplate.opsForValue().set(redisKey, String.valueOf(totalCount), 1, TimeUnit.DAYS);
+            }
         } else {
             log.debug("캐시가 만료되어 RDB fallback이 진행됩니다.");
-            // 서버 분산 환경이나 Redis 재시작 등으로 캐시가 만료되었을 때만 RDB fallback 수행
             totalCount = watchingSessionRepository.countByContentId(contentId);
             redisTemplate.opsForValue().set(redisKey, String.valueOf(totalCount), 1, TimeUnit.DAYS);
         }
@@ -284,7 +290,7 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
      * @return 시청 세션 정보 (시청 중이 아니면 Empty)
      */
     @Override
-    public Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID userId, UUID currentUserId) {
+    public Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID userId) {
 
         String userSessionKey = String.format("ws:user:%s:sessions", userId);
         Set<String> userSessions = redisTemplate.opsForSet().members(userSessionKey);

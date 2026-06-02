@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -285,17 +286,37 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
     @Override
     public Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID userId, UUID currentUserId) {
 
-        // 실시간 같이 보기에서 자신의 프로필을 누른 경우 API가 STOMP보다 빨리 실행되어 자신의 시청 세션이 삭제되지 않음.
-        if (userId.equals(currentUserId)) {
+        String userSessionKey = String.format("ws:user:%s:sessions", userId);
+        Set<String> userSessions = redisTemplate.opsForSet().members(userSessionKey);
+
+        // 유저의 활성화된 웹소켓 세션이 아예 없다면 RDB에 조회없이 시청 중이 아님을 즉시 반환
+        if (userSessions == null || userSessions.isEmpty()) {
             return Optional.empty();
         }
 
-        if (!userRepository.existsById(userId)) {
-            throw new UserNotFoundException(userId);
+        UUID activeContentId = null;
+
+        // 유저 세션들을 순회하며 현재 시청 중인 콘텐츠 ID를 역추적한다.
+        for (String sessionId : userSessions) {
+            String sessionContentKey = String.format("ws:session:%s:contents", sessionId);
+            Set<String> contentIds = redisTemplate.opsForSet().members(sessionContentKey);
+
+            if (contentIds != null && !contentIds.isEmpty()) {
+                String targetContentIdStr = contentIds.iterator().next();
+                activeContentId = UUID.fromString(targetContentIdStr);
+                break;
+            }
         }
 
-        // 시청 세션 조회: 없으면 null 반환 (Swagger 명세 준수)
-        return watchingSessionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+        // Redis 상에서 시청중인 룸 정보가 없다면 퇴장한 것을 판단한다.
+        if (activeContentId == null) {
+            return Optional.empty();
+        }
+
+        // RDB Fullback 1회 조회
+        // redis에서 activeContentId를 확실하게 캐치하므로
+        // 매핑에 필요한 순수 도메인 DTO만 데이터베이스에서 정확하게 1번 가져온다.
+        return watchingSessionRepository.findByContentIdAndUserId(activeContentId, userId)
                 .map(sessionMapper::toDto);
     }
 

@@ -5,11 +5,13 @@ import com.mopl.mopl.domain.user.entity.User;
 import java.util.UUID;
 
 public record UserUpdateProfileEvent(
-        UUID userId
+        UUID userId,
+        String username
 ) {
     public static UserUpdateProfileEvent of(User user) {
         return new UserUpdateProfileEvent(
-                user.getId()
+                user.getId(),
+                user.getName()
         );
     }
 }

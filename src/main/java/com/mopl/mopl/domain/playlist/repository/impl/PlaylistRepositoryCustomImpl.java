@@ -38,7 +38,7 @@ public class PlaylistRepositoryCustomImpl implements PlaylistRepositoryCustom {
         .selectFrom(playlist)
         .join(playlist.user, user).fetchJoin()
         .where(
-            keywordContains(request.keyword()),
+            keywordContains(request.keywordLike()),
             userIdEq(request.ownerIdEqual()),
             subscriberIdEq(request.subscriberIdEqual()),
             cursorCondition(request)
@@ -62,7 +62,7 @@ public class PlaylistRepositoryCustomImpl implements PlaylistRepositoryCustom {
         .select(playlist.count())
         .from(playlist)
         .where(
-            keywordContains(request.keyword()),
+            keywordContains(request.keywordLike()),
             userIdEq(request.ownerIdEqual()),
             subscriberIdEq(request.subscriberIdEqual())
         )

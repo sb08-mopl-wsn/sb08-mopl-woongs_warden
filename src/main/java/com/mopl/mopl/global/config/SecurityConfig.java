@@ -48,8 +48,6 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /* todo 분산환경시 OAuth2 state 저장소를 Redis로 옮기기 등 필요함*/
-
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
@@ -176,10 +174,7 @@ public class SecurityConfig {
 
         // CORS 요청을 허용할 주소
         configuration.setAllowedOrigins(List.of(
-                // 여기는 예시입니다. 프론트 서버만 연결해보면 될것 같습니다.
-                "http://localhost:5173",
-                "http://localhost:3000",
-                "https://mopl.site"
+                "https://woongsanam.kro.kr"
         ));
 
         // CORS 요청에서 허용할 HTTP 메서드

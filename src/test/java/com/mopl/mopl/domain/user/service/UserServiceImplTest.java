@@ -19,6 +19,7 @@ import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.event.user.UserEvent;
 import com.mopl.mopl.global.event.user.UserUpdateLockEvent;
+import com.mopl.mopl.global.event.user.UserUpdateProfileEvent;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import org.junit.jupiter.api.AfterEach;
@@ -466,6 +467,9 @@ class UserServiceImplTest {
 
         assertThat(result).isEqualTo(expected);
         assertThat(user.getPassword()).isEqualTo("new-encoded-password");
+        assertThat(user.getTemporaryPassword()).isNull();
+        assertThat(user.getTemporaryPasswordExpiredAt()).isNull();
+        assertThat(user.isInitPassword()).isFalse();
 
         verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
         verifyNoInteractions(eventPublisher);
@@ -604,7 +608,7 @@ class UserServiceImplTest {
 
         verify(s3ImageStorage).upload(profile, "profile");
         verify(userMapper).toDto(user);
-        verify(eventPublisher).publishEvent(isA(UserEvent.class));
+        verify(eventPublisher).publishEvent(isA(UserUpdateProfileEvent.class));
     }
 
     @Test
@@ -653,7 +657,7 @@ class UserServiceImplTest {
 
         verify(s3ImageStorage).upload(profile, "profile");
         verify(s3ImageStorage).delete(uploadedKey);
-        verify(eventPublisher).publishEvent(isA(UserEvent.class));
+        verify(eventPublisher).publishEvent(isA(UserUpdateProfileEvent.class));
     }
 
     @Test
@@ -685,7 +689,7 @@ class UserServiceImplTest {
 
         verifyNoInteractions(s3ImageStorage);
         verify(userMapper).toDto(user);
-        verify(eventPublisher).publishEvent(isA(UserEvent.class));
+        verify(eventPublisher).publishEvent(isA(UserUpdateProfileEvent.class));
     }
 
     @Test
@@ -730,7 +734,7 @@ class UserServiceImplTest {
 
         verify(s3ImageStorage).upload(profile, "profile");
         verify(userMapper).toDto(user);
-        verify(eventPublisher).publishEvent(isA(UserEvent.class));
+        verify(eventPublisher).publishEvent(isA(UserUpdateProfileEvent.class));
     }
 
     @Test
@@ -769,7 +773,7 @@ class UserServiceImplTest {
 
         verifyNoInteractions(s3ImageStorage);
         verify(userMapper).toDto(user);
-        verify(eventPublisher).publishEvent(isA(UserEvent.class));
+        verify(eventPublisher).publishEvent(isA(UserUpdateProfileEvent.class));
     }
 
     @Test

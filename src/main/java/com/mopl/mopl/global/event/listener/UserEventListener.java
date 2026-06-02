@@ -1,9 +1,17 @@
 package com.mopl.mopl.global.event.listener;
 
+import com.mopl.mopl.domain.notification.dto.NotificationDto;
+import com.mopl.mopl.domain.notification.entity.Notification;
+import com.mopl.mopl.domain.notification.entity.NotificationLevel;
+import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
+import com.mopl.mopl.domain.notification.repository.NotificationRepository;
+import com.mopl.mopl.domain.user.entity.User;
+import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.config.AsyncConfig;
 import com.mopl.mopl.global.event.user.UserEvent;
 import com.mopl.mopl.global.event.user.UserPasswordInitEvent;
 import com.mopl.mopl.global.event.user.UserUpdateLockEvent;
+import com.mopl.mopl.global.event.user.UserUpdateProfileEvent;
 import com.mopl.mopl.global.event.user.UserUpdateRoleEvent;
 import com.mopl.mopl.global.mail.MailService;
 import com.mopl.mopl.global.sse.service.SseService;
@@ -14,12 +22,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.UUID;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class UserEventListener {
     private final SseService sseService;
     private final MailService mailService;
+    private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
+    private final NotificationMapper notificationMapper;
 
     @Async(AsyncConfig.USER_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -28,9 +41,11 @@ public class UserEventListener {
 
         // SSE 푸시 알림 발송
         try {
-            sseService.sendNotification(
+            saveAndSendNotification(
                     event.userId(),
-                    "환영합니다! " + event.name() + "님"
+                    "회원가입을 환영합니다",
+                    "환영합니다! " + event.name() + "님",
+                    NotificationLevel.INFO
             );
         } catch (Exception e) {
             log.warn("생성 알림 전송 실패 - name: {}, id: {}", event.name(), event.userId(), e);
@@ -91,17 +106,33 @@ public class UserEventListener {
 
     @Async(AsyncConfig.USER_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onUserProfileUpdate(UserEvent event) {
-        log.info("[UserEvent] 프로필 변경 - name: {}, id: {}", event.name(), event.userId());
+    public void onUserProfileUpdate(UserUpdateProfileEvent event) {
+        log.info("[UserEvent] 프로필 변경 - name: {}, id: {}", event.username(), event.userId());
 
         // SSE 푸시 알림 발송
         try {
-            sseService.sendNotification(
+            saveAndSendNotification(
                     event.userId(),
-                    event.name() + "님의 프로필이 변경됐어요."
+                    "프로필 변경 안내",
+                    event.username() + "님의 프로필이 변경됐어요.",
+                    NotificationLevel.INFO
             );
         } catch (Exception e) {
-            log.warn("프로필 알림 전송 실패 - name: {}, id: {}", event.name(), event.userId(), e);
+            log.warn("프로필 알림 전송 실패 - name: {}, id: {}", event.username(), event.userId(), e);
         }
+    }
+
+    private void saveAndSendNotification(UUID userId, String title, String content, NotificationLevel level) {
+        User receiver = userRepository.getReferenceById(userId);
+        Notification notification = Notification.builder()
+                .user(receiver)
+                .title(title)
+                .content(content)
+                .level(level)
+                .build();
+
+        Notification saved = notificationRepository.save(notification);
+        NotificationDto dto = notificationMapper.toDto(saved);
+        sseService.sendNotification(userId, dto);
     }
 }

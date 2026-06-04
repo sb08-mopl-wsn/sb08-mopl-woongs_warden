@@ -2,7 +2,6 @@ package com.mopl.mopl.domain.conversation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -11,7 +10,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.mopl.mopl.domain.conversation.dto.ConversationCreateRequest;
+import com.mopl.mopl.domain.conversation.dto.request.ConversationCreateRequest;
+import com.mopl.mopl.domain.conversation.dto.request.CursorConversationRequest;
 import com.mopl.mopl.domain.conversation.dto.response.ConversationDto;
 import com.mopl.mopl.domain.conversation.dto.response.CursorResponseConversationDto;
 import com.mopl.mopl.domain.conversation.entity.Conversation;
@@ -24,7 +24,6 @@ import com.mopl.mopl.domain.dm.repository.DirectMessageRepository;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
-import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.global.exception.BusinessException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -172,7 +171,7 @@ class ConversationServiceImplTest {
   void getMyConversations_FirstPage_ExecutesCount() {
 
     // given
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "updatedAt");
+    CursorConversationRequest request = new CursorConversationRequest(null, null, null, 10, "DESCENDING", "updatedAt");
 
     List<Conversation> mockConvs = new ArrayList<>();
     Conversation conv = Conversation.builder().sender(sender).receiver(receiver).build();
@@ -180,7 +179,7 @@ class ConversationServiceImplTest {
     ReflectionTestUtils.setField(conv, "updatedAt", Instant.now());
     mockConvs.add(conv);
 
-    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(false), eq(null), eq(null), any(
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq(null), eq("updatedAt"), eq(false), eq(null), eq(null), any(
         PageRequest.class))).willReturn(mockConvs);
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(3L);
     given(conversationRepository.countByReceiverId(currentUserId)).willReturn(2L);
@@ -200,14 +199,14 @@ class ConversationServiceImplTest {
 
     // given
     // 클라이언트가 지원하지 않는 createdAt이나 invalidSort를 보낸 상황
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "invalidSort");
+    CursorConversationRequest request = new CursorConversationRequest(null, null, null, 10, "DESCENDING", "invalidSort");
 
     // when & then
     assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("지원합니다.");
 
-    verify(conversationRepository, never()).findMyConversationsByCursor(any(), any(), anyBoolean(), any(), any(), any());
+    verify(conversationRepository, never()).findMyConversationsByCursor(any(), any(), any(), anyBoolean(), any(), any(), any());
   }
 
   @Test
@@ -218,9 +217,9 @@ class ConversationServiceImplTest {
     String cursor = Instant.now().toString();
     UUID idAfter = UUID.randomUUID();
 
-    CursorPaginationRequest request = new CursorPaginationRequest(cursor, idAfter, 10, "DESCENDING", "updatedAt");
+    CursorConversationRequest request = new CursorConversationRequest(null, cursor, idAfter, 10, "DESCENDING", "updatedAt");
 
-    given(conversationRepository.findMyConversationsByCursor(any(UUID.class), any(), anyBoolean(), any(Instant.class), any(UUID.class), any(PageRequest.class)))
+    given(conversationRepository.findMyConversationsByCursor(any(UUID.class), any(), any(), anyBoolean(), any(Instant.class), any(UUID.class), any(PageRequest.class)))
         .willReturn(new ArrayList<>());
 
     // when
@@ -237,7 +236,7 @@ class ConversationServiceImplTest {
   void getMyConversations_HasNextTrue_TruncatesAndSetsNextCursor() {
     // given
     int limit = 2;
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, limit, "DESCENDING", "updatedAt");
+    CursorConversationRequest request = new CursorConversationRequest(null, null, null, limit, "DESCENDING", "updatedAt");
 
     List<Conversation> mockConvs = new ArrayList<>();
     // limit(2) 보다 1개 더 많은 3개 생성
@@ -252,7 +251,7 @@ class ConversationServiceImplTest {
     String expectedNextCursor = mockConvs.get(1).getUpdatedAt().toString();
     UUID expectedNextIdAfter = mockConvs.get(1).getId();
 
-    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq(null), eq("updatedAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
         .willReturn(mockConvs);
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(6L);
     given(conversationRepository.countByReceiverId(currentUserId)).willReturn(4L);
@@ -311,8 +310,8 @@ class ConversationServiceImplTest {
   void getMyConversations_SortByCreatedAt_Success() {
 
     // given
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "DESCENDING", "createdAt");
-    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
+    CursorConversationRequest request = new CursorConversationRequest(null, null, null, 10, "DESCENDING", "createdAt");
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq(null), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
         .willReturn(new ArrayList<>());
 
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(0L);
@@ -323,7 +322,7 @@ class ConversationServiceImplTest {
 
     // then
     assertThat(result).isNotNull();
-    verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class));
+    verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq(null), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class));
     verify(conversationRepository).countBySenderId(currentUserId);
     verify(conversationRepository).countByReceiverId(currentUserId);
   }
@@ -333,8 +332,8 @@ class ConversationServiceImplTest {
   void getMyConversations_InvalidLimit_ThrowsException() {
 
     // given
-    CursorPaginationRequest reqZero = new CursorPaginationRequest(null, null, 0, "DESCENDING", "updatedAt");
-    CursorPaginationRequest reqMinus = new CursorPaginationRequest(null, null, -1, "DESCENDING", "updatedAt");
+    CursorConversationRequest reqZero = new CursorConversationRequest(null, null, null, 0, "DESCENDING", "updatedAt");
+    CursorConversationRequest reqMinus = new CursorConversationRequest(null, null, null, -1, "DESCENDING", "updatedAt");
 
     // when & then
     assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, reqZero))
@@ -346,7 +345,7 @@ class ConversationServiceImplTest {
   @Test
   @DisplayName("대화 목록 조회 - limit이 100 초과이면 예외 발생")
   void getMyConversations_LimitExceeds100_ThrowsException() {
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 101, "DESCENDING", "updatedAt");
+    CursorConversationRequest request = new CursorConversationRequest(null, null, null, 101, "DESCENDING", "updatedAt");
 
     assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
         .isInstanceOf(BusinessException.class).hasMessageContaining("limit은 100 이하의 값");
@@ -355,8 +354,8 @@ class ConversationServiceImplTest {
   @Test
   @DisplayName("대화 목록 조회 - 커서와 idAfter가 짝이 맞지 않으면 예외 발생")
   void getMyConversations_CursorAndIdMismatch_ThrowsException() {
-    CursorPaginationRequest req1 = new CursorPaginationRequest("2026-05-21T00:00:00Z", null, 10, "DESCENDING", "updatedAt");
-    CursorPaginationRequest req2 = new CursorPaginationRequest(null, UUID.randomUUID(), 10, "DESCENDING", "updatedAt");
+    CursorConversationRequest req1 = new CursorConversationRequest(null, "2026-05-21T00:00:00Z", null, 10, "DESCENDING", "updatedAt");
+    CursorConversationRequest req2 = new CursorConversationRequest(null, null, UUID.randomUUID(), 10, "DESCENDING", "updatedAt");
 
     assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, req1))
         .isInstanceOf(BusinessException.class).hasMessageContaining("항상 함께 전달");
@@ -367,7 +366,7 @@ class ConversationServiceImplTest {
   @Test
   @DisplayName("대화 목록 조회 - 정렬 방향(sortDirection)이 잘못되면 예외 발생")
   void getMyConversations_InvalidSortDirection_ThrowsException() {
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "wrongDirection", "updatedAt");
+    CursorConversationRequest request = new CursorConversationRequest(null, null, null, 10, "wrongDirection", "updatedAt");
 
     assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
         .isInstanceOf(BusinessException.class).hasMessageContaining("정렬 방향(sortDirection)");
@@ -376,7 +375,7 @@ class ConversationServiceImplTest {
   @Test
   @DisplayName("대화 목록 조회 - 커서 시간 파싱 실패 시 예외 발생")
   void getMyConversations_InvalidCursorFormat_ThrowsException() {
-    CursorPaginationRequest request = new CursorPaginationRequest("wrong-format", UUID.randomUUID(), 10, "DESCENDING", "updatedAt");
+    CursorConversationRequest request = new CursorConversationRequest(null, "wrong-format", UUID.randomUUID(), 10, "DESCENDING", "updatedAt");
 
     assertThatThrownBy(() -> conversationService.getMyConversations(currentUserId, request))
         .isInstanceOf(BusinessException.class).hasMessageContaining("잘못된 형식의 커서 데이터");
@@ -401,8 +400,8 @@ class ConversationServiceImplTest {
   @DisplayName("대화 목록 조회 - sortDirection이 ASCENDING이면 정상 조회된다")
   void getMyConversations_AscendingSort_Success() {
     // given
-    CursorPaginationRequest request = new CursorPaginationRequest(null, null, 10, "ASCENDING", "updatedAt");
-    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(true), any(), any(), any()))
+    CursorConversationRequest request = new CursorConversationRequest(null, null, null, 10, "ASCENDING", "updatedAt");
+    given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq(null), eq("updatedAt"), eq(true), any(), any(), any()))
         .willReturn(new ArrayList<>());
     given(conversationRepository.countBySenderId(currentUserId)).willReturn(0L);
     given(conversationRepository.countByReceiverId(currentUserId)).willReturn(0L);
@@ -413,7 +412,7 @@ class ConversationServiceImplTest {
     // then
     assertThat(result).isNotNull();
     // ASCENDING일 때 isAscending = true로 호출되는지 검증
-    verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq("updatedAt"), eq(true), any(), any(), any());
+    verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq(null), eq("updatedAt"), eq(true), any(), any(), any());
   }
 
   @Test

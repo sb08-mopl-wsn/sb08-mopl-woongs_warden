@@ -10,8 +10,8 @@ import com.mopl.mopl.domain.watchingSession.dto.request.WatchingSessionPageReque
 import com.mopl.mopl.domain.watchingSession.dto.response.CursorResponseWatchingSessionDto;
 import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
-import com.mopl.mopl.infrastructure.ai.ContentRecommendService;
 import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
+import com.mopl.mopl.infrastructure.ai.service.ContentRecommendService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;

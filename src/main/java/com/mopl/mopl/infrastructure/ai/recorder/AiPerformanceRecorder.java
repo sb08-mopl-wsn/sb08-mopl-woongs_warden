@@ -1,4 +1,4 @@
-package com.mopl.mopl.infrastructure.ai;
+package com.mopl.mopl.infrastructure.ai.recorder;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;

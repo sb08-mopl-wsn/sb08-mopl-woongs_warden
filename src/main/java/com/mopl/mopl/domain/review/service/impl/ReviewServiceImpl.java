@@ -10,6 +10,7 @@ import com.mopl.mopl.domain.review.dto.response.CursorResponseReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewStatsDto;
 import com.mopl.mopl.domain.review.entity.Review;
+import com.mopl.mopl.domain.review.event.ReviewChangedEvent;
 import com.mopl.mopl.domain.review.exception.ReviewErrorCode;
 import com.mopl.mopl.domain.review.exception.ReviewException;
 import com.mopl.mopl.domain.review.exception.ReviewNotFoundException;
@@ -20,10 +21,6 @@ import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.event.ReviewCreatedEvent;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,6 +28,11 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -59,6 +61,7 @@ public class ReviewServiceImpl implements ReviewService {
       Review savedReview = reviewRepository.saveAndFlush(review);
 
       eventPublisher.publishEvent(ReviewCreatedEvent.of(savedReview));
+      eventPublisher.publishEvent(new ReviewChangedEvent(userId));
       return reviewMapper.toDto(savedReview);
     } catch (DataIntegrityViolationException e) {
       throw new ReviewException(ReviewErrorCode.DUPLICATE_REVIEW);
@@ -114,6 +117,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     reviewRepository.flush();
     updateContentReviewStats(reviewToUpdate.getContent().getId());
+    eventPublisher.publishEvent(new ReviewChangedEvent(userId));
 
     return reviewMapper.toDto(reviewToUpdate);
   }
@@ -133,6 +137,7 @@ public class ReviewServiceImpl implements ReviewService {
     reviewRepository.flush();
 
     updateContentReviewStats(content.getId());
+    eventPublisher.publishEvent(new ReviewChangedEvent(userId));
 
   }
 

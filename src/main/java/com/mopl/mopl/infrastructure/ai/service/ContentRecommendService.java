@@ -1,26 +1,29 @@
-package com.mopl.mopl.infrastructure.ai;
+package com.mopl.mopl.infrastructure.ai.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.domain.content.entity.Content;
-import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.ai.dto.AiRecommendation;
 import com.mopl.mopl.infrastructure.ai.dto.ContentRecommendResponse;
 import com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis;
+import com.mopl.mopl.infrastructure.ai.dto.RecommendResult;
 import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
 import com.mopl.mopl.infrastructure.ai.event.SseStatusEvent;
 import com.mopl.mopl.infrastructure.ai.exception.AiParseFailedException;
 import com.mopl.mopl.infrastructure.ai.exception.AiTimeoutException;
 import com.mopl.mopl.infrastructure.ai.exception.AiUnavailableException;
-import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
+import com.mopl.mopl.infrastructure.ai.prompt.AiPrompts;
+import com.mopl.mopl.infrastructure.ai.recorder.AiPerformanceRecorder;
+import com.mopl.mopl.infrastructure.ai.strategy.ColdStartRecommendStrategy;
+import com.mopl.mopl.infrastructure.ai.strategy.PersonalizedRecommendStrategy;
+import com.mopl.mopl.infrastructure.ai.strategy.RecommendStrategyContext;
 import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.retry.NonTransientAiException;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -40,44 +43,31 @@ import static com.mopl.mopl.global.config.AsyncConfig.AI_RECOMMEND_EXECUTOR;
 public class ContentRecommendService
 {
     private static final int MAX_RECOMMENDATIONS = 5;
-    private static final int FALLBACK_LIMIT = 50;
 
     private final ChatClient chatClient;
-    private final ContentRepository contentRepository;
     private final ImageUrlConverter imageUrlConverter;
     private final ObjectMapper objectMapper;
     private final AiPerformanceRecorder aiPerformanceRecorder;
-    private final IntentAnalysisService intentAnalysisService;
-    private final ContentSearchQueryService contentSearchQueryService;
-    private final ContentSimilaritySearchService contentSimilaritySearchService;
     private final UserTasteProfileService userTasteProfileService;
+    private final PersonalizedRecommendStrategy personalizedStrategy;
+    private final ColdStartRecommendStrategy coldStartStrategy;
 
     @Async(AI_RECOMMEND_EXECUTOR)
     public void recommendStream(String prompt, UUID userId, SseEmitter emitter) {
         try {
-            // Stage 1: 의도 분석
-            if (!sendStatus(emitter, "intent_analysis", "질문을 분석하고 있습니다...")) return;
-            IntentAnalysis intentAnalysis = intentAnalysisService.analysis(prompt);
-
-            // 비관련 질문 처리
-            if ("unrelated".equals(intentAnalysis.intent())) {
-                log.info("[AI Recommend] 비관련 질문 감지 - 즉시 빈 배열 반환");
-                sendResult(emitter, List.of());
-                emitter.complete();
-                return;
-            }
-
-            // Stage 2: 후보 필터링
             if (!sendStatus(emitter, "candidate_filtering", "맞춤 콘텐츠를 찾고 있습니다...")) return;
-            List<Content> candidates = findCandidates(intentAnalysis, userId);
 
-            // Stage 3: 텍스트 스트리밍 추천
+            RecommendStrategyContext context = resolveStrategy(userId);
+            boolean isColdStart = context.strategy() instanceof ColdStartRecommendStrategy;
+            IntentAnalysis intent = context.strategy().analyzeIntent(prompt);
+            List<Content> candidates = context.strategy()
+                    .retrieveCandidates(intent, userId, context.tasteEmbedding());
+
             if (!sendStatus(emitter, "recommendation", "추천 결과를 생성하고 있습니다...")) return;
-            List<AiRecommendation> recommendations = generateRecommendation(prompt, intentAnalysis, candidates);
-
-            List<ContentRecommendResponse> response = mapToResponse(recommendations, candidates);
-            sendResult(emitter, response);
+            List<AiRecommendation> recommendations = generateRecommendation(prompt, intent, candidates);
+            sendResult(emitter, new RecommendResult(mapToResponse(recommendations, candidates), isColdStart));
             emitter.complete();
+
         } catch (AiTimeoutException e) {
             sendError(emitter, "AI_TIMEOUT", "AI 서비스 응답이 지연되고 있습니다.");
         } catch (AiUnavailableException e) {
@@ -90,44 +80,12 @@ public class ContentRecommendService
         }
     }
 
-    /**
-     * 의도 분서 결과를 기반으로 후보 콘텐츠를 필터링한다.
-     * <p>
-     * conetentType과 키워드로 Java 스트림 필터링하며,
-     * 후보가 0건이면 전체 콘텐츠로 fallback으로 반환한다.
-     *
-     * @param intent 의도 분석 결과
-     * @return 후보 콘텐츠 목록
-     */
-    private List<Content> findCandidates(IntentAnalysis intent, UUID userId) {
-        return aiPerformanceRecorder.record("candidate-retrieval", () -> {
-            List<Content> similarContents = contentSimilaritySearchService.findSimilarByUserTaste(userId);
-
-            if (!similarContents.isEmpty()) {
-                log.info("[AI Recommend] 취향 기반 후보 {}건", similarContents.size());
-                return similarContents;
-            }
-
-            List<String> keywords = intent.keywords();
-            if ((keywords == null || keywords.isEmpty()) && userId != null) {
-                keywords = userTasteProfileService.getTopTags(userId);
-                log.info("[AI Recommend] 키워드 없음 — 취향 태그로 대체: {}", keywords);
-            }
-
-            List<String> candidateIds = contentSearchQueryService.searchCandidateIds(intent.contentType(), keywords);
-
-            if (candidateIds.isEmpty()) {
-                log.warn("[AI Recommend] ES 후보 0건 — 상위 {}건으로 fallback", FALLBACK_LIMIT);
-                return contentRepository.findAll(PageRequest.of(0, FALLBACK_LIMIT)).getContent();
-            }
-
-            List<UUID> uuids = candidateIds.stream().map(UUID::fromString).toList();
-            List<Content> candidates = contentRepository.findAllById(uuids);
-
-            log.info("[AI Recommend] 후보 필터링 — ES {}건 → DB 조회 {}건", candidateIds.size(), candidates.size());
-
-            return candidates;
-        });
+    private RecommendStrategyContext resolveStrategy(UUID userId) {
+        float[] tasteEmbedding = userTasteProfileService.getTasteEmbedding(userId);
+        if (tasteEmbedding != null) {
+            return new RecommendStrategyContext(personalizedStrategy, tasteEmbedding);
+        }
+        return new RecommendStrategyContext(coldStartStrategy, null);
     }
 
     /**
@@ -217,7 +175,7 @@ public class ContentRecommendService
         }
     }
 
-    private void sendResult(SseEmitter emitter, List<ContentRecommendResponse> result) {
+    private void sendResult(SseEmitter emitter, RecommendResult result) {
         try {
             emitter.send(SseEmitter.event()
                     .name("result")

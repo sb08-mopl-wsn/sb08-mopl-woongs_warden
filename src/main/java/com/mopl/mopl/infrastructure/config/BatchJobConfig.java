@@ -1,7 +1,7 @@
 package com.mopl.mopl.infrastructure.config;
 
 import com.mopl.mopl.domain.content.repository.ContentRepository;
-import com.mopl.mopl.infrastructure.ai.ContentEmbeddingService;
+import com.mopl.mopl.infrastructure.ai.service.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.batch.SportsdbCollectTasklet;
 import com.mopl.mopl.infrastructure.batch.TmdbCollectTasklet;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;

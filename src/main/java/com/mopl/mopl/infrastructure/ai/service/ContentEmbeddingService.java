@@ -1,4 +1,4 @@
-package com.mopl.mopl.infrastructure.ai;
+package com.mopl.mopl.infrastructure.ai.service;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import lombok.RequiredArgsConstructor;

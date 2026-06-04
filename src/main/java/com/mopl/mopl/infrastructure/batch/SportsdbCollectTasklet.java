@@ -2,7 +2,7 @@ package com.mopl.mopl.infrastructure.batch;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
-import com.mopl.mopl.infrastructure.ai.ContentEmbeddingService;
+import com.mopl.mopl.infrastructure.ai.service.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
 import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;

@@ -3,6 +3,7 @@ package com.mopl.mopl.infrastructure.ai;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis;
 import com.mopl.mopl.infrastructure.ai.exception.AiTimeoutException;
+import com.mopl.mopl.infrastructure.ai.recorder.AiPerformanceRecorder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

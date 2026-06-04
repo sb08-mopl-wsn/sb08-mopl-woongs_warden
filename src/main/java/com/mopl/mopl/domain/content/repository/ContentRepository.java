@@ -25,16 +25,32 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
         FROM contents
         WHERE embedding IS NOT NULL
         AND id NOT IN (SELECT content_id FROM reviews WHERE user_id = CAST(:userId AS uuid))
-        AND embedding <=> CAST(:embedding AS vector) < 0.8
-        ORDER BY RANDOM()
-        LIMIT :limit
+        AND embedding <=> CAST(:embedding AS vector) < 0.3
+        ORDER BY distance ASC
+        LIMIT :pool
     ) sub
-    ORDER BY distance
+    ORDER BY RANDOM()
+    LIMIT :limit
     """, nativeQuery = true)
     List<Content> findSimilarContents(
             @Param("embedding") String embedding,
+            @Param("pool") int pool,
             @Param("limit") int limit,
             @Param("userId") String userId
+    );
+
+    @Query(value = """
+    SELECT AVG(embedding)::text
+    FROM contents
+    WHERE id IN (
+        SELECT content_id FROM reviews
+        WHERE user_id = CAST(:userId AS uuid)
+        AND rating >= :minRating
+    )
+    """, nativeQuery = true)
+    String findAvgEmbeddingByUserId(
+            @Param("userId") String userId,
+            @Param("minRating") double minRating
     );
 
     boolean existsByExternalIdAndContentType(String externalId, ContentType contentType);

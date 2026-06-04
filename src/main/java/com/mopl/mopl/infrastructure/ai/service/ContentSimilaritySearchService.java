@@ -1,4 +1,4 @@
-package com.mopl.mopl.infrastructure.ai;
+package com.mopl.mopl.infrastructure.ai.service;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
@@ -12,23 +12,22 @@ import java.util.UUID;
 @Slf4j
 @RequiredArgsConstructor
 @Service
-public class ContentSimilaritySearchService
-{
-    private static final int SIMILAR_CONTENT_LIMIT = 50;
+public class ContentSimilaritySearchService {
+
+    private static final int CANDIDATE_POOL = 15;
+    private static final int CANDIDATE_LIMIT = 10;
 
     private final ContentRepository contentRepository;
-    private final UserTasteProfileService userTasteProfileService;
 
-    public List<Content> findSimilarByUserTaste(UUID userId) {
-        float[] tasteEmbedding = userTasteProfileService.getTasteEmbedding(userId);
-
+    public List<Content> findSimilarByUserTaste(UUID userId, float[] tasteEmbedding) {
         if (tasteEmbedding == null || tasteEmbedding.length == 0) {
             log.warn("[유사도 검색] 취향 프로파일 없음 (콜드 스타트): userId={}", userId);
             return List.of();
         }
 
         String embeddingStr = toVectorString(tasteEmbedding);
-        List<Content> results = contentRepository.findSimilarContents(embeddingStr, SIMILAR_CONTENT_LIMIT, userId.toString());
+        List<Content> results = contentRepository.findSimilarContents(
+                embeddingStr, CANDIDATE_POOL, CANDIDATE_LIMIT, userId.toString());
 
         log.debug("[유사도 검색] userId={}, 결과={}건", userId, results.size());
         return results;

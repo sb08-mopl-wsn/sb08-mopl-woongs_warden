@@ -61,6 +61,7 @@ public class ReviewServiceImpl implements ReviewService {
       Review savedReview = reviewRepository.saveAndFlush(review);
 
       eventPublisher.publishEvent(ReviewCreatedEvent.of(savedReview));
+      updateContentReviewStats(content.getId());
       eventPublisher.publishEvent(new ReviewChangedEvent(userId));
       return reviewMapper.toDto(savedReview);
     } catch (DataIntegrityViolationException e) {

@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @Service
 public class UserTasteProfileService
 {
-    private static final String TASTE_KEY_PREFIX = "teste:";
+    private static final String TASTE_KEY_PREFIX = "taste:";
     private static final Duration TASTE_TTL = Duration.ofHours(1);
     private static final double MIN_RATING = 4.0;
     private static final int TOP_TAGS = 5;
@@ -56,7 +56,13 @@ public class UserTasteProfileService
             return null;
         }
 
-        float[] avgEmbedding = parseEmbedding(avgEmbeddingStr);
+        float[] avgEmbedding;
+        try {
+            avgEmbedding = parseEmbedding(avgEmbeddingStr);
+        } catch (NumberFormatException e) {
+            log.warn("[취향 프로파일] 임베딩 파싱 실패: userId={}, raw={}", userId, avgEmbeddingStr, e);
+            return null;
+        }
 
         log.debug("[취향 프로파일] 생성 완료: userId={}", userId);
 

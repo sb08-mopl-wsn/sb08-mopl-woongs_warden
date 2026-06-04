@@ -72,7 +72,12 @@ public class ContentServiceImpl implements ContentService
         Content savedContent = contentRepository.save(content);
 
         applicationEventPublisher.publishEvent(new ContentIndexEvent(savedContent));
-        contentEmbeddingService.generateAndSave(savedContent);
+
+        try {
+            contentEmbeddingService.generateAndSave(savedContent, "api");
+        } catch (Exception e) {
+            log.warn("콘텐츠 임베딩 생성 실패: contentId={}", savedContent.getId(), e);
+        }
 
         return contentMapper.toContentDto(savedContent);
     }

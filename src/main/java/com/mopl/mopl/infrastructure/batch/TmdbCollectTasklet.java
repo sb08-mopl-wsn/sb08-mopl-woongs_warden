@@ -96,7 +96,7 @@ public class TmdbCollectTasklet implements Tasklet
                     log.warn("TMDB 인덱싱 실패: externalId={}", content.getExternalId(), e);
                 }
                 try {
-                    contentEmbeddingService.generateAndSave(content);
+                    contentEmbeddingService.generateAndSave(content, "tmdb");
                 } catch (Exception e) {
                     log.warn("TMDB 임베딩 생성 실패: externalId={}", content.getExternalId(), e);
                 }

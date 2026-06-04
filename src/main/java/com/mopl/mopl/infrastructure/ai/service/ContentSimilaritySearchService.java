@@ -2,6 +2,7 @@ package com.mopl.mopl.infrastructure.ai.service;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.ai.util.VectorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,8 +13,9 @@ import java.util.UUID;
 @Slf4j
 @RequiredArgsConstructor
 @Service
-public class ContentSimilaritySearchService {
-
+public class ContentSimilaritySearchService
+{
+    private static final double SIMILARITY_THRESHOLD = 0.3;
     private static final int CANDIDATE_POOL = 15;
     private static final int CANDIDATE_LIMIT = 10;
 
@@ -25,21 +27,11 @@ public class ContentSimilaritySearchService {
             return List.of();
         }
 
-        String embeddingStr = toVectorString(tasteEmbedding);
+        String embeddingStr = VectorUtils.serialize(tasteEmbedding);
         List<Content> results = contentRepository.findSimilarContents(
-                embeddingStr, CANDIDATE_POOL, CANDIDATE_LIMIT, userId.toString());
+                embeddingStr, SIMILARITY_THRESHOLD, CANDIDATE_POOL, CANDIDATE_LIMIT, userId.toString());
 
         log.debug("[유사도 검색] userId={}, 결과={}건", userId, results.size());
         return results;
-    }
-
-    private String toVectorString(float[] embedding) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < embedding.length; i++) {
-            sb.append(embedding[i]);
-            if (i < embedding.length - 1) sb.append(",");
-        }
-        sb.append("]");
-        return sb.toString();
     }
 }

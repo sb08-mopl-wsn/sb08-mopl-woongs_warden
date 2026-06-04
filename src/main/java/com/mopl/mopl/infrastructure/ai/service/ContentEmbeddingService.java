@@ -1,11 +1,11 @@
 package com.mopl.mopl.infrastructure.ai.service;
 
 import com.mopl.mopl.domain.content.entity.Content;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -13,16 +13,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class ContentEmbeddingService
 {
     private final EmbeddingModel embeddingModel;
+    private final MeterRegistry meterRegistry;
 
-    @Transactional
-    public void generateAndSave(Content content) {
+    public void generateAndSave(Content content, String source) {
         try {
             String text = buildEmbeddingText(content);
             float[] embedding = embeddingModel.embed(text);
             content.updateEmbedding(embedding);
             log.debug("[임베딩 생성] contentId={}", content.getId());
         } catch (Exception e) {
-            log.warn("[임베딩 생성 실패] contentId={}, error={}", content.getId(), e.getMessage());
+            log.warn("[임베딩 생성 실패] contentId={}, error={}", content.getId(), e.getMessage(), e);
+            meterRegistry.counter("mopl.batch.embedding.failed", "source", source).increment();
         }
     }
 

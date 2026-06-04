@@ -59,7 +59,7 @@ public class SportsdbCollectTasklet implements Tasklet
                             log.warn("Sportsdb 인덱싱 실패: externalId={}", content.getExternalId(), e);
                         }
                         try {
-                            contentEmbeddingService.generateAndSave(content);
+                            contentEmbeddingService.generateAndSave(content, "sportsdb");
                         } catch (Exception e) {
                             log.warn("Sportsdb 임베딩 생성 실패: externalId={}", content.getExternalId(), e);
                         }

@@ -16,6 +16,10 @@ public class ReviewEventListener
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewChanged(ReviewChangedEvent event) {
-        userTasteProfileService.evictTasteProfile(event.userId());
+        try {
+            userTasteProfileService.evictTasteProfile(event.userId());
+        } catch (Exception e) {
+            log.warn("[ReviewEvent] taste profile cache evict 실패 userId={}", event.userId(), e);
+        }
     }
 }

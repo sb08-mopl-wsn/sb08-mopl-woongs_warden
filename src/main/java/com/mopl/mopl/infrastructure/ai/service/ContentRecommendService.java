@@ -81,6 +81,9 @@ public class ContentRecommendService
     }
 
     private RecommendStrategyContext resolveStrategy(UUID userId) {
+        if (userId == null) {
+            return new RecommendStrategyContext(coldStartStrategy, null);
+        }
         float[] tasteEmbedding = userTasteProfileService.getTasteEmbedding(userId);
         if (tasteEmbedding != null) {
             return new RecommendStrategyContext(personalizedStrategy, tasteEmbedding);

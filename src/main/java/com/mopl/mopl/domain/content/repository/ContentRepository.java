@@ -25,7 +25,7 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
         FROM contents
         WHERE embedding IS NOT NULL
         AND id NOT IN (SELECT content_id FROM reviews WHERE user_id = CAST(:userId AS uuid))
-        AND embedding <=> CAST(:embedding AS vector) < 0.3
+        AND embedding <=> CAST(:embedding AS vector) < :threshold
         ORDER BY distance ASC
         LIMIT :pool
     ) sub
@@ -34,6 +34,7 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
     """, nativeQuery = true)
     List<Content> findSimilarContents(
             @Param("embedding") String embedding,
+            @Param("threshold") double threshold,
             @Param("pool") int pool,
             @Param("limit") int limit,
             @Param("userId") String userId

@@ -8,7 +8,7 @@ import java.util.UUID;
 public record PlaylistSearchRequest(
     UUID ownerIdEqual,
     UUID subscriberIdEqual,
-    String keyword,
+    String keywordLike,
     @NotNull(message = "limit는 필수입니다.")
     @Min(1)
     @Max(100)

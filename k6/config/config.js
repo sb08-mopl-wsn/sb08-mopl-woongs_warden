@@ -2,8 +2,7 @@ import http from 'k6/http';
 import {check, fail} from 'k6';
 
 // ─── 환경변수 ───
-// export const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
-export const BASE_URL = __ENV.BASE_URL || 'https://woongsanam.kro.kr';
+export const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 
 if (!__ENV.TEST_EMAIL || !__ENV.TEST_PASSWORD) {
     throw new Error(
@@ -61,13 +60,10 @@ export function login() {
         refreshToken = res.cookies['REFRESH_TOKEN'][0].value;
     }
 
-
-    console.log(`[로그인 응답] status=${res.status}, body=${res.body}`);
-
     const body = JSON.parse(res.body);
     return {
         accessToken: body.accessToken,
         csrfToken: csrfToken,
-        refreshToken: refreshToken
+        refreshToken: refreshToken,
     };
 }

@@ -1,10 +1,10 @@
 package com.mopl.mopl.domain.conversation.controller;
 
-import com.mopl.mopl.domain.conversation.dto.ConversationCreateRequest;
+import com.mopl.mopl.domain.conversation.dto.request.ConversationCreateRequest;
+import com.mopl.mopl.domain.conversation.dto.request.CursorConversationRequest;
 import com.mopl.mopl.domain.conversation.dto.response.ConversationDto;
 import com.mopl.mopl.domain.conversation.dto.response.CursorResponseConversationDto;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
-import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +22,6 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-
-import java.util.UUID;
 
 @Tag(name = "대화방(Conversation)", description = "1:1 대화방 관리 API")
 public interface ConversationApi {
@@ -52,7 +51,7 @@ public interface ConversationApi {
     })
     ResponseEntity<CursorResponseConversationDto> getMyConversations(
             @Parameter(hidden = true) MoplUserDetails userDetails,
-            @ParameterObject @Valid @ModelAttribute CursorPaginationRequest request
+            @ParameterObject @Valid @ModelAttribute CursorConversationRequest request
     );
 
     @Operation(summary = "대화 조회", description = "대화방 ID로 상세 정보를 조회합니다.")

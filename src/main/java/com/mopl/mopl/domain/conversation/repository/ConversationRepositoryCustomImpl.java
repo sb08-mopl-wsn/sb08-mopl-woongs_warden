@@ -1,11 +1,13 @@
 package com.mopl.mopl.domain.conversation.repository;
 
 import static com.mopl.mopl.domain.conversation.entity.QConversation.conversation;
+import static com.mopl.mopl.domain.dm.entity.QDirectMessage.directMessage;
 
 import com.mopl.mopl.domain.conversation.entity.Conversation;
 import com.mopl.mopl.domain.user.entity.QUser;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.Instant;
 import java.util.List;
@@ -22,7 +24,7 @@ public class ConversationRepositoryCustomImpl implements ConversationRepositoryC
 
   @Override
   public List<Conversation> findMyConversationsByCursor(
-      UUID userId, String sortBy, boolean isAsc, Instant cursor, UUID idAfter, Pageable pageable) {
+      UUID userId, String keywordLike, String sortBy, boolean isAsc, Instant cursor, UUID idAfter, Pageable pageable) {
 
     QUser senderUser = new QUser("senderUser");
     QUser receiverUser = new QUser("receiverUser");
@@ -34,11 +36,31 @@ public class ConversationRepositoryCustomImpl implements ConversationRepositoryC
         .where(
             // 내가 보냈거나 받은 방
             conversation.sender.id.eq(userId).or(conversation.receiver.id.eq(userId)),
+            keywordCondition(userId, keywordLike, senderUser, receiverUser),
             cursorCondition(sortBy, isAsc, cursor, idAfter)
         )
         .orderBy(dynamicOrder(sortBy, isAsc), isAsc ? conversation.id.asc() : conversation.id.desc())
         .limit(pageable.getPageSize())
         .fetch();
+  }
+
+  @Override
+  public long countMyConversationsByCursorCondition(UUID userId, String keywordLike) {
+    QUser senderUser = new QUser("senderUser");
+    QUser receiverUser = new QUser("receiverUser");
+
+    Long count = queryFactory
+        .select(conversation.count())
+        .from(conversation)
+        .join(conversation.sender, senderUser)
+        .join(conversation.receiver, receiverUser)
+        .where(
+            conversation.sender.id.eq(userId).or(conversation.receiver.id.eq(userId)),
+            keywordCondition(userId, keywordLike, senderUser, receiverUser)
+        )
+        .fetchOne();
+
+    return count == null ? 0L : count;
   }
 
   // 동적 쿼리 헬퍼 메서드
@@ -67,5 +89,25 @@ public class ConversationRepositoryCustomImpl implements ConversationRepositoryC
 
     // 기본값 updatedAt
     return isAsc ? conversation.updatedAt.asc() : conversation.updatedAt.desc();
+  }
+
+  private BooleanExpression keywordCondition(UUID myId, String keywordLike, QUser senderUser, QUser receiverUser) {
+    if (keywordLike == null || keywordLike.isBlank()) {
+      return null;
+    }
+
+    // 1. 상대방 이름 검색
+    BooleanExpression nameMatch = conversation.sender.id.eq(myId).and(receiverUser.name.containsIgnoreCase(keywordLike))
+        .or(conversation.receiver.id.eq(myId).and(senderUser.name.containsIgnoreCase(keywordLike)));
+
+    // 2. 대화 내용 검색 (서브쿼리 활용: 해당 방의 메시지 중 하나라도 검색어가 포함되어 있는지)
+    BooleanExpression contentMatch = JPAExpressions.selectOne()
+        .from(directMessage)
+        .where(directMessage.conversation.id.eq(conversation.id)
+            .and(directMessage.content.containsIgnoreCase(keywordLike)))
+        .exists();
+
+    // 이름이나 내용 중 하나라도 매칭되면 반환
+    return nameMatch.or(contentMatch);
   }
 }

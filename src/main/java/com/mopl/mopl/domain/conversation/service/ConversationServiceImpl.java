@@ -1,6 +1,7 @@
 package com.mopl.mopl.domain.conversation.service;
 
-import com.mopl.mopl.domain.conversation.dto.ConversationCreateRequest;
+import com.mopl.mopl.domain.conversation.dto.request.ConversationCreateRequest;
+import com.mopl.mopl.domain.conversation.dto.request.CursorConversationRequest;
 import com.mopl.mopl.domain.conversation.dto.response.ConversationDto;
 import com.mopl.mopl.domain.conversation.dto.response.CursorResponseConversationDto;
 import com.mopl.mopl.domain.conversation.entity.Conversation;
@@ -14,7 +15,6 @@ import com.mopl.mopl.domain.dm.repository.DirectMessageRepository;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
-import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import java.time.Instant;
@@ -79,7 +79,7 @@ public class ConversationServiceImpl implements ConversationService{
   }
 
   @Override
-  public CursorResponseConversationDto getMyConversations(UUID currentUserId, CursorPaginationRequest request) {
+  public CursorResponseConversationDto getMyConversations(UUID currentUserId, CursorConversationRequest request) {
 
     // limit 값 검증
     if (request.limit() == null || request.limit() <= 0) {
@@ -124,7 +124,7 @@ public class ConversationServiceImpl implements ConversationService{
     boolean byCreatedAt = "createdAt".equals(sortBy);
 
     List<Conversation> conversations = conversationRepository.findMyConversationsByCursor(
-        currentUserId, sortBy, isAsc, cursorTime, request.idAfter(), pageRequest
+        currentUserId, request.keywordLike(), sortBy, isAsc, cursorTime, request.idAfter(), pageRequest
     );
 
     // 다음 페이지 존재 확인
@@ -145,9 +145,9 @@ public class ConversationServiceImpl implements ConversationService{
     // 사용자 총 대화방 개수
     long totalCount = -1L;
     if (request.cursor() == null || request.cursor().isBlank()) {
-      long sentCount = conversationRepository.countBySenderId(currentUserId);
-      long receivedCount = conversationRepository.countByReceiverId(currentUserId);
-      totalCount = sentCount + receivedCount;
+      totalCount = conversationRepository.countMyConversationsByCursorCondition(
+          currentUserId, request.keywordLike()
+      );
     }
 
     // DTO 변환

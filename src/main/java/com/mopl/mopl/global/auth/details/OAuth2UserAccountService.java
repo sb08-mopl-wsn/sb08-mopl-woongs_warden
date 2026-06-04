@@ -6,9 +6,11 @@ import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.Social;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.event.user.UserEvent;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import com.mopl.mopl.global.exception.oauth2.OAuth2LoginException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class OAuth2UserAccountService {
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public User findOrCreateSocialUser(OAuth2UserInfo userInfo) {
@@ -48,7 +51,7 @@ public class OAuth2UserAccountService {
 
     private User saveSocialUser(OAuth2UserInfo userInfo) {
         try {
-            return userRepository.save(
+            User savedUser = userRepository.save(
                     User.builder()
                             .email(userInfo.email())
                             .name(userInfo.name())
@@ -57,6 +60,10 @@ public class OAuth2UserAccountService {
                             .socialId(userInfo.socialId())
                             .build()
             );
+
+            eventPublisher.publishEvent(UserEvent.of(savedUser));
+            return savedUser;
+
         } catch (DataIntegrityViolationException e) {
             return userRepository.findByEmail(userInfo.email())
                     .map(existingUser -> {

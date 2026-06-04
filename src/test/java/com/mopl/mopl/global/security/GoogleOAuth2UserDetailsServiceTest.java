@@ -11,6 +11,7 @@ import com.mopl.mopl.global.auth.details.OAuth2UserAccountService;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetails;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetailsService;
 import com.mopl.mopl.global.auth.extractor.GoogleOAuth2UserInfoExtractor;
+import com.mopl.mopl.global.event.user.UserEvent;
 import com.mopl.mopl.global.exception.oauth2.OAuth2LoginException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.LockedException;
@@ -38,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -53,13 +56,16 @@ class GoogleOAuth2UserDetailsServiceTest {
     @Mock
     private UserMapper userMapper;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private OAuth2UserDetailsService service;
     private MockRestServiceServer mockServer;
 
     @BeforeEach
     void setUp() {
         OAuth2UserAccountService accountService =
-                new OAuth2UserAccountService(userRepository);
+                new OAuth2UserAccountService(userRepository, eventPublisher);
 
         service = new OAuth2UserDetailsService(
                 userMapper,
@@ -121,6 +127,7 @@ class GoogleOAuth2UserDetailsServiceTest {
 
         verify(userRepository).findBySocialTypeAndSocialId(Social.GOOGLE, "google-sub-1");
         verify(userMapper).toDto(user);
+        verify(eventPublisher, never()).publishEvent(any(UserEvent.class));
 
         mockServer.verify();
     }
@@ -188,7 +195,7 @@ class GoogleOAuth2UserDetailsServiceTest {
                 .isInstanceOf(LockedException.class)
                 .hasMessageContaining("잠긴 계정입니다.");
 
-        verify(existingUser, org.mockito.Mockito.never())
+        verify(existingUser, never())
                 .updateSocialInfo(org.mockito.Mockito.any(), org.mockito.Mockito.anyString());
         verifyNoInteractions(userMapper);
 
@@ -222,7 +229,7 @@ class GoogleOAuth2UserDetailsServiceTest {
                 .isInstanceOf(LockedException.class)
                 .hasMessageContaining("잠긴 계정입니다.");
 
-        verify(existingUser, org.mockito.Mockito.never())
+        verify(existingUser, never())
                 .updateSocialInfo(org.mockito.Mockito.any(), org.mockito.Mockito.anyString());
         verifyNoInteractions(userMapper);
 
@@ -252,7 +259,6 @@ class GoogleOAuth2UserDetailsServiceTest {
                 .hasMessageContaining("잠긴 계정입니다.");
 
         verifyNoInteractions(userMapper);
-
         mockServer.verify();
     }
 
@@ -278,14 +284,14 @@ class GoogleOAuth2UserDetailsServiceTest {
         given(existingUser.getSocialType()).willReturn(null);
         given(existingUser.updateSocialInfo(Social.GOOGLE, "google-sub-1"))
                 .willReturn(existingUser);
+
         given(existingUser.isLocked()).willReturn(false);
         given(userMapper.toDto(existingUser)).willReturn(userDto);
-
         OAuth2UserDetails result = (OAuth2UserDetails) service.loadUser(oauth2UserRequest());
 
         assertThat(result.getUserDto()).isEqualTo(userDto);
-
         verify(existingUser).updateSocialInfo(Social.GOOGLE, "google-sub-1");
+        verify(eventPublisher, never()).publishEvent(any(UserEvent.class));
 
         mockServer.verify();
     }
@@ -312,9 +318,7 @@ class GoogleOAuth2UserDetailsServiceTest {
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
-
         verifyNoInteractions(userMapper);
-
         mockServer.verify();
     }
 
@@ -336,14 +340,13 @@ class GoogleOAuth2UserDetailsServiceTest {
                 .willReturn(Optional.empty());
         given(userRepository.findByEmail("google@test.com"))
                 .willReturn(Optional.of(existingUser));
+
         given(existingUser.getSocialType()).willReturn(Social.GOOGLE);
         given(existingUser.getSocialId()).willReturn("other-google-sub");
-
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
 
         verifyNoInteractions(userMapper);
-
         mockServer.verify();
     }
 
@@ -371,18 +374,17 @@ class GoogleOAuth2UserDetailsServiceTest {
         given(userMapper.toDto(savedUser)).willReturn(userDto);
 
         OAuth2UserDetails result = (OAuth2UserDetails) service.loadUser(oauth2UserRequest());
-
         assertThat(result.getUserDto()).isEqualTo(userDto);
-
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
 
         User savedArgument = captor.getValue();
         assertThat(savedArgument.getEmail()).isEqualTo("google@test.com");
         assertThat(savedArgument.getName()).isEqualTo("구글사용자");
+
         assertThat(savedArgument.getSocialType()).isEqualTo(Social.GOOGLE);
         assertThat(savedArgument.getSocialId()).isEqualTo("google-sub-1");
-
+        verify(eventPublisher).publishEvent(any(UserEvent.class));
         mockServer.verify();
     }
 
@@ -409,14 +411,12 @@ class GoogleOAuth2UserDetailsServiceTest {
         given(userMapper.toDto(savedUser)).willReturn(userDto);
 
         OAuth2UserDetails result = (OAuth2UserDetails) service.loadUser(oauth2UserRequest());
-
         assertThat(result.getUserDto()).isEqualTo(userDto);
-
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
 
         assertThat(captor.getValue().getName()).isEqualTo("google@test.com");
-
+        verify(eventPublisher).publishEvent(any(UserEvent.class));
         mockServer.verify();
     }
 
@@ -442,6 +442,7 @@ class GoogleOAuth2UserDetailsServiceTest {
                 .willReturn(Optional.of(existingUser));
         given(userRepository.save(any(User.class)))
                 .willThrow(DataIntegrityViolationException.class);
+
         given(existingUser.getSocialType()).willReturn(null);
         given(existingUser.updateSocialInfo(Social.GOOGLE, "google-sub-1"))
                 .willReturn(existingUser);
@@ -449,11 +450,8 @@ class GoogleOAuth2UserDetailsServiceTest {
         given(userMapper.toDto(existingUser)).willReturn(userDto);
 
         OAuth2UserDetails result = (OAuth2UserDetails) service.loadUser(oauth2UserRequest());
-
         assertThat(result.getUserDto()).isEqualTo(userDto);
-
         verify(existingUser).updateSocialInfo(Social.GOOGLE, "google-sub-1");
-
         mockServer.verify();
     }
 
@@ -476,12 +474,10 @@ class GoogleOAuth2UserDetailsServiceTest {
                 .willReturn(Optional.empty());
         given(userRepository.save(any(User.class)))
                 .willThrow(DataIntegrityViolationException.class);
-
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(AuthAuthenticationFailedException.class);
 
         verifyNoInteractions(userMapper);
-
         mockServer.verify();
     }
 

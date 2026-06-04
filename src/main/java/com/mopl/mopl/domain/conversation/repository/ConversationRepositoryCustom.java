@@ -9,6 +9,8 @@ import org.springframework.data.domain.Pageable;
 public interface ConversationRepositoryCustom {
 
   List<Conversation> findMyConversationsByCursor(
-      UUID userId, String sortBy, boolean isAsc, Instant cursor, UUID idAfter, Pageable pageable
+      UUID userId, String keywordLike, String sortBy, boolean isAsc, Instant cursor, UUID idAfter, Pageable pageable
   );
+
+  long countMyConversationsByCursorCondition(UUID userId, String keywordLike);
 }

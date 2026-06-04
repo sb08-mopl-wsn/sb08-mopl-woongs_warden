@@ -1,11 +1,11 @@
 package com.mopl.mopl.domain.conversation.controller;
 
-import com.mopl.mopl.domain.conversation.dto.ConversationCreateRequest;
+import com.mopl.mopl.domain.conversation.dto.request.ConversationCreateRequest;
+import com.mopl.mopl.domain.conversation.dto.request.CursorConversationRequest;
 import com.mopl.mopl.domain.conversation.dto.response.ConversationDto;
 import com.mopl.mopl.domain.conversation.dto.response.CursorResponseConversationDto;
 import com.mopl.mopl.domain.conversation.service.ConversationService;
 import com.mopl.mopl.global.auth.details.MoplUserDetails;
-import com.mopl.mopl.global.dto.CursorPaginationRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +44,7 @@ public class ConversationController implements ConversationApi {
   @GetMapping
   public ResponseEntity<CursorResponseConversationDto> getMyConversations(
       @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
-      @Valid @ModelAttribute CursorPaginationRequest request
+      @Valid @ModelAttribute CursorConversationRequest request
   ) {
     UUID currentUserId = userDetails.getUserDto().id();
     CursorResponseConversationDto response = conversationService.getMyConversations(currentUserId, request);

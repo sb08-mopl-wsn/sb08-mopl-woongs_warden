@@ -10,6 +10,7 @@ import com.mopl.mopl.global.auth.details.OAuth2UserAccountService;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetails;
 import com.mopl.mopl.global.auth.details.OAuth2UserDetailsService;
 import com.mopl.mopl.global.auth.extractor.KakaoOAuth2UserInfoExtractor;
+import com.mopl.mopl.global.event.user.UserEvent;
 import com.mopl.mopl.global.exception.oauth2.OAuth2LoginException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -51,13 +53,16 @@ class KakaoOAuth2UserDetailsServiceTest {
     @Mock
     private UserMapper userMapper;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private OAuth2UserDetailsService service;
     private MockRestServiceServer mockServer;
 
     @BeforeEach
     void setUp() {
         OAuth2UserAccountService accountService =
-                new OAuth2UserAccountService(userRepository);
+                new OAuth2UserAccountService(userRepository, eventPublisher);
 
         service = new OAuth2UserDetailsService(
                 userMapper,
@@ -67,7 +72,6 @@ class KakaoOAuth2UserDetailsServiceTest {
 
         RestTemplate restTemplate = new RestTemplate();
         mockServer = MockRestServiceServer.bindTo(restTemplate).build();
-
         service.setRestOperations(restTemplate);
     }
 
@@ -96,13 +100,11 @@ class KakaoOAuth2UserDetailsServiceTest {
         given(userMapper.toDto(user)).willReturn(userDto);
 
         OAuth2UserDetails result = (OAuth2UserDetails) service.loadUser(oauth2UserRequest());
-
         assertThat(result.getUserDto()).isEqualTo(userDto);
         assertThat(result.getAttributes().get("id")).isEqualTo(12345);
 
         verify(userRepository).findBySocialTypeAndSocialId(Social.KAKAO, "12345");
         verify(userMapper).toDto(user);
-
         mockServer.verify();
     }
 
@@ -123,9 +125,7 @@ class KakaoOAuth2UserDetailsServiceTest {
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
-
         verifyNoInteractions(userRepository, userMapper);
-
         mockServer.verify();
     }
 
@@ -160,7 +160,6 @@ class KakaoOAuth2UserDetailsServiceTest {
         verify(existingUser, org.mockito.Mockito.never())
                 .updateSocialInfo(org.mockito.Mockito.any(), org.mockito.Mockito.anyString());
         verifyNoInteractions(userMapper);
-
         mockServer.verify();
     }
 
@@ -181,7 +180,6 @@ class KakaoOAuth2UserDetailsServiceTest {
                 .hasMessageContaining("Attribute value for 'id' cannot be null");
 
         verifyNoInteractions(userRepository, userMapper);
-
         mockServer.verify();
     }
 
@@ -196,9 +194,7 @@ class KakaoOAuth2UserDetailsServiceTest {
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
-
         verifyNoInteractions(userRepository, userMapper);
-
         mockServer.verify();
     }
 
@@ -219,9 +215,7 @@ class KakaoOAuth2UserDetailsServiceTest {
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
-
         verifyNoInteractions(userRepository, userMapper);
-
         mockServer.verify();
     }
 
@@ -243,9 +237,7 @@ class KakaoOAuth2UserDetailsServiceTest {
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
-
         verifyNoInteractions(userRepository, userMapper);
-
         mockServer.verify();
     }
 
@@ -276,7 +268,6 @@ class KakaoOAuth2UserDetailsServiceTest {
                 .hasMessageContaining("잠긴 계정입니다.");
 
         verifyNoInteractions(userMapper);
-
         mockServer.verify();
     }
 
@@ -310,11 +301,8 @@ class KakaoOAuth2UserDetailsServiceTest {
         given(userMapper.toDto(existingUser)).willReturn(userDto);
 
         OAuth2UserDetails result = (OAuth2UserDetails) service.loadUser(oauth2UserRequest());
-
         assertThat(result.getUserDto()).isEqualTo(userDto);
-
         verify(existingUser).updateSocialInfo(Social.KAKAO, "12345");
-
         mockServer.verify();
     }
 
@@ -344,9 +332,7 @@ class KakaoOAuth2UserDetailsServiceTest {
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
-
         verifyNoInteractions(userMapper);
-
         mockServer.verify();
     }
 
@@ -377,9 +363,7 @@ class KakaoOAuth2UserDetailsServiceTest {
 
         assertThatThrownBy(() -> service.loadUser(oauth2UserRequest()))
                 .isInstanceOf(OAuth2LoginException.class);
-
         verifyNoInteractions(userMapper);
-
         mockServer.verify();
     }
 
@@ -411,18 +395,17 @@ class KakaoOAuth2UserDetailsServiceTest {
         given(userMapper.toDto(savedUser)).willReturn(userDto);
 
         OAuth2UserDetails result = (OAuth2UserDetails) service.loadUser(oauth2UserRequest());
-
         assertThat(result.getUserDto()).isEqualTo(userDto);
-
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
 
         User savedArgument = captor.getValue();
         assertThat(savedArgument.getEmail()).isEqualTo("kakao@test.com");
         assertThat(savedArgument.getName()).isEqualTo("카카오사용자");
+
         assertThat(savedArgument.getSocialType()).isEqualTo(Social.KAKAO);
         assertThat(savedArgument.getSocialId()).isEqualTo("12345");
-
+        verify(eventPublisher).publishEvent(any(UserEvent.class));
         mockServer.verify();
     }
 
@@ -452,14 +435,12 @@ class KakaoOAuth2UserDetailsServiceTest {
         given(userMapper.toDto(savedUser)).willReturn(userDto);
 
         OAuth2UserDetails result = (OAuth2UserDetails) service.loadUser(oauth2UserRequest());
-
         assertThat(result.getUserDto()).isEqualTo(userDto);
-
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
 
         assertThat(captor.getValue().getName()).isEqualTo("kakao@test.com");
-
+        verify(eventPublisher).publishEvent(any(UserEvent.class));
         mockServer.verify();
     }
 

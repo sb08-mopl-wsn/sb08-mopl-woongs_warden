@@ -30,7 +30,7 @@ public record CursorConversationRequest(
       sortDirection = sortDirection.trim();
       if (sortDirection.isEmpty()) sortDirection = null;
     }
-    
+
     if (limit == null) limit = 20;
     if (sortDirection == null || sortDirection.isBlank()) sortDirection = "DESCENDING";
   }

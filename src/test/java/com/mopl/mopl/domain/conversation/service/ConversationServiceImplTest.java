@@ -181,16 +181,14 @@ class ConversationServiceImplTest {
 
     given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq(null), eq("updatedAt"), eq(false), eq(null), eq(null), any(
         PageRequest.class))).willReturn(mockConvs);
-    given(conversationRepository.countBySenderId(currentUserId)).willReturn(3L);
-    given(conversationRepository.countByReceiverId(currentUserId)).willReturn(2L);
+    given(conversationRepository.countMyConversationsByCursorCondition(currentUserId, null)).willReturn(5L);
 
     // when
     CursorResponseConversationDto result = conversationService.getMyConversations(currentUserId, request);
 
     // then
     assertThat(result.totalCount()).isEqualTo(5L);
-    verify(conversationRepository).countBySenderId(currentUserId);
-    verify(conversationRepository).countByReceiverId(currentUserId);
+    verify(conversationRepository).countMyConversationsByCursorCondition(currentUserId, null);
   }
 
   @Test
@@ -227,8 +225,7 @@ class ConversationServiceImplTest {
 
     // then
     assertThat(result.totalCount()).isEqualTo(-1L);
-    verify(conversationRepository, never()).countBySenderId(any());
-    verify(conversationRepository, never()).countByReceiverId(any());
+    verify(conversationRepository, never()).countMyConversationsByCursorCondition(any(), any());
   }
 
   @Test
@@ -253,8 +250,7 @@ class ConversationServiceImplTest {
 
     given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq(null), eq("updatedAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
         .willReturn(mockConvs);
-    given(conversationRepository.countBySenderId(currentUserId)).willReturn(6L);
-    given(conversationRepository.countByReceiverId(currentUserId)).willReturn(4L);
+    given(conversationRepository.countMyConversationsByCursorCondition(currentUserId, null)).willReturn(10L);
     given(directMessageRepository.findLatestMessage(any())).willReturn(Optional.empty());
 
     given(conversationMapper.toDto(any(), any(), any())).willReturn(
@@ -314,8 +310,7 @@ class ConversationServiceImplTest {
     given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq(null), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class)))
         .willReturn(new ArrayList<>());
 
-    given(conversationRepository.countBySenderId(currentUserId)).willReturn(0L);
-    given(conversationRepository.countByReceiverId(currentUserId)).willReturn(0L);
+    given(conversationRepository.countMyConversationsByCursorCondition(currentUserId, null)).willReturn(0L);
 
     // when
     CursorResponseConversationDto result = conversationService.getMyConversations(currentUserId, request);
@@ -323,8 +318,7 @@ class ConversationServiceImplTest {
     // then
     assertThat(result).isNotNull();
     verify(conversationRepository).findMyConversationsByCursor(eq(currentUserId), eq(null), eq("createdAt"), eq(false), eq(null), eq(null), any(PageRequest.class));
-    verify(conversationRepository).countBySenderId(currentUserId);
-    verify(conversationRepository).countByReceiverId(currentUserId);
+    verify(conversationRepository).countMyConversationsByCursorCondition(currentUserId, null);
   }
 
   @Test
@@ -403,8 +397,7 @@ class ConversationServiceImplTest {
     CursorConversationRequest request = new CursorConversationRequest(null, null, null, 10, "ASCENDING", "updatedAt");
     given(conversationRepository.findMyConversationsByCursor(eq(currentUserId), eq(null), eq("updatedAt"), eq(true), any(), any(), any()))
         .willReturn(new ArrayList<>());
-    given(conversationRepository.countBySenderId(currentUserId)).willReturn(0L);
-    given(conversationRepository.countByReceiverId(currentUserId)).willReturn(0L);
+    given(conversationRepository.countMyConversationsByCursorCondition(currentUserId, null)).willReturn(0L);
 
     // when
     CursorResponseConversationDto result = conversationService.getMyConversations(currentUserId, request);

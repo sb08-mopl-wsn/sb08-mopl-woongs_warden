@@ -16,6 +16,21 @@ public record CursorConversationRequest(
 ) {
 
   public CursorConversationRequest {
+    if (keywordLike != null) {
+      keywordLike = keywordLike.trim();
+      if (keywordLike.isEmpty()) keywordLike = null;
+    }
+
+    if (sortBy != null) {
+      sortBy = sortBy.trim();
+      if (sortBy.isEmpty()) sortBy = null;
+    }
+
+    if (sortDirection != null) {
+      sortDirection = sortDirection.trim();
+      if (sortDirection.isEmpty()) sortDirection = null;
+    }
+    
     if (limit == null) limit = 20;
     if (sortDirection == null || sortDirection.isBlank()) sortDirection = "DESCENDING";
   }

@@ -44,6 +44,25 @@ public class ConversationRepositoryCustomImpl implements ConversationRepositoryC
         .fetch();
   }
 
+  @Override
+  public long countMyConversationsByCursorCondition(UUID userId, String keywordLike) {
+    QUser senderUser = new QUser("senderUser");
+    QUser receiverUser = new QUser("receiverUser");
+
+    Long count = queryFactory
+        .select(conversation.count())
+        .from(conversation)
+        .join(conversation.sender, senderUser)
+        .join(conversation.receiver, receiverUser)
+        .where(
+            conversation.sender.id.eq(userId).or(conversation.receiver.id.eq(userId)),
+            keywordCondition(userId, keywordLike, senderUser, receiverUser)
+        )
+        .fetchOne();
+
+    return count == null ? 0L : count;
+  }
+
   // 동적 쿼리 헬퍼 메서드
   private BooleanExpression cursorCondition(String sortBy, boolean isAsc, Instant cursor, UUID idAfter) {
 

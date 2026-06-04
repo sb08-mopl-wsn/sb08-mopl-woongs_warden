@@ -145,9 +145,9 @@ public class ConversationServiceImpl implements ConversationService{
     // 사용자 총 대화방 개수
     long totalCount = -1L;
     if (request.cursor() == null || request.cursor().isBlank()) {
-      long sentCount = conversationRepository.countBySenderId(currentUserId);
-      long receivedCount = conversationRepository.countByReceiverId(currentUserId);
-      totalCount = sentCount + receivedCount;
+      totalCount = conversationRepository.countMyConversationsByCursorCondition(
+          currentUserId, request.keywordLike()
+      );
     }
 
     // DTO 변환

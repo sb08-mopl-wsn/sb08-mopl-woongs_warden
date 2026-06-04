@@ -46,12 +46,14 @@ jacocoTestReport {
 					'**/global/logging/**',
 					'**/global/interceptor/**',
 					'**/exception/**',
-					'**/ai/*Ai*',
+					'**/ai/prompt/**',
 					'**/elasticsearch/**',
 					'**/kafka/event/**',
-					'**/ai/*UserTasteProfileService*',
-					'**/ai/*ContentEmbeddingService*',
-					'**/ai/*ContentSimilaritySearchService*'
+					'**/ai/recorder/**',
+					'**/ai/service/*UserTasteProfileService*',
+					'**/ai/service/*ContentEmbeddingService*',
+					'**/ai/service/*ContentSimilaritySearchService*',
+					'**/ai/strategy/**'
 			])
 		}))
 	}

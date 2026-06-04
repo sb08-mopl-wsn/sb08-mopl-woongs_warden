@@ -6,17 +6,18 @@ import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
 import com.mopl.mopl.infrastructure.ai.dto.AiRecommendation;
-import com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis;
 import com.mopl.mopl.infrastructure.ai.event.SseErrorEvent;
 import com.mopl.mopl.infrastructure.ai.recorder.AiPerformanceRecorder;
-import com.mopl.mopl.infrastructure.ai.service.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.ai.service.ContentRecommendService;
 import com.mopl.mopl.infrastructure.ai.service.ContentSimilaritySearchService;
 import com.mopl.mopl.infrastructure.ai.service.UserTasteProfileService;
+import com.mopl.mopl.infrastructure.ai.strategy.ColdStartRecommendStrategy;
+import com.mopl.mopl.infrastructure.ai.strategy.PersonalizedRecommendStrategy;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
 import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -39,10 +40,11 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.atLeastOnce;
@@ -53,31 +55,30 @@ import static org.mockito.Mockito.never;
 @SuppressWarnings("unchecked")
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ContentRecommendService Test")
-class ContentRecommendServiceTest
-{
+class ContentRecommendServiceTest {
+
     @InjectMocks private ContentRecommendService contentRecommendService;
 
     @Mock private ContentRepository contentRepository;
-
     @Mock private ChatClient chatClient;
     @Mock private ImageUrlConverter imageUrlConverter;
     @Mock private ChatClientRequestSpec chatClientRequestSpec;
     @Mock private CallResponseSpec callResponseSpec;
-
     @Mock private ChatResponse chatResponse;
     @Mock private ChatResponseMetadata chatResponseMetadata;
     @Mock private Usage usage;
     @Mock private ObjectMapper objectMapper;
-    @Mock private IntentAnalysisService intentAnalysisService;
     @Mock private AiPerformanceRecorder aiPerformanceRecorder;
     @Mock private Generation generation;
     @Mock private AssistantMessage assistantMessage;
     @Mock private ContentSearchQueryService contentSearchQueryService;
-    @Mock private ContentEmbeddingService contentEmbeddingService;
     @Mock private ContentSimilaritySearchService contentSimilaritySearchService;
     @Mock private UserTasteProfileService userTasteProfileService;
+    @Mock private PersonalizedRecommendStrategy personalizedStrategy;
+    @Mock private ColdStartRecommendStrategy coldStartStrategy;
 
     private List<Content> contentList;
+    private final float[] tasteEmbedding = new float[]{0.1f, 0.2f, 0.3f};
 
     @BeforeEach
     void setUp() {
@@ -107,6 +108,9 @@ class ContentRecommendServiceTest
                     Supplier<?> supplier = invocation.getArgument(1);
                     return supplier.get();
                 });
+
+        lenient().when(imageUrlConverter.convert(anyString()))
+                .thenReturn("https://cdn.example.com/poster.jpg");
     }
 
     private void stubLlmCallSuccess(String jsonResponse) {
@@ -124,157 +128,132 @@ class ContentRecommendServiceTest
         given(assistantMessage.getText()).willReturn(jsonResponse);
     }
 
-    @Test
-    @DisplayName("장르 기반 추천 성공 — ES 후보 필터링 후 추천")
-    void givenGenreIntent_whenRecommendStream_thenSendsResultEvent() throws Exception {
-        // given
-        SseEmitter emitter = mock(SseEmitter.class);
+    @Nested
+    @DisplayName("Personalized 추천")
+    class Personalized {
 
-        given(intentAnalysisService.analysis(anyString()))
-                .willReturn(new IntentAnalysis("genre_based", List.of("액션"), "movie"));
-        given(contentSearchQueryService.searchCandidateIds(anyString(), anyList()))
-                .willReturn(contentList.stream()
-                        .map(c -> c.getId().toString())
-                        .toList());
-        given(contentRepository.findAllById(anyList())).willReturn(contentList);
-        given(imageUrlConverter.convert(anyString())).willReturn("https://cdn.example.com/poster.jpg");
+        @Test
+        @DisplayName("taste profile 있으면 pgvector 기반 추천")
+        void givenTasteProfile_whenRecommendStream_thenPersonalizedResult() throws Exception {
+            // given
+            SseEmitter emitter = mock(SseEmitter.class);
+            UUID userId = UUID.randomUUID();
+            UUID contentId = contentList.getFirst().getId();
 
-        UUID contentId = contentList.getFirst().getId();
-        String jsonResponse = "[{\"id\":\"%s\",\"reason\":\"화려한 액션이 돋보이는 영화입니다\"}]"
-                .formatted(contentId);
-        stubLlmCallSuccess(jsonResponse);
+            given(userTasteProfileService.getTasteEmbedding(userId)).willReturn(tasteEmbedding);
+            given(personalizedStrategy.analyzeIntent(anyString()))
+                    .willReturn(new com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis("personalized", List.of(), null));
+            given(personalizedStrategy.retrieveCandidates(any(), any(), any()))
+                    .willReturn(contentList);
 
-        List<AiRecommendation> aiResponse = List.of(
-                new AiRecommendation(contentId, "화려한 액션이 돋보이는 영화입니다")
-        );
-        given(objectMapper.readValue(anyString(), any(TypeReference.class))).willReturn(aiResponse);
+            String jsonResponse = "[{\"id\":\"%s\",\"reason\":\"취향 기반 추천입니다\"}]".formatted(contentId);
+            stubLlmCallSuccess(jsonResponse);
+            given(objectMapper.readValue(anyString(), any(TypeReference.class)))
+                    .willReturn(List.of(new AiRecommendation(contentId, "취향 기반 추천입니다")));
 
-        // when
-        contentRecommendService.recommendStream("액션 영화 추천해줘", UUID.randomUUID(), emitter);
+            // when
+            contentRecommendService.recommendStream("추천해줘", userId, emitter);
 
-        // then
-        then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
-        then(emitter).should().complete();
-        then(contentSearchQueryService).should().searchCandidateIds("movie", List.of("액션"));
-        then(contentRepository).should().findAllById(anyList());
-        then(contentRepository).should(never()).findAll();
+            // then
+            then(personalizedStrategy).should().retrieveCandidates(any(), eq(userId), eq(tasteEmbedding));
+            then(coldStartStrategy).should(never()).retrieveCandidates(any(), any(), any());
+            then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
+            then(emitter).should().complete();
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 콘텐츠 ID면 필터링")
+        void givenNonExistentContentId_whenRecommendStream_thenFiltersOut() throws Exception {
+            // given
+            SseEmitter emitter = mock(SseEmitter.class);
+            UUID userId = UUID.randomUUID();
+            UUID fakeId = UUID.randomUUID();
+
+            given(userTasteProfileService.getTasteEmbedding(userId)).willReturn(tasteEmbedding);
+            given(personalizedStrategy.analyzeIntent(anyString()))
+                    .willReturn(new com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis("personalized", List.of(), null));
+            given(personalizedStrategy.retrieveCandidates(any(), any(), any()))
+                    .willReturn(contentList);
+
+            String jsonResponse = "[{\"id\":\"%s\",\"reason\":\"존재하지 않는 콘텐츠\"}]".formatted(fakeId);
+            stubLlmCallSuccess(jsonResponse);
+            given(objectMapper.readValue(anyString(), any(TypeReference.class)))
+                    .willReturn(List.of(new AiRecommendation(fakeId, "존재하지 않는 콘텐츠")));
+
+            // when
+            contentRecommendService.recommendStream("추천해줘", userId, emitter);
+
+            // then
+            then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
+            then(emitter).should().complete();
+        }
+
+        @Test
+        @DisplayName("LLM 타임아웃 시 AI_TIMEOUT SSE 에러 이벤트 발행")
+        void givenLlmTimeout_whenRecommendStream_thenSendsErrorEvent() throws Exception {
+            // given
+            SseEmitter emitter = mock(SseEmitter.class);
+            UUID userId = UUID.randomUUID();
+
+            given(userTasteProfileService.getTasteEmbedding(userId)).willReturn(tasteEmbedding);
+            given(personalizedStrategy.analyzeIntent(anyString()))
+                    .willReturn(new com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis("personalized", List.of(), null));
+            given(personalizedStrategy.retrieveCandidates(any(), any(), any()))
+                    .willReturn(contentList);
+
+            given(chatClient.prompt()).willReturn(chatClientRequestSpec);
+            given(chatClientRequestSpec.system(anyString())).willReturn(chatClientRequestSpec);
+            given(chatClientRequestSpec.user(anyString())).willReturn(chatClientRequestSpec);
+            given(chatClientRequestSpec.call()).willThrow(new ResourceAccessException("timeout"));
+
+            // when
+            contentRecommendService.recommendStream("추천해줘", userId, emitter);
+
+            // then
+            ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
+                    ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+            then(emitter).should(atLeastOnce()).send(captor.capture());
+
+            boolean hasErrorEvent = captor.getAllValues().stream()
+                    .anyMatch(builder -> builder.build().stream()
+                            .anyMatch(d -> d.getData() instanceof SseErrorEvent errorEvent
+                                    && "AI_TIMEOUT".equals(errorEvent.code())));
+
+            assertThat(hasErrorEvent).isTrue();
+        }
     }
 
-    @Test
-    @DisplayName("비관련 질문이면 즉시 빈 배열 반환 — LLM 2회차 호출 없음")
-    void givenUnrelatedIntent_whenRecommendStream_thenReturnsEmptyImmediately() throws Exception {
-        // given
-        SseEmitter emitter = mock(SseEmitter.class);
+    @Nested
+    @DisplayName("ColdStart 추천")
+    class ColdStart {
 
-        given(intentAnalysisService.analysis(anyString()))
-                .willReturn(new IntentAnalysis("unrelated", List.of(), null));
+        @Test
+        @DisplayName("taste profile 없으면 인기 콘텐츠 기반 추천")
+        void givenNoTasteProfile_whenRecommendStream_thenColdStartResult() throws Exception {
+            // given
+            SseEmitter emitter = mock(SseEmitter.class);
+            UUID userId = UUID.randomUUID();
+            UUID contentId = contentList.getFirst().getId();
 
-        // when
-        contentRecommendService.recommendStream("오늘 날씨 어때", UUID.randomUUID(), emitter);
+            given(userTasteProfileService.getTasteEmbedding(userId)).willReturn(null);
+            given(coldStartStrategy.analyzeIntent(anyString()))
+                    .willReturn(new com.mopl.mopl.infrastructure.ai.dto.IntentAnalysis("trend", List.of(), null));
+            given(coldStartStrategy.retrieveCandidates(any(), any(), any()))
+                    .willReturn(contentList);
 
-        // then
-        then(contentSearchQueryService).should(never()).searchCandidateIds(any(), any());
-        then(contentRepository).should(never()).findAll();
-        then(chatClient).should(never()).prompt();
-        then(emitter).should().complete();
-    }
+            String jsonResponse = "[{\"id\":\"%s\",\"reason\":\"인기 콘텐츠입니다\"}]".formatted(contentId);
+            stubLlmCallSuccess(jsonResponse);
+            given(objectMapper.readValue(anyString(), any(TypeReference.class)))
+                    .willReturn(List.of(new AiRecommendation(contentId, "인기 콘텐츠입니다")));
 
-    @Test
-    @DisplayName("후보 0건이면 전체 콘텐츠로 fallback")
-    void givenNoCandidates_whenRecommendStream_thenFallbackToAll() throws Exception {
-        // given
-        SseEmitter emitter = mock(SseEmitter.class);
+            // when
+            contentRecommendService.recommendStream("추천해줘", userId, emitter);
 
-        given(intentAnalysisService.analysis(anyString()))
-                .willReturn(new IntentAnalysis("similar", List.of("매칭안됨"), "movie"));
-        given(contentSearchQueryService.searchCandidateIds(anyString(), anyList()))
-                .willReturn(List.of());
-        given(contentRepository.findAll()).willReturn(contentList);
-        given(imageUrlConverter.convert(anyString())).willReturn("https://cdn.example.com/poster.jpg");
-
-        UUID contentId = contentList.getFirst().getId();
-        String jsonResponse = "[{\"id\":\"%s\",\"reason\":\"비슷한 액션 영화입니다\"}]".formatted(contentId);
-        stubLlmCallSuccess(jsonResponse);
-
-        List<AiRecommendation> aiResponse = List.of(
-                new AiRecommendation(contentId, "비슷한 액션 영화입니다")
-        );
-        given(objectMapper.readValue(anyString(), any(TypeReference.class))).willReturn(aiResponse);
-
-        // when
-        contentRecommendService.recommendStream("존 윅이랑 비슷한 거", UUID.randomUUID(), emitter);
-
-        // then
-        then(contentSearchQueryService).should().searchCandidateIds("movie", List.of("매칭안됨"));
-        then(contentRepository).should(never()).findAllById(anyList());
-        then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
-        then(emitter).should().complete();
-    }
-
-    @Test
-    @DisplayName("응답에 존재하지 않는 콘텐츠ID면 필터링")
-    void givenNonExistentContentId_whenRecommendStream_thenFiltersOut() throws Exception {
-        // given
-        SseEmitter emitter = mock(SseEmitter.class);
-
-        given(intentAnalysisService.analysis(anyString()))
-                .willReturn(new IntentAnalysis("genre_based", List.of("액션"), "movie"));
-        given(contentSearchQueryService.searchCandidateIds(anyString(), anyList()))
-                .willReturn(contentList.stream()
-                        .map(c -> c.getId().toString())
-                        .toList());
-        given(contentRepository.findAllById(anyList())).willReturn(contentList);
-
-        UUID fakeId = UUID.randomUUID();
-        String jsonResponse = "[{\"id\":\"%s\",\"reason\":\"존재하지 않는 콘텐츠\"}]".formatted(fakeId);
-        stubLlmCallSuccess(jsonResponse);
-
-        List<AiRecommendation> aiResponse = List.of(
-                new AiRecommendation(fakeId, "존재하지 않는 콘텐츠")
-        );
-        given(objectMapper.readValue(anyString(), any(TypeReference.class))).willReturn(aiResponse);
-
-        // when
-        contentRecommendService.recommendStream("액션 영화 추천해줘", UUID.randomUUID(), emitter);
-
-        // then
-        then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
-        then(emitter).should().complete();
-    }
-
-    @Test
-    @DisplayName("Stage 3 타임아웃시 AI TIMEOUT SSE 에러 이벤트 발행")
-    void givenLlmTimeout_whenRecommendStream_thenSendsErrorEvent() throws Exception {
-        // given
-        SseEmitter emitter = mock(SseEmitter.class);
-
-        given(intentAnalysisService.analysis(anyString()))
-                .willReturn(new IntentAnalysis("genre_based", List.of("액션"), "movie"));
-        given(contentSearchQueryService.searchCandidateIds(anyString(), anyList()))
-                .willReturn(contentList.stream()
-                        .map(c -> c.getId().toString())
-                        .toList());
-        given(contentRepository.findAllById(anyList())).willReturn(contentList);
-
-        given(chatClient.prompt()).willReturn(chatClientRequestSpec);
-        given(chatClientRequestSpec.system(anyString())).willReturn(chatClientRequestSpec);
-        given(chatClientRequestSpec.user(anyString())).willReturn(chatClientRequestSpec);
-        given(chatClientRequestSpec.call()).willThrow(new ResourceAccessException("timeout"));
-
-        // when
-        contentRecommendService.recommendStream("액션 영화 추천해줘", UUID.randomUUID(), emitter);
-
-        // then
-        ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
-                ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
-        then(emitter).should(atLeastOnce()).send(captor.capture());
-        then(emitter).should().complete();
-
-        boolean hasErrorEvent = captor.getAllValues().stream()
-                .anyMatch(builder -> builder.build().stream()
-                        .anyMatch(d -> d.getData() instanceof SseErrorEvent errorEvent
-                                && "AI_TIMEOUT".equals(errorEvent.code())));
-
-        assertThat(hasErrorEvent).isTrue();
+            // then
+            then(coldStartStrategy).should().retrieveCandidates(any(), eq(userId), isNull());
+            then(personalizedStrategy).should(never()).retrieveCandidates(any(), any(), any());
+            then(emitter).should(atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
+            then(emitter).should().complete();
+        }
     }
 }

@@ -37,6 +37,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.connection.StringRedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -902,10 +904,9 @@ public class WatchingSessionServiceTest {
         @Test
         @DisplayName("유저의 활성화된 웹소켓 세션 키가 레디스에 없으면 RDB 조회를 생략하고 empty를 반환한다.")
         void noUserSessionInRedis_returnsEmptyWithoutRdb() {
-            UUID currentUserId = UUID.randomUUID();
+            // given
             String userSessionKey = "ws:user:" + userId + ":sessions";
 
-            // given
             given(redisTemplate.opsForSet()).willReturn(setOperations);
             given(setOperations.members(userSessionKey)).willReturn(Collections.emptySet());
 
@@ -919,17 +920,14 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("유저 세션은 존재하나 세션 내부 시청 룸 정보가 없으면 RDB 조회를 생략하고 empty를 반환한다.")
-        void sessionExistsButNoActiveRoomInRedis_returnsEmptyWithoutRdb() {
-            UUID currentUserId = UUID.randomUUID();
-            String userSessionKey = "ws:user:" + userId + ":sessions";
-            String mockSessionId = "mock-stomp-session-id";
-            String sessionContentKey = "ws:session:" + mockSessionId + ":contents";
-
+        @DisplayName("유저 세션은 존재하나 파이프라인 결과 리스트가 비어있으면 empty를 반환한다.")
+        void pipelineResultIsEmpty_returnsEmpty() {
             //given
+            String userSessionKey = "ws:user:" + userId + ":sessions";
             given(redisTemplate.opsForSet()).willReturn(setOperations);
-            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of(mockSessionId)));
-            given(setOperations.members(sessionContentKey)).willReturn(Collections.emptySet());
+            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of("session-id")));
+            // executePipelined 비어있는 결과 반환
+            given(redisTemplate.executePipelined(any(RedisCallback.class))).willReturn(Collections.emptyList());
 
             // when
             Optional<WatchingSessionDto> result =
@@ -941,17 +939,15 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("Redis에서 시청 중인 룸 ID 역추적에 성공하면 RDB에서 DTO 스냅샷을 1회 조회하여 반환한다.")
-        void redisSessionHit_fetchesDtoFromRdbAndReturns() {
-            UUID currentUserId = UUID.randomUUID();
-            String userSessionKey = "ws:user:" + userId + ":sessions";
-            String mockSessionId = "mock-stomp-session-id";
-            String sessionContentKey = "ws:session:" + mockSessionId + ":contents";
-
+        @DisplayName("Redis 파이프라인 역추적에 성공하면 RDB에서 데이터를 조회하여 스냅샷 DTO를 반환한다.")
+        void redisSessionHitViaPipeline_fetchesDtoFromRdbAndReturns() {
             // given
+            String userSessionKey = "ws:user:" + userId + ":sessions";
             given(redisTemplate.opsForSet()).willReturn(setOperations);
-            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of(mockSessionId)));
-            given(setOperations.members(sessionContentKey)).willReturn(new HashSet<>(List.of(contentId.toString())));
+            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of("session-id")));
+
+            List<Object> pipelineResults = List.of(new HashSet<>(List.of(contentId.toString())));
+            given(redisTemplate.executePipelined(any(RedisCallback.class))).willReturn(pipelineResults);
 
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
@@ -967,19 +963,16 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("레디스 추적엔 성공했으나 RDB 상에 정합성이 깨져 세션 데이터가 없으면 empty를 반환한다.")
-        void redisSessionHitButRdbMiss_returnsEmpty() {
-            String userSessionKey = "ws:user:" + userId + ":sessions";
-            String mockSessionId = "mock-stomp-session-id";
-            String sessionContentKey = "ws:session:" + mockSessionId + ":contents";
-
+        @DisplayName("파이프라인 추적 결과 타입이 Collection 인터페이스가 아니면 무시하고 empty를 반환한다. (타입 캐스팅 예외 방어)")
+        void pipelineResultNotCollection_skipsAndReturnsEmpty() {
             // given
+            String userSessionKey = "ws:user:" + userId + ":sessions";
             given(redisTemplate.opsForSet()).willReturn(setOperations);
-            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of(mockSessionId)));
-            given(setOperations.members(sessionContentKey)).willReturn(new HashSet<>(List.of(contentId.toString())));
+            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of("session-id")));
 
-            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
-                    .willReturn(Optional.empty());
+            // Collection이 아닌 String 단건 등이 넘어왔을 떄의 안전한 검증
+            List<Object> corruptedPipelineResults = List.of("corrupted-string-data");
+            given(redisTemplate.executePipelined(any(RedisCallback.class))).willReturn(corruptedPipelineResults);
 
             // when
             Optional<WatchingSessionDto> result =
@@ -987,6 +980,54 @@ public class WatchingSessionServiceTest {
 
             // then
             assertThat(result).isEmpty();
+            verifyNoInteractions(watchingSessionRepository);
+        }
+
+        @Test
+        @DisplayName("Redis 파이프라인 역추적 시, 유저의 세션 수만큼 sMembers 벌크 명령어가 정상적으로 버퍼 큐에 적재되고 RDB 조회가 수행된다.")
+        void redisSessionHitViaPipeline_verifiesPipelinedCommandsAndFetchesFromRdb() {
+            // given
+            String userSessionKey = "ws:user:" + userId + ":sessions";
+            String mockSessionId1 = "session-id-1";
+            String mockSessionId2 = "session-id-2";
+
+            Set<String> mockSessions = new LinkedHashSet<>(List.of(mockSessionId1, mockSessionId2));
+
+            given(redisTemplate.opsForSet()).willReturn(setOperations);
+            given(setOperations.members(userSessionKey)).willReturn(mockSessions);
+
+            List<Object> pipelineResults = List.of(
+                    new HashSet<>(List.of(contentId.toString())),
+                    Collections.emptySet()
+            );
+
+            given(redisTemplate.executePipelined(any(RedisCallback.class))).willAnswer(invocation -> {
+                RedisCallback<?> callback = invocation.getArgument(0);
+
+                StringRedisConnection mockStringRedisConn =
+                        mock(org.springframework.data.redis.connection.StringRedisConnection.class);
+
+                callback.doInRedis(mockStringRedisConn);
+
+                verify(mockStringRedisConn, times(1)).sMembers("ws:session:" + mockSessionId1 + ":contents");
+                verify(mockStringRedisConn, times(1)).sMembers("ws:session:" + mockSessionId2 + ":contents");
+
+                return pipelineResults;
+            });
+
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(session));
+            given(sessionMapper.toDto(session)).willReturn(sessionDto);
+
+            // when
+            Optional<WatchingSessionDto> result =
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
+
+            // then
+            assertThat(result).isPresent();
+            assertThat(result.get()).isEqualTo(sessionDto);
+
+            verify(watchingSessionRepository, times(1)).findByContentIdAndUserId(contentId, userId);
         }
     }
 }

@@ -24,16 +24,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.connection.StringRedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -261,7 +262,7 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
             try {
                 // 파싱 예외 발생 시 방어 로직
                 totalCount = Long.parseLong(cachedCount);
-            } catch(NumberFormatException e) {
+            } catch (NumberFormatException e) {
                 log.error("Redis 오염이 발생하여 캐시 파싱 실패로 RDB 리카운트 및 캐시 회복을 진행한다. Key: {}", redisKey);
                 totalCount = watchingSessionRepository.countByContentId(contentId);
                 redisTemplate.opsForValue().set(redisKey, String.valueOf(totalCount), 1, TimeUnit.DAYS);
@@ -284,11 +285,12 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
     }
 
     /**
-     * 특정 유저가 현재 시청 중인 세션을 조회합니다.
+     * 특정 유저가 현재 시청 중인 세션을 조회합니다. (Redis 파이프라인 최적화 튜닝 완료)
      *
      * @param userId 조회할 유저 ID
      * @return 시청 세션 정보 (시청 중이 아니면 Empty)
      */
+    @SuppressWarnings("unchecked")
     @Override
     public Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID userId) {
 
@@ -300,17 +302,33 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
             return Optional.empty();
         }
 
+        // Redis Connection을 단 1번만 잡고 벌크 명령어로 묶어서 파이프라인 송신
+        List<Object> pipelineResults = redisTemplate.executePipelined(new RedisCallback<Object>() {
+            @Override
+            public Object doInRedis(RedisConnection connection) throws DataAccessException {
+                StringRedisConnection stringRedisConn = (StringRedisConnection) connection;
+                for (String sessionId : userSessions) {
+                    String sessionContentKey = String.format("ws:session:%s:contents", sessionId);
+                    // 동기 호출되지 않고 내부 명령어 버퍼 큐에 누적 저장된다.
+                    stringRedisConn.sMembers(sessionContentKey);
+                }
+                return null;
+            }
+        });
+
         UUID activeContentId = null;
 
-        // 유저 세션들을 순회하며 현재 시청 중인 콘텐츠 ID를 역추적한다.
-        for (String sessionId : userSessions) {
-            String sessionContentKey = String.format("ws:session:%s:contents", sessionId);
-            Set<String> contentIds = redisTemplate.opsForSet().members(sessionContentKey);
-
-            if (contentIds != null && !contentIds.isEmpty()) {
-                String targetContentIdStr = contentIds.iterator().next();
-                activeContentId = UUID.fromString(targetContentIdStr);
-                break;
+        // 파이프라인 결과 리스트를 순회하며 데이터를 안전하게 추출 (ClassCastException 방어)
+        if (pipelineResults != null) {
+            for (Object result : pipelineResults) {
+                if (result instanceof Collection) {
+                    Collection<String> contentIds = (Collection<String>) result;
+                    if (!contentIds.isEmpty()) {
+                        String targetContentIdStr = contentIds.iterator().next();
+                        activeContentId = UUID.fromString(targetContentIdStr);
+                        break;
+                    }
+                }
             }
         }
 
@@ -319,7 +337,7 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
             return Optional.empty();
         }
 
-        // RDB Fullback 1회 조회
+        // RDB Fallback 1회 조회
         // redis에서 activeContentId를 확실하게 캐치하므로
         // 매핑에 필요한 순수 도메인 DTO만 데이터베이스에서 정확하게 1번 가져온다.
         return watchingSessionRepository.findByContentIdAndUserId(activeContentId, userId)

@@ -2,6 +2,7 @@ package com.mopl.mopl.infrastructure.batch;
 
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.ai.service.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
 import com.mopl.mopl.infrastructure.external.constants.ExternalApiConstants;
 import com.mopl.mopl.infrastructure.external.sportsdb.SportsdbApiClient;
@@ -31,6 +32,7 @@ public class SportsdbCollectTasklet implements Tasklet
     private final EntityManager entityManager;
     private final MeterRegistry meterRegistry;
     private final ContentIndexService contentIndexService;
+    private final ContentEmbeddingService contentEmbeddingService;
 
     @Override
     public @Nullable RepeatStatus execute(@NonNull StepContribution contribution, @NonNull ChunkContext chunkContext) throws Exception {
@@ -55,6 +57,11 @@ public class SportsdbCollectTasklet implements Tasklet
                         } catch (Exception e) {
                             meterRegistry.counter("mopl.batch.sportsdb.index.failed").increment();
                             log.warn("Sportsdb 인덱싱 실패: externalId={}", content.getExternalId(), e);
+                        }
+                        try {
+                            contentEmbeddingService.generateAndSave(content, "sportsdb");
+                        } catch (Exception e) {
+                            log.warn("Sportsdb 임베딩 생성 실패: externalId={}", content.getExternalId(), e);
                         }
                         saved++;
                     } catch (DataIntegrityViolationException e) {

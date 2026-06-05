@@ -37,11 +37,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.connection.StringRedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.SetOperations;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,11 +77,18 @@ public class WatchingSessionServiceTest {
     private BadWordFilter badWordFilter;
     @Mock
     private S3ImageStorage s3ImageStorage;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+    @Mock
+    private SetOperations<String, String> setOperations;
 
     // common
     private UUID contentId;
     private UUID userId;
     private UUID sessionId;
+    private String redisKey;
 
     private User user;
     private Content content;
@@ -87,6 +100,7 @@ public class WatchingSessionServiceTest {
         contentId = UUID.randomUUID();
         userId = UUID.randomUUID();
         sessionId = UUID.randomUUID();
+        redisKey = "content:watcher:count:" + contentId;
 
         user = User.builder()
                 .name("테스트 유저")
@@ -192,6 +206,7 @@ public class WatchingSessionServiceTest {
 
             // then
             verify(watchingSessionRepository, never()).saveAndFlush(any());
+            verifyNoInteractions(redisTemplate);
 
             ArgumentCaptor<WatchingSessionEvent> captor =
                     ArgumentCaptor.forClass(WatchingSessionEvent.class);
@@ -211,6 +226,7 @@ public class WatchingSessionServiceTest {
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.empty());
             given(watchingSessionRepository.saveAndFlush(any())).willReturn(session);
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
             given(sessionMapper.toDto(eq(sessionId), any(), eq(content), eq(user)))
                     .willReturn(sessionDto);
 
@@ -219,6 +235,8 @@ public class WatchingSessionServiceTest {
 
             // then
             verify(watchingSessionRepository, times(1)).saveAndFlush(any(WatchingSession.class));
+            verify(valueOperations, times(1)).increment(redisKey);
+            verify(redisTemplate, times(1)).expire(redisKey, 1, TimeUnit.DAYS);
             verify(eventPublisher, times(1)).publishEvent(any(WatchingSessionEvent.class));
         }
 
@@ -247,10 +265,9 @@ public class WatchingSessionServiceTest {
     }
 
     @Test
-    @DisplayName("기존 세션이 있으면 watcherCount를 증가시키지 않는다.")
-    void existingSession_doesNotIncrementWatcherCount() {
+    @DisplayName("기존 세션이 있으면 새로 생성하지 않고 Redis 카운트도 올리지 않는다.")
+    void existingSession_reusesSessionAndPublishesEvent() {
         // given
-        ReflectionTestUtils.setField(content, "watcherCount", 3);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
         given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
@@ -261,26 +278,34 @@ public class WatchingSessionServiceTest {
         watchingSessionService.join(contentId, userId);
 
         //then
-        assertThat(content.getWatcherCount()).isEqualTo(3);
+        verify(watchingSessionRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(redisTemplate);
+
+        ArgumentCaptor<WatchingSessionEvent> captor = ArgumentCaptor.forClass(WatchingSessionEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().change().type()).isEqualTo(ChangeType.JOIN);
     }
 
     @Test
-    @DisplayName("신규 세션이면 watcherCount를 1 증가시킨다.")
+    @DisplayName("세션이 없으면 신규 생성하고 Redis INCR 및 TTL을 갱신한다.")
     void newSession_incrementsWatcherCount() {
         // given
-        ReflectionTestUtils.setField(content, "watcherCount", 2);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
         given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                 .willReturn(Optional.empty());
         given(watchingSessionRepository.saveAndFlush(any())).willReturn(session);
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
 
         // when
         watchingSessionService.join(contentId, userId);
 
         // then
-        assertThat(content.getWatcherCount()).isEqualTo(3);
+        verify(watchingSessionRepository, times(1)).saveAndFlush(any(WatchingSession.class));
+        verify(valueOperations, times(1)).increment(redisKey);
+        verify(redisTemplate, times(1)).expire(redisKey, 1, TimeUnit.DAYS);
+        verify(eventPublisher, times(1)).publishEvent(any(WatchingSessionEvent.class));
     }
 
     @Nested
@@ -303,11 +328,13 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("세션 삭제 후 반드시 flush가 호출된다.(쓰기 지연 방지)")
-        void leave_deleteThenFlushInOrder() {
+        @DisplayName("세션 삭제 후 Redis DECR이 순차적으로 정상 호출된다.")
+        void leave_decrementsRedisCountAndFlushes() {
             // given
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.decrement(redisKey)).willReturn(5L);
             given(sessionMapper.toDto(eq(sessionId), any(), eq(content), eq(user)))
                     .willReturn(sessionDto);
 
@@ -316,9 +343,10 @@ public class WatchingSessionServiceTest {
 
             // then
             // delete -> flush 순서 보장하는가?
-            InOrder inOrder = inOrder(watchingSessionRepository, eventPublisher);
+            InOrder inOrder = inOrder(watchingSessionRepository, valueOperations, eventPublisher);
             inOrder.verify(watchingSessionRepository).delete(session);
             inOrder.verify(watchingSessionRepository).flush();
+            inOrder.verify(valueOperations).decrement(redisKey);
             inOrder.verify(eventPublisher).publishEvent(any(WatchingSessionEvent.class));
         }
 
@@ -330,6 +358,8 @@ public class WatchingSessionServiceTest {
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(eq(sessionId), any(), eq(content), eq(user)))
                     .willReturn(sessionDto);
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.decrement(redisKey)).willReturn(10L);
 
             // when
             watchingSessionService.leave(contentId, userId);
@@ -353,6 +383,8 @@ public class WatchingSessionServiceTest {
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.decrement(redisKey)).willReturn(0L);
 
             // when
             watchingSessionService.leave(contentId, userId);
@@ -373,6 +405,8 @@ public class WatchingSessionServiceTest {
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.decrement(redisKey)).willReturn(2L);
 
             // when
             watchingSessionService.leave(contentId, userId);
@@ -389,12 +423,52 @@ public class WatchingSessionServiceTest {
             given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.decrement(redisKey)).willReturn(0L);
 
             // when
             watchingSessionService.leave(contentId, userId);
 
             // then
             assertThat(content.getWatcherCount()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("Redis DECR 결과가 음수 미만으로 떨어지면 0으로 보정한다.")
+        void leave_preventsNegativeRedisCount() {
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(session));
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.decrement(redisKey)).willReturn(-1L);
+            given(sessionMapper.toDto(any(), any(), any(), any())).willReturn(sessionDto);
+
+            watchingSessionService.leave(contentId, userId);
+
+            verify(valueOperations).set(redisKey, "0");
+        }
+
+        @Test
+        @DisplayName("Redis 카운트 값이 숫자가 아닌 형태로 오염되어 있으면 NumberFormatException을 캐치하고, RDB 리카운트 후 캐시를 자가 복구(Self-Heal)한다.")
+        void cacheCorrupted_fallbackToRdbAndHealsCache() {
+            // given
+            WatchingSessionPageRequest request = new WatchingSessionPageRequest(
+                    null, null, null, 10, SortDirection.DESCENDING, "createdAt"
+            );
+
+            given(watchingSessionRepository.findAllByCursor(any(WatchingSessionSearchCondition.class), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
+
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn("오염된데이터값");
+            given(watchingSessionRepository.countByContentId(contentId)).willReturn(7L);
+
+            // when
+            CursorResponseWatchingSessionDto result = watchingSessionService.findByContentInWatchingSession(contentId, request);
+
+            // then
+            assertThat(result.totalCount()).isEqualTo(7L);
+            verify(valueOperations, times(1)).set(redisKey, "7", 1, TimeUnit.DAYS);
+            assertThat(result.data()).isEmpty();
         }
     }
 
@@ -654,6 +728,9 @@ public class WatchingSessionServiceTest {
             given(watchingSessionRepository.findAllByCursor(
                     any(WatchingSessionSearchCondition.class), any(Pageable.class)
             )).willReturn(sessions);
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn(null);
+
             given(watchingSessionRepository.countByContentId(contentId)).willReturn(2L);
             given(sessionMapper.toDto(any(WatchingSession.class))).willReturn(sessionDto);
 
@@ -682,6 +759,9 @@ public class WatchingSessionServiceTest {
             given(watchingSessionRepository.findAllByCursor(any(), any()))
                     .willReturn(new ArrayList<>(List.of(s1, s2, s3)));
 
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn(null);
+
             given(watchingSessionRepository.countByContentId(contentId)).willReturn(3L);
             given(sessionMapper.toDto(any(WatchingSession.class))).willReturn(sessionDto);
 
@@ -706,6 +786,10 @@ public class WatchingSessionServiceTest {
             // given
             given(watchingSessionRepository.findAllByCursor(any(), any()))
                     .willReturn(new ArrayList<>(List.of(buildMockSession(Instant.now()), last)));
+
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn(null);
+
             given(watchingSessionRepository.countByContentId(contentId)).willReturn(2L);
             given(sessionMapper.toDto(any(WatchingSession.class)))
                     .willReturn(sessionDto);
@@ -727,6 +811,10 @@ public class WatchingSessionServiceTest {
             // given
             given(watchingSessionRepository.findAllByCursor(any(), any()))
                     .willReturn(Collections.emptyList());
+
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn(null);
+
             given(watchingSessionRepository.countByContentId(contentId)).willReturn(0L);
 
             // when
@@ -749,6 +837,10 @@ public class WatchingSessionServiceTest {
             // given
             given(watchingSessionRepository.findAllByCursor(any(), any()))
                     .willReturn(Collections.emptyList());
+
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn(null);
+
             given(watchingSessionRepository.countByContentId(contentId))
                     .willReturn(0L);
 
@@ -769,6 +861,10 @@ public class WatchingSessionServiceTest {
             // given
             given(watchingSessionRepository.findAllByCursor(any(), any()))
                     .willReturn(Collections.emptyList());
+
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn(null);
+
             given(watchingSessionRepository.countByContentId(contentId)).willReturn(10L);
 
             // when
@@ -778,6 +874,27 @@ public class WatchingSessionServiceTest {
             // then
             assertThat(result.totalCount()).isEqualTo(10L);
         }
+
+        @Test
+        @DisplayName("Redis에 캐시된 값이 있다면 RDB count 쿼리를 생략하고 캐시 값을 파싱하여 반환한다.")
+        void cacheHit_usesRedisCountWithRdbQuery() {
+            // given
+            WatchingSessionPageRequest request = buildRequest(10);
+            given(watchingSessionRepository.findAllByCursor(any(), any()))
+                    .willReturn(Collections.emptyList());
+
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(valueOperations.get(redisKey)).willReturn("45");
+
+            // when
+            CursorResponseWatchingSessionDto result =
+                    watchingSessionService.findByContentInWatchingSession(contentId, request);
+
+            // then
+            assertThat(result.totalCount()).isEqualTo(45L);
+            verify(watchingSessionRepository, never()).countByContentId(any());
+            verify(valueOperations, never()).set(any(), any(), anyLong(), any());
+        }
     }
 
     @Nested
@@ -785,64 +902,60 @@ public class WatchingSessionServiceTest {
     class FindCurrentWatchingSessionByUserId {
 
         @Test
-        @DisplayName("userId == currentUserId이면 DB조회 없이 Optional.empty()를 반환한다.")
-        void sameUser_returnsEmptyWithoutDB() {
+        @DisplayName("유저의 활성화된 웹소켓 세션 키가 레디스에 없으면 RDB 조회를 생략하고 empty를 반환한다.")
+        void noUserSessionInRedis_returnsEmptyWithoutRdb() {
+            // given
+            String userSessionKey = "ws:user:" + userId + ":sessions";
+
+            given(redisTemplate.opsForSet()).willReturn(setOperations);
+            given(setOperations.members(userSessionKey)).willReturn(Collections.emptySet());
 
             // when
             Optional<WatchingSessionDto> result =
-                    watchingSessionService.findCurrentWatchingSessionByUserId(userId, userId);
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
 
             // then
             assertThat(result).isEmpty();
-            verifyNoInteractions(userRepository, watchingSessionRepository);
+            verifyNoInteractions(watchingSessionRepository, userRepository);
         }
 
         @Test
-        @DisplayName("User가 없으면 UserNotFoundException을 던진다.")
-        void userNotFound_throwsException() {
-            UUID currentUserId = UUID.randomUUID();
-
-            // given
-            given(userRepository.existsById(userId)).willReturn(false);
-
-            // when & then
-            assertThatThrownBy(() ->
-                    watchingSessionService.findCurrentWatchingSessionByUserId(userId, currentUserId))
-                    .isInstanceOf(UserNotFoundException.class);
-        }
-
-        @Test
-        @DisplayName("시청 중인 세션이 없으면 Optional.empty()를 반환한다.")
-        void noSession_returnsEmpty() {
-            UUID currentUserId = UUID.randomUUID();
-
-            // given
-            given(userRepository.existsById(userId)).willReturn(true);
-            given(watchingSessionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId))
-                    .willReturn(Optional.empty());
+        @DisplayName("유저 세션은 존재하나 파이프라인 결과 리스트가 비어있으면 empty를 반환한다.")
+        void pipelineResultIsEmpty_returnsEmpty() {
+            //given
+            String userSessionKey = "ws:user:" + userId + ":sessions";
+            given(redisTemplate.opsForSet()).willReturn(setOperations);
+            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of("session-id")));
+            // executePipelined 비어있는 결과 반환
+            given(redisTemplate.executePipelined(any(RedisCallback.class))).willReturn(Collections.emptyList());
 
             // when
             Optional<WatchingSessionDto> result =
-                    watchingSessionService.findCurrentWatchingSessionByUserId(userId, currentUserId);
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
 
             // then
             assertThat(result).isEmpty();
+            verifyNoInteractions(watchingSessionRepository, userRepository);
         }
 
         @Test
-        @DisplayName("시청 중인 세션이 있으면 매핑된 DTO를 반환한다.")
-        void sessionExists_returnsDto() {
-            UUID currentUserId = UUID.randomUUID();
-
+        @DisplayName("Redis 파이프라인 역추적에 성공하면 RDB에서 데이터를 조회하여 스냅샷 DTO를 반환한다.")
+        void redisSessionHitViaPipeline_fetchesDtoFromRdbAndReturns() {
             // given
-            given(userRepository.existsById(userId)).willReturn(true);
-            given(watchingSessionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId))
+            String userSessionKey = "ws:user:" + userId + ":sessions";
+            given(redisTemplate.opsForSet()).willReturn(setOperations);
+            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of("session-id")));
+
+            List<Object> pipelineResults = List.of(new HashSet<>(List.of(contentId.toString())));
+            given(redisTemplate.executePipelined(any(RedisCallback.class))).willReturn(pipelineResults);
+
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
                     .willReturn(Optional.of(session));
             given(sessionMapper.toDto(session)).willReturn(sessionDto);
 
             // when
             Optional<WatchingSessionDto> result =
-                    watchingSessionService.findCurrentWatchingSessionByUserId(userId, currentUserId);
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
 
             // then
             assertThat(result).isPresent();
@@ -850,13 +963,71 @@ public class WatchingSessionServiceTest {
         }
 
         @Test
-        @DisplayName("자기 자신 조회 시 userRepository.existsById는 호출되지 않는다.")
-        void selfQuery_skipsUserExistenceCheck() {
+        @DisplayName("파이프라인 추적 결과 타입이 Collection 인터페이스가 아니면 무시하고 empty를 반환한다. (타입 캐스팅 예외 방어)")
+        void pipelineResultNotCollection_skipsAndReturnsEmpty() {
+            // given
+            String userSessionKey = "ws:user:" + userId + ":sessions";
+            given(redisTemplate.opsForSet()).willReturn(setOperations);
+            given(setOperations.members(userSessionKey)).willReturn(new HashSet<>(List.of("session-id")));
+
+            // Collection이 아닌 String 단건 등이 넘어왔을 떄의 안전한 검증
+            List<Object> corruptedPipelineResults = List.of("corrupted-string-data");
+            given(redisTemplate.executePipelined(any(RedisCallback.class))).willReturn(corruptedPipelineResults);
+
             // when
-            watchingSessionService.findCurrentWatchingSessionByUserId(userId, userId);
+            Optional<WatchingSessionDto> result =
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
 
             // then
-            verify(userRepository, never()).existsById(any());
+            assertThat(result).isEmpty();
+            verifyNoInteractions(watchingSessionRepository);
+        }
+
+        @Test
+        @DisplayName("Redis 파이프라인 역추적 시, 유저의 세션 수만큼 sMembers 벌크 명령어가 정상적으로 버퍼 큐에 적재되고 RDB 조회가 수행된다.")
+        void redisSessionHitViaPipeline_verifiesPipelinedCommandsAndFetchesFromRdb() {
+            // given
+            String userSessionKey = "ws:user:" + userId + ":sessions";
+            String mockSessionId1 = "session-id-1";
+            String mockSessionId2 = "session-id-2";
+
+            Set<String> mockSessions = new LinkedHashSet<>(List.of(mockSessionId1, mockSessionId2));
+
+            given(redisTemplate.opsForSet()).willReturn(setOperations);
+            given(setOperations.members(userSessionKey)).willReturn(mockSessions);
+
+            List<Object> pipelineResults = List.of(
+                    new HashSet<>(List.of(contentId.toString())),
+                    Collections.emptySet()
+            );
+
+            given(redisTemplate.executePipelined(any(RedisCallback.class))).willAnswer(invocation -> {
+                RedisCallback<?> callback = invocation.getArgument(0);
+
+                StringRedisConnection mockStringRedisConn =
+                        mock(org.springframework.data.redis.connection.StringRedisConnection.class);
+
+                callback.doInRedis(mockStringRedisConn);
+
+                verify(mockStringRedisConn, times(1)).sMembers("ws:session:" + mockSessionId1 + ":contents");
+                verify(mockStringRedisConn, times(1)).sMembers("ws:session:" + mockSessionId2 + ":contents");
+
+                return pipelineResults;
+            });
+
+            given(watchingSessionRepository.findByContentIdAndUserId(contentId, userId))
+                    .willReturn(Optional.of(session));
+            given(sessionMapper.toDto(session)).willReturn(sessionDto);
+
+            // when
+            Optional<WatchingSessionDto> result =
+                    watchingSessionService.findCurrentWatchingSessionByUserId(userId);
+
+            // then
+            assertThat(result).isPresent();
+            assertThat(result.get()).isEqualTo(sessionDto);
+
+            verify(watchingSessionRepository, times(1)).findByContentIdAndUserId(contentId, userId);
         }
     }
 }

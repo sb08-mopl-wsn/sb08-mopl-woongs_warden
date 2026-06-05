@@ -24,14 +24,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.connection.StringRedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -56,6 +60,11 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
     // S3
     private final S3ImageStorage s3ImageStorage;
+
+    // redis
+    private final StringRedisTemplate redisTemplate;
+
+    private static final String REDIS_KEY_PREFIX = "content:watcher:count:";
 
     /**
      * 콘텐츠 실시간 웹소켓 접속을 위한 로직
@@ -88,6 +97,11 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
 
         if (isNew.get()) {
             content.updateWatcherCount(content.getWatcherCount() + 1);
+
+            // Redis 분산 카운터 증가 (Atomic INCR)
+            String redisKey = REDIS_KEY_PREFIX + contentId;
+            redisTemplate.opsForValue().increment(redisKey);
+            redisTemplate.expire(redisKey, 1, TimeUnit.DAYS);
         }
 
         WatchingSessionDto sessionDto = sessionMapper.toDto(
@@ -127,6 +141,14 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                     Content content = session.getContent();
                     // 음수 방지
                     content.updateWatcherCount(Math.max(0, content.getWatcherCount() - 1));
+
+                    // Redis 분산 카운터 감소 (Atomic DECR)
+                    String redisKey = REDIS_KEY_PREFIX + contentId;
+                    Long currentCount = redisTemplate.opsForValue().decrement(redisKey);
+                    // 음수 방지
+                    if (currentCount != null && currentCount < 0) {
+                        redisTemplate.opsForValue().set(redisKey, "0");
+                    }
 
                     publishSessionEvent(contentId, ChangeType.LEAVE, sessionDto, content.getWatcherCount());
                 });
@@ -232,8 +254,24 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
                 .map(sessionMapper::toDto)
                 .toList();
 
-        // TODO: 잦은 조회로 성능 문제 발생하므로 캐싱 처리하겠습니다.
-        long totalCount = watchingSessionRepository.countByContentId(contentId);
+        String redisKey = REDIS_KEY_PREFIX + contentId;
+        String cachedCount = redisTemplate.opsForValue().get(redisKey);
+
+        long totalCount;
+        if (cachedCount != null) {
+            try {
+                // 파싱 예외 발생 시 방어 로직
+                totalCount = Long.parseLong(cachedCount);
+            } catch (NumberFormatException e) {
+                log.error("Redis 오염이 발생하여 캐시 파싱 실패로 RDB 리카운트 및 캐시 회복을 진행한다. Key: {}", redisKey);
+                totalCount = watchingSessionRepository.countByContentId(contentId);
+                redisTemplate.opsForValue().set(redisKey, String.valueOf(totalCount), 1, TimeUnit.DAYS);
+            }
+        } else {
+            log.debug("캐시가 만료되어 RDB fallback이 진행됩니다.");
+            totalCount = watchingSessionRepository.countByContentId(contentId);
+            redisTemplate.opsForValue().set(redisKey, String.valueOf(totalCount), 1, TimeUnit.DAYS);
+        }
 
         return new CursorResponseWatchingSessionDto(
                 data,
@@ -247,25 +285,62 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
     }
 
     /**
-     * 특정 유저가 현재 시청 중인 세션을 조회합니다.
+     * 특정 유저가 현재 시청 중인 세션을 조회합니다. (Redis 파이프라인 최적화 튜닝 완료)
      *
      * @param userId 조회할 유저 ID
      * @return 시청 세션 정보 (시청 중이 아니면 Empty)
      */
+    @SuppressWarnings("unchecked")
     @Override
-    public Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID userId, UUID currentUserId) {
+    public Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID userId) {
 
-        // 실시간 같이 보기에서 자신의 프로필을 누른 경우 API가 STOMP보다 빨리 실행되어 자신의 시청 세션이 삭제되지 않음.
-        if (userId.equals(currentUserId)) {
+        String userSessionKey = String.format("ws:user:%s:sessions", userId);
+        Set<String> userSessions = redisTemplate.opsForSet().members(userSessionKey);
+
+        // 유저의 활성화된 웹소켓 세션이 아예 없다면 RDB에 조회없이 시청 중이 아님을 즉시 반환
+        if (userSessions == null || userSessions.isEmpty()) {
             return Optional.empty();
         }
 
-        if (!userRepository.existsById(userId)) {
-            throw new UserNotFoundException(userId);
+        // Redis Connection을 단 1번만 잡고 벌크 명령어로 묶어서 파이프라인 송신
+        List<Object> pipelineResults = redisTemplate.executePipelined(new RedisCallback<Object>() {
+            @Override
+            public Object doInRedis(RedisConnection connection) throws DataAccessException {
+                StringRedisConnection stringRedisConn = (StringRedisConnection) connection;
+                for (String sessionId : userSessions) {
+                    String sessionContentKey = String.format("ws:session:%s:contents", sessionId);
+                    // 동기 호출되지 않고 내부 명령어 버퍼 큐에 누적 저장된다.
+                    stringRedisConn.sMembers(sessionContentKey);
+                }
+                return null;
+            }
+        });
+
+        UUID activeContentId = null;
+
+        // 파이프라인 결과 리스트를 순회하며 데이터를 안전하게 추출 (ClassCastException 방어)
+        if (pipelineResults != null) {
+            for (Object result : pipelineResults) {
+                if (result instanceof Collection) {
+                    Collection<String> contentIds = (Collection<String>) result;
+                    if (!contentIds.isEmpty()) {
+                        String targetContentIdStr = contentIds.iterator().next();
+                        activeContentId = UUID.fromString(targetContentIdStr);
+                        break;
+                    }
+                }
+            }
         }
 
-        // 시청 세션 조회: 없으면 null 반환 (Swagger 명세 준수)
-        return watchingSessionRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+        // Redis 상에서 시청중인 룸 정보가 없다면 퇴장한 것을 판단한다.
+        if (activeContentId == null) {
+            return Optional.empty();
+        }
+
+        // RDB Fallback 1회 조회
+        // redis에서 activeContentId를 확실하게 캐치하므로
+        // 매핑에 필요한 순수 도메인 DTO만 데이터베이스에서 정확하게 1번 가져온다.
+        return watchingSessionRepository.findByContentIdAndUserId(activeContentId, userId)
                 .map(sessionMapper::toDto);
     }
 

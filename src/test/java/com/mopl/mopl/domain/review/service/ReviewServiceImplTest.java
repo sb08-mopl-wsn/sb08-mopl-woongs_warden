@@ -1,11 +1,5 @@
 package com.mopl.mopl.domain.review.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.any;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.then;
-
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
@@ -16,6 +10,7 @@ import com.mopl.mopl.domain.review.dto.response.CursorResponseReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewDto;
 import com.mopl.mopl.domain.review.dto.response.ReviewStatsDto;
 import com.mopl.mopl.domain.review.entity.Review;
+import com.mopl.mopl.domain.review.event.ReviewChangedEvent;
 import com.mopl.mopl.domain.review.exception.ReviewErrorCode;
 import com.mopl.mopl.domain.review.exception.ReviewException;
 import com.mopl.mopl.domain.review.mapper.ReviewMapper;
@@ -25,11 +20,6 @@ import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.event.ReviewCreatedEvent;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -44,6 +34,18 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ReviewService Unit Test")
@@ -104,6 +106,8 @@ class ReviewServiceImplTest {
       given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
       given(reviewMapper.toEntity(request, user, content)).willReturn(review);
       given(reviewRepository.saveAndFlush(any(Review.class))).willReturn(review);
+      given(contentRepository.findByIdForUpdate(contentId)).willReturn(Optional.of(content));
+      given(reviewRepository.getReviewStats(contentId)).willReturn(new ReviewStatsDto(1L, 4.0));
       given(reviewMapper.toDto(review)).willReturn(reviewDto);
 
       // when
@@ -116,6 +120,9 @@ class ReviewServiceImplTest {
       // 검증
       then(reviewRepository).should().saveAndFlush(any(Review.class));
       then(eventPublisher).should().publishEvent(any(ReviewCreatedEvent.class));
+      then(contentRepository).should().findByIdForUpdate(contentId);
+      then(reviewRepository).should().getReviewStats(contentId);
+      then(eventPublisher).should().publishEvent(any(ReviewChangedEvent.class));
     }
 
     @Test

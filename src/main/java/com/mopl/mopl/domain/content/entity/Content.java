@@ -56,6 +56,10 @@ public class Content extends BaseUpdatableEntity
     @Column(name = "release_date", nullable = true)
     private Instant releaseDate;
 
+    @Column(name = "embedding", columnDefinition = "vector(768)")
+    @JdbcTypeCode(SqlTypes.VECTOR)
+    private float[] embedding;
+
     @Builder
     public Content(String title, String description, ContentType contentType, String thumbnailKey, List<String> tags, Instant releaseDate, String externalId) {
         this.title = title;
@@ -83,6 +87,10 @@ public class Content extends BaseUpdatableEntity
         if (tags != null) {
             this.tags = tags;
         }
+    }
+
+    public void updateEmbedding(float[] embedding) {
+        this.embedding = embedding;
     }
 
     public void updateReviewStats(BigDecimal avgRating, int reviewCount) {

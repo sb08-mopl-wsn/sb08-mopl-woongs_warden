@@ -1,6 +1,7 @@
 package com.mopl.mopl.infrastructure.config;
 
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.ai.service.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.batch.SportsdbCollectTasklet;
 import com.mopl.mopl.infrastructure.batch.TmdbCollectTasklet;
 import com.mopl.mopl.infrastructure.elasticsearch.ContentIndexService;
@@ -45,6 +46,7 @@ public class BatchJobConfig
 
     private final ContentRepository contentRepository;
     private final ContentIndexService contentIndexService;
+    private final ContentEmbeddingService contentEmbeddingService;
 
     private final EntityManager entityManager;
 
@@ -82,12 +84,18 @@ public class BatchJobConfig
     /* Tasklet */
     @Bean
     public TmdbCollectTasklet tmdbCollectTasklet() {
-        return new TmdbCollectTasklet(tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, meterRegistry, contentIndexService, collectPages);
+        return new TmdbCollectTasklet(
+                tmdbApiClient, tmdbContentMapper, contentRepository, entityManager, meterRegistry,
+                contentIndexService, contentEmbeddingService, collectPages
+        );
     }
 
     @Bean
     public SportsdbCollectTasklet sportsdbCollectTasklet() {
-        return new SportsdbCollectTasklet(sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager, meterRegistry, contentIndexService);
+        return new SportsdbCollectTasklet(
+                sportsdbApiClient, sportsdbContentMapper, contentRepository, entityManager, meterRegistry,
+                contentIndexService, contentEmbeddingService
+        );
     }
 
     @Bean

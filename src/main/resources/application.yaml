@@ -1,4 +1,9 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiTextEmbeddingAutoConfiguration
   threads:
     virtual:
       enabled: true
@@ -165,7 +170,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, loggers, caches, metrics, prometheus
+        include: health, info, loggers, caches, metrics, prometheus, beans
   endpoint:
     health:
       show-details: always

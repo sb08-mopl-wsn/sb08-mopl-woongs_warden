@@ -174,7 +174,8 @@ public class SecurityConfig {
 
         // CORS 요청을 허용할 주소
         configuration.setAllowedOrigins(List.of(
-                "https://woongsanam.kro.kr"
+                "http://localhost:5173/",
+                "https://woongsanam.kro.kr/"
         ));
 
         // CORS 요청에서 허용할 HTTP 메서드

@@ -3,13 +3,20 @@ package com.mopl.mopl.domain.review.repository;
 import com.mopl.mopl.domain.content.entity.Content;
 import com.mopl.mopl.domain.review.entity.Review;
 import com.mopl.mopl.domain.user.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.jpa.repository.JpaRepository;
 
 
 public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewRepositoryCustom {
 
   // 수정,삭제,조회
   Optional<Review> findByUserAndContent(User user, Content content);
+
+  @Query("SELECT r.content FROM Review r WHERE r.user.id = :userId AND r.rating >= :minRating")
+  List<Content> findHighRatedContents(@Param("userId") UUID userId, @Param("minRating") double minRating);
 }

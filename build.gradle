@@ -46,9 +46,14 @@ jacocoTestReport {
 					'**/global/logging/**',
 					'**/global/interceptor/**',
 					'**/exception/**',
-					'**/ai/*Ai*',
+					'**/ai/prompt/**',
 					'**/elasticsearch/**',
-					'**/kafka/event/**'
+					'**/kafka/event/**',
+					'**/ai/recorder/**',
+					'**/ai/service/*UserTasteProfileService*',
+					'**/ai/service/*ContentEmbeddingService*',
+					'**/ai/service/*ContentSimilaritySearchService*',
+					'**/ai/strategy/**'
 			])
 		}))
 	}
@@ -100,6 +105,8 @@ dependencies {
 
 	// ai
 	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+	implementation 'org.hibernate.orm:hibernate-vector:6.6.49.Final'
+	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
 
 	// I/O
 	implementation 'org.springframework.boot:spring-boot-starter-cache'

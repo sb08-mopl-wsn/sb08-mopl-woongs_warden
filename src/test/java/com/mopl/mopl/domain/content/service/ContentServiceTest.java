@@ -10,6 +10,7 @@ import com.mopl.mopl.domain.content.entity.ContentType;
 import com.mopl.mopl.domain.content.exception.ContentNotFoundException;
 import com.mopl.mopl.domain.content.mapper.ContentMapper;
 import com.mopl.mopl.domain.content.repository.ContentRepository;
+import com.mopl.mopl.infrastructure.ai.service.ContentEmbeddingService;
 import com.mopl.mopl.infrastructure.kafka.event.ContentIndexEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +44,7 @@ class ContentServiceTest
     @Mock private ContentRepository contentRepository;
     @Mock private ContentMapper contentMapper;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
+    @Mock private ContentEmbeddingService contentEmbeddingService;
 
     private UUID contentId;
     private Content content;

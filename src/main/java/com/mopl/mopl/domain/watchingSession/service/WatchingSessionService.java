@@ -17,5 +17,5 @@ public interface WatchingSessionService {
 
     CursorResponseWatchingSessionDto findByContentInWatchingSession(UUID contentId, WatchingSessionPageRequest request);
 
-    Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID watcherId, UUID currentUserId);
+    Optional<WatchingSessionDto> findCurrentWatchingSessionByUserId(UUID watcherId);
 }

@@ -6,14 +6,12 @@ import com.mopl.mopl.domain.user.dto.request.*;
 import com.mopl.mopl.domain.user.service.UserService;
 import com.mopl.mopl.domain.watchingSession.dto.response.WatchingSessionDto;
 import com.mopl.mopl.domain.watchingSession.service.WatchingSessionService;
-import com.mopl.mopl.global.auth.details.MoplUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,7 +22,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("api/users")
 @Slf4j
-public class UserController  implements UserApi{
+public class UserController implements UserApi {
     private final UserService userService;
     private final WatchingSessionService watchingSessionService;
 
@@ -96,12 +94,9 @@ public class UserController  implements UserApi{
 
     @GetMapping("/{watcherId}/watching-sessions")
     public ResponseEntity<WatchingSessionDto> findCurrentWatchingSession(
-            @PathVariable UUID watcherId,
-            @AuthenticationPrincipal MoplUserDetails userDetails
+            @PathVariable UUID watcherId
     ) {
-        UUID currentUserId = userDetails.getUserDto().id();
-
-        Optional<WatchingSessionDto> sessionDto = watchingSessionService.findCurrentWatchingSessionByUserId(watcherId, currentUserId);
+        Optional<WatchingSessionDto> sessionDto = watchingSessionService.findCurrentWatchingSessionByUserId(watcherId);
 
         return ResponseEntity.ok(sessionDto.orElse(null));
     }

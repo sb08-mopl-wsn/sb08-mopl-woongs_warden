@@ -9,6 +9,7 @@ import com.mopl.mopl.infrastructure.elasticsearch.ContentSearchQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -33,18 +34,13 @@ public class PersonalizedRecommendStrategy implements RecommendStrategy
 
     @Override
     public List<Content> retrieveCandidates(IntentAnalysis intent, UUID userId, float[] tasteEmbedding) {
-        List<Content> candidates = contentSimilaritySearchService
-                .findSimilarByUserTaste(userId, tasteEmbedding);
+        List<Content> candidates = contentSimilaritySearchService.findSimilarByUserTaste(userId, tasteEmbedding);
 
         if (!candidates.isEmpty()) return candidates;
 
-        log.info("[AI Recommend] pgvector 후보 없음 — 취향 태그로 OpenSearch fallback");
-        List<String> topTags = userTasteProfileService.getTopTags(userId);
-        List<String> candidateIds = contentSearchQueryService.searchCandidateIds(null, topTags);
-        List<UUID> uuids = candidateIds.stream().map(UUID::fromString).toList();
-
-        return uuids.isEmpty()
-                ? contentRepository.findAll(PageRequest.of(0, FALLBACK_LIMIT)).getContent()
-                : contentRepository.findAllById(uuids);
+        log.info("[AI Recommend] pgvector 후보 없음 — 평점 높은 순 fallback");
+        return contentRepository.findAll(
+                PageRequest.of(0, FALLBACK_LIMIT, Sort.by(Sort.Direction.DESC, "avgRating"))
+        ).getContent();
     }
 }

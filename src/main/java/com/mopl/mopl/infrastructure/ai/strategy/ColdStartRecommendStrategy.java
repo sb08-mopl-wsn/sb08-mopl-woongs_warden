@@ -32,18 +32,7 @@ public class ColdStartRecommendStrategy implements RecommendStrategy {
 
     @Override
     public List<Content> retrieveCandidates(IntentAnalysis intent, UUID userId, float[] tasteEmbedding) {
-        List<String> topTags = userTasteProfileService.getTopTags(userId);
-
-        if (!topTags.isEmpty()) {
-            List<String> candidateIds = contentSearchQueryService.searchCandidateIds(null, topTags);
-            if (!candidateIds.isEmpty()) {
-                List<UUID> uuids = candidateIds.stream().map(UUID::fromString).toList();
-                log.info("[AI Recommend] Cold start — 취향 태그 기반 후보 {}건", uuids.size());
-                return contentRepository.findAllById(uuids);
-            }
-        }
-
-        log.info("[AI Recommend] Cold start — 인기 콘텐츠 fallback");
+        log.info("[AI Recommend] Cold start — 평점 높은 순 추천");
         return contentRepository.findAll(
                 PageRequest.of(0, FALLBACK_LIMIT, Sort.by(Sort.Direction.DESC, "avgRating"))
         ).getContent();

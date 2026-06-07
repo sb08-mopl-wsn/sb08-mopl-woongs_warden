@@ -27,7 +27,7 @@ public class BanExpirationScheduler {
     @Scheduled(cron = "0 0 4 * * *")
     public void unbanExpiredUsers() {
 
-        log.info("[BanBackupScheduler] 새벽 벤 미해제 유저 백업 스캔 시작...");
+        log.info("[BanExpirationScheduler] 벤 미해제 유저 백업 스캔 시작...");
 
         List<User> expiredUsers = userRepository
                 .findAllByIsBannedTrueAndBanExpiresAtBeforeAndIsLockedFalse(
@@ -35,7 +35,7 @@ public class BanExpirationScheduler {
                 );
 
         if (expiredUsers.isEmpty()) {
-            log.info("[BanBackupScheduler] 벤 미해제 유저가 없습니다.");
+            log.info("[BanExpirationScheduler] 벤 미해제 유저가 없습니다.");
             return;
         }
 

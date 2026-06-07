@@ -103,10 +103,27 @@ public class RedisKeyExpiredListenerTest {
     }
 
     @Test
-    @DisplayName("정지 해제 처리 중 예외(UUID 파싱 에러, DB 에러 등)가 발생하더라도 에러를 catch 블록에서 격리하여 수신 파이프라인을 유지한다.")
-    void onMessage_exceptionThrown_isolatedInCatchBlock() {
+    @DisplayName("유저는 정상 조회되었으나 해제 프로세서(processUnban) 처리 도중 장애가 발생해도, 내부 catch 블록에서 차단하여 파이프라인을 유지한다.")
+    void onMessage_processUnbanThrowsException_isolatedInInternalCatchBlock() {
         // given
-        String corruptedKey = BadWordNotificationProcessor.BAN_KEY_PREFIX + "corrupted-user-id-string";
+        String expiredKey = BadWordNotificationProcessor.BAN_KEY_PREFIX + userId.toString();
+        given(mockMessage.toString()).willReturn(expiredKey);
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+
+        doThrow(new RuntimeException("DB 영속성 컨텍스트 플러시 오류 또는 커넥션 장애")).when(userUnbanProcessor).processUnban(mockUser);
+
+        // when & then
+        redisKeyExpiredListener.onMessage(mockMessage, new byte[0]);
+
+        verify(userRepository, times(1)).findById(userId);
+        verify(userUnbanProcessor, times(1)).processUnban(mockUser);
+    }
+
+    @Test
+    @DisplayName("만료된 키의 UUID 포맷이 잘못되어 IllegalArgumentException이 터지더라도, 외부 catch 블록에서 정교하게 감싸 수신 파이프라인을 지켜낸다.")
+    void onMessage_invalidUuidFormat_isolatedInExternalCatchBlock() {
+        // given
+        String corruptedKey = BadWordNotificationProcessor.BAN_KEY_PREFIX + "corrupted-non-uuid-string";
         given(mockMessage.toString()).willReturn(corruptedKey);
 
         // when & then

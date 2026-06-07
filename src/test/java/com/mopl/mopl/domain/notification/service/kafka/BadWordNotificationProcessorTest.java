@@ -175,6 +175,51 @@ public class BadWordNotificationProcessorTest {
     }
 
     @Test
+    @DisplayName("Redis 인프라 장애로 인해 TTL 설정 연산 도중 예외가 발생하더라도, 메인 로직 트랜잭션은 차단되지 않고 격리 마감된다.")
+    void processBadWordDetected_RedisSetThrowsException_IsolatesError() {
+        // given
+        ReflectionTestUtils.setField(mockUser, "warningCount", 2);
+        ReflectionTestUtils.setField(mockUser, "isBanned", true);
+        ReflectionTestUtils.setField(mockUser, "banExpiresAt", LocalDateTime.now().plusMinutes(5));
+
+        BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
+
+        // Redis 장애 주입
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
+        doThrow(new RuntimeException("Redis 커넥션 끊김")).when(valueOperations).set(anyString(), any(), anyLong(), any());
+
+        // when & then
+        badWordNotificationProcessor.processBadWordDetected(event);
+
+        assertThat(mockUser.getWarningCount()).isEqualTo(3);
+        verify(notificationRepository, times(1)).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("정지 만료 시간 격차가 최대 제한치(30일)를 초과할 경우, 가드 조건에 걸려 Redis 설정을 건너뛴다.")
+    void processBadWordDetected_BanDurationExceedsMax_SkipsRedisSet() {
+        // given
+        ReflectionTestUtils.setField(mockUser, "warningCount", 2);
+        ReflectionTestUtils.setField(mockUser, "isBanned", true);
+
+        LocalDateTime exceedExpiresAt = LocalDateTime.now().plusDays(31);
+        ReflectionTestUtils.setField(mockUser, "banExpiresAt", exceedExpiresAt);
+
+        BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
+
+        // when
+        badWordNotificationProcessor.processBadWordDetected(event);
+
+        // then
+        assertThat(mockUser.getWarningCount()).isEqualTo(3);
+        verify(valueOperations, never()).set(anyString(), any(), anyLong(), any());
+    }
+
+    @Test
     @DisplayName("누적 경고로 인해 2차 정지 상태가 될 때(경고 6회), 1시간 이용 금지 안내 알림이 생성된다.")
     void processBadWordDetected_SecondBan() {
         // given

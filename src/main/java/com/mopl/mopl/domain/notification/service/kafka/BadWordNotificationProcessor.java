@@ -34,7 +34,11 @@ public class BadWordNotificationProcessor {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
+    private static final String BAN_STATUS_VALUE = "banned";
+    private static final long MAX_BAN_DURATION_SECONDS = 86400 * 30; // 30일
+
     public static final String BAN_KEY_PREFIX = "users:banned:ttl:";
+
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processBadWordDetected(BadWordDetectedEvent event) {
@@ -77,15 +81,21 @@ public class BadWordNotificationProcessor {
                         banExpiresAt
                 ).getSeconds();
 
-                if (durationSeconds > 0) {
+                if (durationSeconds > 0 && durationSeconds <= MAX_BAN_DURATION_SECONDS) {
                     String redisKey = BAN_KEY_PREFIX + userId.toString();
-                    redisTemplate.opsForValue().set(
+                    try {
+                        redisTemplate.opsForValue().set(
                             redisKey,
-                            "banned",
+                            BAN_STATUS_VALUE,
                             durationSeconds,
                             TimeUnit.SECONDS
-                    );
-                    log.info("[Redis TTL] 실시간 유저 벤 해제 동작 중. userId: {}, {}초 뒤 만료 이벤트 발생", userId, durationSeconds);
+                        );
+                        log.info("[Redis TTL] 실시간 유저 벤 해제 TTL 설정 완료. userId: {}, {}초 뒤 만료", userId, durationSeconds);
+                    } catch (Exception e) {
+                        log.error("[Redis TTL] TTL 설정 실패. 스케줄러가 백업 처리 예정. userId: {}", userId, e);
+                    }
+                } else if (durationSeconds > MAX_BAN_DURATION_SECONDS) {
+                    log.warn("[Redis TTL] 정지 기간이 최대 허용치를 초과하여 TTL 미설정. userId: {}, duration: {}초", userId, durationSeconds);
                 }
             }
         }

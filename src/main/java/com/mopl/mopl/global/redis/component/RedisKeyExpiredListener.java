@@ -37,9 +37,18 @@ public class RedisKeyExpiredListener extends KeyExpirationEventMessageListener {
 
             try {
                 UUID userId = UUID.fromString(userIdStr);
-                userRepository.findById(userId).ifPresent(userUnbanProcessor::processUnban);
-            } catch (Exception e) {
-                log.error("[Redis Listener] 실시간 정지 해제 실패. userId: {}", userIdStr, e);
+                userRepository.findById(userId).ifPresentOrElse(
+                        user -> {
+                                    try {
+                                        userUnbanProcessor.processUnban(user);
+                                    } catch (Exception e) {
+                                        log.error("[Redis Listener] 정지 해제 처리 중 오류 발생. userId: {}", userIdStr, e);
+                                    }
+                        },
+                        () -> log.warn("[Redis Listener] 정지 해제 대상 유저를 찾을 수 없음. userId: {}", userIdStr)
+                    );
+            } catch (IllegalArgumentException e) {
+                log.error("[Redis Listener] 잘못된 UUID 형식의 키 감지. userIdStr: {}", userIdStr, e);
             }
         }
     }

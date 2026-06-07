@@ -1,5 +1,6 @@
 package com.mopl.mopl.domain.notification.service.kafka;
 
+import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.notification.entity.NotificationLevel;
 import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
@@ -47,8 +48,11 @@ public class BadWordNotificationProcessor {
                 .level(NotificationLevel.INFO)
                 .build();
 
-        Notification saved = notificationRepository.save(notification);
-        sseService.sendNotification(userId, notificationMapper.toDto(saved));
+        Notification saved = notificationRepository.saveAndFlush(notification);
+        NotificationDto dto = notificationMapper.toDto(saved);
+
+        log.info("[Redis] 실시간 SSE 알림을 알림 발행 - targetUserid: {}", userId);
+        sseService.sendNotification(userId, dto);
 
         log.info("[BadWordNotificationProcessor] 처리 완료 - userId: {}, warningCount: {}", userId, receiver.getWarningCount());
     }
@@ -68,7 +72,6 @@ public class BadWordNotificationProcessor {
 
     private String resolveContent(User receiver) {
         String base = "부적절한 표현이 감지되어 마스킹 처리되었습니다. \n";
-
         if (!receiver.isBanned()) {
             return base + "바른 언어 사용을 부탁드립니다. 🙏";
         }

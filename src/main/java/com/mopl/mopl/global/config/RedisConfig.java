@@ -1,8 +1,6 @@
 package com.mopl.mopl.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mopl.mopl.global.redis.component.WatchingSessionRedisConsumer;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.redis.service.RedisSubscriber;
@@ -16,8 +14,7 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
-public class RedisConfig
-{
+public class RedisConfig {
     @Bean
     public ChannelTopic watchTopic() {
         return new ChannelTopic("mopl-contents-watch-channel");

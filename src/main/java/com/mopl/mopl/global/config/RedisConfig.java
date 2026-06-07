@@ -1,6 +1,9 @@
 package com.mopl.mopl.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mopl.mopl.domain.user.repository.UserRepository;
+import com.mopl.mopl.global.component.UserUnbanProcessor;
+import com.mopl.mopl.global.redis.component.RedisKeyExpiredListener;
 import com.mopl.mopl.global.redis.component.WatchingSessionRedisConsumer;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.redis.service.RedisSubscriber;
@@ -38,6 +41,15 @@ public class RedisConfig {
         redisTemplate.setHashValueSerializer(serializer);
         redisTemplate.afterPropertiesSet();
         return redisTemplate;
+    }
+
+    @Bean
+    public RedisKeyExpiredListener redisKeyExpiredListener(
+            RedisMessageListenerContainer redisMessageListenerContainer,
+            UserRepository userRepository,
+            UserUnbanProcessor userUnbanProcessor
+    ) {
+        return new RedisKeyExpiredListener(redisMessageListenerContainer, userRepository, userUnbanProcessor);
     }
 
     @Bean

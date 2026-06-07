@@ -12,11 +12,15 @@ import com.mopl.mopl.global.event.BadWordDetectedEvent;
 import com.mopl.mopl.global.sse.service.SseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -27,6 +31,10 @@ public class BadWordNotificationProcessor {
     private final NotificationRepository notificationRepository;
     private final NotificationMapper notificationMapper;
     private final SseService sseService;
+
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    public static final String BAN_KEY_PREFIX = "users:banned:ttl:";
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processBadWordDetected(BadWordDetectedEvent event) {
@@ -51,9 +59,36 @@ public class BadWordNotificationProcessor {
         Notification saved = notificationRepository.saveAndFlush(notification);
         NotificationDto dto = notificationMapper.toDto(saved);
 
-        log.info("[Redis] 실시간 SSE 알림을 알림 발행 - targetUserid: {}", userId);
-        sseService.sendNotification(userId, dto);
+        try {
+            log.info("[Redis] 실시간 SSE 알림을 알림 발행 - targetUserid: {}", userId);
+            sseService.sendNotification(userId, dto);
+        } catch (Exception e) {
+            log.error("[SSE] 실시간 알림 발송 중 예외 발생 - userId: {}", userId);
+        }
 
+        // 유저 벤 해제
+        // 1. 유저가 3번의 경고로 벤을 당했을 경우,
+        // 2. 9번의 경고로 락이 걸리지 않았을 경우
+        if (receiver.isBanned() && !receiver.isLocked()) {
+            LocalDateTime banExpiresAt = receiver.getBanExpiresAt();
+            if (banExpiresAt != null) {
+                long durationSeconds = Duration.between(
+                        LocalDateTime.now(),
+                        banExpiresAt
+                ).getSeconds();
+
+                if (durationSeconds > 0) {
+                    String redisKey = BAN_KEY_PREFIX + userId.toString();
+                    redisTemplate.opsForValue().set(
+                            redisKey,
+                            "banned",
+                            durationSeconds,
+                            TimeUnit.SECONDS
+                    );
+                    log.info("[Redis TTL] 실시간 유저 벤 해제 동작 중. userId: {}, {}초 뒤 만료 이벤트 발생", userId, durationSeconds);
+                }
+            }
+        }
         log.info("[BadWordNotificationProcessor] 처리 완료 - userId: {}, warningCount: {}", userId, receiver.getWarningCount());
     }
 

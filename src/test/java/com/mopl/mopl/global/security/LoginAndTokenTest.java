@@ -195,8 +195,8 @@ class LoginAndTokenTest {
     }
 
     @Test
-    @DisplayName("/api/auth/sign-in 로그인 실패 - 정지된 사용자")
-    void signInFailure_BannedUser() throws Exception {
+    @DisplayName("/api/auth/sign-in 로그인 실패 - 3번째 밴으로 계정 잠금된 사용자")
+    void signInFailure_LockedUser() throws Exception {
         UserDto userDto = new UserDto(
                 UUID.randomUUID(),
                 Instant.parse("2026-05-08T00:00:00Z"),
@@ -204,7 +204,7 @@ class LoginAndTokenTest {
                 "정지사용자",
                 null,
                 Role.USER,
-                false,
+                true,
                 true
         );
 

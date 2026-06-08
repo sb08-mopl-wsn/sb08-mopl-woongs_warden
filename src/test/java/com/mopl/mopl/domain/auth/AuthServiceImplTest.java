@@ -248,8 +248,8 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("정지된 사용자의 refreshToken이면 토큰과 쿠키를 만료하고 AuthRevokedTokenException")
-        void refresh_fail_bannedUser() throws JOSEException {
+        @DisplayName("3번째 밴으로 계정 잠금된 사용자의 refreshToken이면 토큰과 쿠키를 만료하고 AuthRevokedTokenException")
+        void refresh_fail_lockedUser() throws JOSEException {
             String oldRefreshToken = "old.refresh.token";
             String oldAccessToken = "old.access.token";
             UUID userId = UUID.randomUUID();
@@ -261,7 +261,7 @@ class AuthServiceImplTest {
                     "정지사용자",
                     null,
                     Role.USER,
-                    false,
+                    true,
                     true
             );
 

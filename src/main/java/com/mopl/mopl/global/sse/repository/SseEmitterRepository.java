@@ -69,4 +69,9 @@ public class SseEmitterRepository {
             entry -> List.copyOf(entry.getValue())
         ));
   }
+
+  // 로그아웃 시 특정 유저의 모든 Emitter 연결 강제 삭제
+  public void deleteAllByUserId(UUID userId) {
+    emitters.remove(userId);
+  }
 }

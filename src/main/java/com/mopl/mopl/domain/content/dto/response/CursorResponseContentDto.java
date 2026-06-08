@@ -12,4 +12,8 @@ public record CursorResponseContentDto
         long totalCount,
         String sortBy,
         String sortDirection
-) {}
+) {
+    public CursorResponseContentDto withContents(List<ContentDto> contents) {
+        return new CursorResponseContentDto(contents, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
+    }
+}

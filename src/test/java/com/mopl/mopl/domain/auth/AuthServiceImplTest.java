@@ -3,6 +3,7 @@ package com.mopl.mopl.domain.auth;
 import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
 import com.mopl.mopl.domain.auth.exception.AuthFailedRefreshToken;
 import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
+import com.mopl.mopl.domain.auth.exception.AuthRevokedTokenException;
 import com.mopl.mopl.domain.auth.service.AuthServiceImpl;
 import com.mopl.mopl.domain.auth.service.AuthenticationAttemptService;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
@@ -244,6 +245,48 @@ class AuthServiceImplTest {
 
             verify(jwtTokenProvider).expireRefreshCookie(response);
             verify(jwtRegistry, never()).getJwtInformationByRefreshToken(any());
+        }
+
+        @Test
+        @DisplayName("정지된 사용자의 refreshToken이면 토큰과 쿠키를 만료하고 AuthRevokedTokenException")
+        void refresh_fail_bannedUser() throws JOSEException {
+            String oldRefreshToken = "old.refresh.token";
+            String oldAccessToken = "old.access.token";
+            UUID userId = UUID.randomUUID();
+
+            UserDto userDto = new UserDto(
+                    userId,
+                    null,
+                    "user@mopl.com",
+                    "정지사용자",
+                    null,
+                    Role.USER,
+                    false,
+                    true
+            );
+
+            JwtInformation oldJwtInfo = new JwtInformation(
+                    userDto,
+                    oldAccessToken,
+                    oldRefreshToken
+            );
+
+            MoplUserDetails userDetails = new MoplUserDetails(userDto, "encodedPassword");
+
+            when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtRegistry.hasActiveJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(true);
+            when(jwtRegistry.getJwtInformationByRefreshToken(oldRefreshToken)).thenReturn(oldJwtInfo);
+            when(jwtTokenProvider.getUserEmailFromToken(oldRefreshToken)).thenReturn("user@mopl.com");
+            when(userDetailsService.loadUserByUsernameForToken("user@mopl.com"))
+                    .thenReturn(userDetails);
+
+            assertThatThrownBy(() -> authService.refresh(oldRefreshToken, response))
+                    .isInstanceOf(AuthRevokedTokenException.class);
+
+            verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
+            verify(jwtTokenProvider).expireRefreshCookie(response);
+            verify(jwtTokenProvider, never()).generateAccessToken(any());
+            verify(jwtRegistry, never()).rotateJwtInformation(any(), any());
         }
 
         @Test

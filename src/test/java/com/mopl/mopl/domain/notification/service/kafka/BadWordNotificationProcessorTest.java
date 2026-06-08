@@ -1,5 +1,6 @@
 package com.mopl.mopl.domain.notification.service.kafka;
 
+import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
@@ -48,6 +49,8 @@ public class BadWordNotificationProcessorTest {
     private RedisTemplate<String, Object> redisTemplate;
     @Mock
     private ValueOperations<String, Object> valueOperations;
+    @Mock
+    private JwtRegistry jwtRegistry;
 
     @InjectMocks
     private BadWordNotificationProcessor badWordNotificationProcessor;
@@ -120,6 +123,7 @@ public class BadWordNotificationProcessorTest {
         assertThat(actual.getTitle()).contains("🚨 욕설 사용으로 인한 경고", "[누적 경고: 1]");
         assertThat(actual.getContent()).contains("바른 언어 사용을 부탁드립니다.");
         verify(sseService).sendNotification(eq(userId), eq(mockDto));
+        verify(jwtRegistry, never()).invalidateJwtInformationByUserId(any());
     }
 
     @Test
@@ -172,6 +176,7 @@ public class BadWordNotificationProcessorTest {
 
         String expectedRedisKey = "users:banned:ttl:" + userId.toString();
         verify(valueOperations, times(1)).set(eq(expectedRedisKey), eq("banned"), anyLong(), eq(TimeUnit.SECONDS));
+        verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
     }
 
     @Test

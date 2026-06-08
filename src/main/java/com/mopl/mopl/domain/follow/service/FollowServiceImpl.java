@@ -101,14 +101,23 @@ public class FollowServiceImpl implements FollowService {
    * 현재 요청자가 특정 유저를 팔로우하고 있는지 확인하는 메서드
    * @param followerId 상태를 확인할 주체(현재 로그인한 유저)의 ID
    * @param followeeId 팔로우 여부를 확인할 대상 유저의 ID
-   * @return 팔로우 중이면 true, 아니면 false 반환
+   * @return 팔로우 중이면 FollowDto, 아니면 FollowNotFoundException 발생
    */
   @Override
-  public boolean isFollowedByMe(UUID followerId, UUID followeeId) {
-    // 로그인 안한 사용자의 조회 요청 방어
-    if (followerId == null) return false;
+  public FollowDto isFollowedByMe(UUID followerId, UUID followeeId) {
+    if (followerId == null) {
+        throw new FollowNotFoundException();
+    }
 
-    return followRepository.existsByFollowerIdAndFolloweeId(followerId, followeeId);
+    User follower = userRepository.findById(followerId)
+        .orElseThrow(FollowerNotFoundException::new);
+    User followee = userRepository.findById(followeeId)
+        .orElseThrow(FolloweeNotFoundException::new);
+
+    Follow follow = followRepository.findByFollowerAndFollowee(follower, followee)
+        .orElseThrow(FollowNotFoundException::new);
+
+    return followMapper.toDto(follow);
   }
 
   /**

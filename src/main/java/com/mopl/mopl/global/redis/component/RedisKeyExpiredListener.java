@@ -5,20 +5,23 @@ import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.global.component.UserUnbanProcessor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
-import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.listener.KeyExpirationEventMessageListener;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 import java.util.UUID;
 
 @Slf4j
-public class RedisKeyExpiredListener implements MessageListener {
+public class RedisKeyExpiredListener extends KeyExpirationEventMessageListener {
 
     private final UserRepository userRepository;
     private final UserUnbanProcessor userUnbanProcessor;
 
     public RedisKeyExpiredListener(
+            RedisMessageListenerContainer listenerContainer,
             UserRepository userRepository,
             UserUnbanProcessor userUnbanProcessor
     ) {
+        super(listenerContainer);
         this.userRepository = userRepository;
         this.userUnbanProcessor = userUnbanProcessor;
     }
@@ -36,14 +39,14 @@ public class RedisKeyExpiredListener implements MessageListener {
                 UUID userId = UUID.fromString(userIdStr);
                 userRepository.findById(userId).ifPresentOrElse(
                         user -> {
-                            try {
-                                userUnbanProcessor.processUnban(user);
-                            } catch (Exception e) {
-                                log.error("[Redis Listener] 정지 해제 처리 중 오류 발생. userId: {}", userIdStr, e);
-                            }
+                                    try {
+                                        userUnbanProcessor.processUnban(user);
+                                    } catch (Exception e) {
+                                        log.error("[Redis Listener] 정지 해제 처리 중 오류 발생. userId: {}", userIdStr, e);
+                                    }
                         },
                         () -> log.warn("[Redis Listener] 정지 해제 대상 유저를 찾을 수 없음. userId: {}", userIdStr)
-                );
+                    );
             } catch (IllegalArgumentException e) {
                 log.error("[Redis Listener] 잘못된 UUID 형식의 키 감지. userIdStr: {}", userIdStr, e);
             }

@@ -12,7 +12,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
-import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -46,10 +45,11 @@ public class RedisConfig {
 
     @Bean
     public RedisKeyExpiredListener redisKeyExpiredListener(
+            RedisMessageListenerContainer redisMessageListenerContainer,
             UserRepository userRepository,
             UserUnbanProcessor userUnbanProcessor
     ) {
-        return new RedisKeyExpiredListener(userRepository, userUnbanProcessor);
+        return new RedisKeyExpiredListener(redisMessageListenerContainer, userRepository, userUnbanProcessor);
     }
 
     @Bean
@@ -57,7 +57,6 @@ public class RedisConfig {
             RedisConnectionFactory factory,
             RedisSubscriber redisSubscriber,
             WatchingSessionRedisConsumer watchingConsumer,
-            RedisKeyExpiredListener redisKeyExpiredListener,
             ChannelTopic watchTopic,
             ChannelTopic chatTopic
     ) {
@@ -70,8 +69,6 @@ public class RedisConfig {
 
         container.addMessageListener(watchingConsumer, watchTopic);
         container.addMessageListener(watchingConsumer, chatTopic);
-
-        container.addMessageListener(redisKeyExpiredListener, new PatternTopic("__keyevent@*__:expired"));
 
         return container;
     }

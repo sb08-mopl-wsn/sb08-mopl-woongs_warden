@@ -19,9 +19,15 @@ public class BanExpirationScheduler {
     private final UserUnbanProcessor userUnbanProcessor;
     private static final Logger log = LoggerFactory.getLogger(BanExpirationScheduler.class);
 
-    // TODO: 추후 Redis TTL 도입으로 정확도를 개선하고 시스템 부하를 줄일 예정
-    @Scheduled(fixedDelay = 30000)
+    /**
+     * [새벽 백업용 스케줄러]
+     * 매일 새벽 4시 0분 0초에 딱 한번만 실행한다.
+     * 배포나 장애로 인해 Redis 이벤트를 놓쳐 풀리지 못한 유저의 벤을 풀어준다.
+     */
+    @Scheduled(cron = "0 0 4 * * *")
     public void unbanExpiredUsers() {
+
+        log.info("[BanExpirationScheduler] 벤 미해제 유저 백업 스캔 시작...");
 
         List<User> expiredUsers = userRepository
                 .findAllByIsBannedTrueAndBanExpiresAtBeforeAndIsLockedFalse(
@@ -29,10 +35,11 @@ public class BanExpirationScheduler {
                 );
 
         if (expiredUsers.isEmpty()) {
+            log.info("[BanExpirationScheduler] 벤 미해제 유저가 없습니다.");
             return;
         }
 
-        log.info("[BanExpirationScheduler] 정지 해제 유저: {}명", expiredUsers.size());
+        log.warn("[BanExpirationScheduler] 인프라 장애로 누수되었던 유저 {}명을 발견하여 강제 해제합니다.", expiredUsers.size());
 
         expiredUsers.forEach(user -> {
             try {

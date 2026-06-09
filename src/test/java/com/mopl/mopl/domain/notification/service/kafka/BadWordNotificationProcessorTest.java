@@ -1,5 +1,6 @@
 package com.mopl.mopl.domain.notification.service.kafka;
 
+import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.notification.mapper.NotificationMapper;
@@ -17,17 +18,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class BadWordNotificationProcessorTest {
@@ -40,6 +45,12 @@ public class BadWordNotificationProcessorTest {
     private NotificationMapper notificationMapper;
     @Mock
     private SseService sseService;
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+    @Mock
+    private ValueOperations<String, Object> valueOperations;
+    @Mock
+    private JwtRegistry jwtRegistry;
 
     @InjectMocks
     private BadWordNotificationProcessor badWordNotificationProcessor;
@@ -59,6 +70,7 @@ public class BadWordNotificationProcessorTest {
         ReflectionTestUtils.setField(mockUser, "id", userId);
         ReflectionTestUtils.setField(mockUser, "warningCount", 0);
         ReflectionTestUtils.setField(mockUser, "isBanned", false);
+        ReflectionTestUtils.setField(mockUser, "isLocked", false);
 
         mockNotification = Notification.builder()
                 .user(mockUser)
@@ -93,7 +105,8 @@ public class BadWordNotificationProcessorTest {
         // given
         BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
         given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
-        given(notificationRepository.save(any(Notification.class))).willReturn(mockNotification);
+
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
         given(notificationMapper.toDto(any())).willReturn(mockDto);
 
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
@@ -104,12 +117,32 @@ public class BadWordNotificationProcessorTest {
         // then
         assertThat(mockUser.getWarningCount()).isEqualTo(1);
 
-        verify(notificationRepository).save(notificationCaptor.capture());
+        verify(notificationRepository).saveAndFlush(notificationCaptor.capture());
         Notification actual = notificationCaptor.getValue();
 
         assertThat(actual.getTitle()).contains("🚨 욕설 사용으로 인한 경고", "[누적 경고: 1]");
         assertThat(actual.getContent()).contains("바른 언어 사용을 부탁드립니다.");
         verify(sseService).sendNotification(eq(userId), eq(mockDto));
+        verify(jwtRegistry, never()).invalidateJwtInformationByUserId(any());
+    }
+
+    @Test
+    @DisplayName("실시간 알림 발송(SSE) 중 네트워크 등 예외가 발생하더라도 메인 비즈니스 트랜잭션은 차단되지 않고 정상 마감된다.")
+    void processBadWordDetected_SseThrowsException_maintainsTransaction() throws Exception {
+        // given
+        BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
+        given(notificationMapper.toDto(any(Notification.class))).willReturn(mockDto);
+
+        // SSE 전송 실패 유도
+        doThrow(new RuntimeException("SSE 연결 끊김")).when(sseService).sendNotification(any(), any());
+
+        // when & then (예외가 밖으로 터지지 않는지 검증)
+        badWordNotificationProcessor.processBadWordDetected(event);
+
+        assertThat(mockUser.getWarningCount()).isEqualTo(1);
+        verify(notificationRepository, times(1)).saveAndFlush(any());
     }
 
     @Test
@@ -117,13 +150,12 @@ public class BadWordNotificationProcessorTest {
     void processBadWordDetected_FirstBan() {
         // given
         ReflectionTestUtils.setField(mockUser, "warningCount", 2);
+
         BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
-
-        mockUser.increaseWarningCount();
-        ReflectionTestUtils.setField(mockUser, "isBanned", true);
-
         given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
-        given(notificationRepository.save(any(Notification.class))).willReturn(mockNotification);
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
+
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
 
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
 
@@ -131,11 +163,63 @@ public class BadWordNotificationProcessorTest {
         badWordNotificationProcessor.processBadWordDetected(event);
 
         // then
-        verify(notificationRepository).save(notificationCaptor.capture());
+        assertThat(mockUser.getWarningCount()).isEqualTo(3);
+        assertThat(mockUser.isBanned()).isTrue();
+        assertThat(mockUser.isLocked()).isFalse();
+        assertThat(mockUser.getBanExpiresAt()).isNotNull();
+        verify(notificationRepository).saveAndFlush(notificationCaptor.capture());
         Notification actual = notificationCaptor.getValue();
 
         assertThat(actual.getTitle()).contains("🚫 [1차 정지]", "실시간 채팅 5분 이용 금지");
         assertThat(actual.getContent()).contains("5분간 실시간 채팅 이용이 제한됩니다.");
+
+        String expectedRedisKey = "users:banned:ttl:" + userId.toString();
+        verify(valueOperations, times(1)).set(eq(expectedRedisKey), eq("banned"), anyLong(), eq(TimeUnit.SECONDS));
+        verify(jwtRegistry, never()).invalidateJwtInformationByUserId(any());
+    }
+
+    @Test
+    @DisplayName("Redis 인프라 장애로 인해 TTL 설정 연산 도중 예외가 발생하더라도, 메인 로직 트랜잭션은 차단되지 않고 격리 마감된다.")
+    void processBadWordDetected_RedisSetThrowsException_IsolatesError() {
+        // given
+        ReflectionTestUtils.setField(mockUser, "warningCount", 2);
+
+        BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
+
+        // Redis 장애 주입
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
+        doThrow(new RuntimeException("Redis 커넥션 끊김")).when(valueOperations).set(anyString(), any(), anyLong(), any());
+
+        // when & then
+        badWordNotificationProcessor.processBadWordDetected(event);
+
+        assertThat(mockUser.getWarningCount()).isEqualTo(3);
+        verify(notificationRepository, times(1)).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("정지 만료 시간 격차가 최대 제한치(30일)를 초과할 경우, 가드 조건에 걸려 Redis 설정을 건너뛴다.")
+    void processBadWordDetected_BanDurationExceedsMax_SkipsRedisSet() {
+        // given
+        ReflectionTestUtils.setField(mockUser, "warningCount", 3);
+        ReflectionTestUtils.setField(mockUser, "isBanned", true);
+
+        LocalDateTime exceedExpiresAt = LocalDateTime.now().plusDays(31);
+        ReflectionTestUtils.setField(mockUser, "banExpiresAt", exceedExpiresAt);
+
+        BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
+
+        // when
+        badWordNotificationProcessor.processBadWordDetected(event);
+
+        // then
+        assertThat(mockUser.getWarningCount()).isEqualTo(4);
+        assertThat(mockUser.getBanExpiresAt()).isEqualTo(exceedExpiresAt);
+        verify(valueOperations, never()).set(anyString(), any(), anyLong(), any());
     }
 
     @Test
@@ -143,20 +227,20 @@ public class BadWordNotificationProcessorTest {
     void processBadWordDetected_SecondBan() {
         // given
         ReflectionTestUtils.setField(mockUser, "warningCount", 5);
-        mockUser.increaseWarningCount();
-        ReflectionTestUtils.setField(mockUser, "isBanned", true);
 
         BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
         given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
-        given(notificationRepository.save(any(Notification.class))).willReturn(mockNotification);
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
 
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
 
         // when
         badWordNotificationProcessor.processBadWordDetected(event);
 
         // then
-        verify(notificationRepository).save(notificationCaptor.capture());
+        assertThat(mockUser.getWarningCount()).isEqualTo(6);
+        verify(notificationRepository).saveAndFlush(notificationCaptor.capture());
         Notification actual = notificationCaptor.getValue();
 
         assertThat(actual.getTitle()).contains("🚫 [2차 정지]", "실시간 채팅 1시간 이용 금지");
@@ -168,12 +252,10 @@ public class BadWordNotificationProcessorTest {
     void processBadWordDetected_PermanentBan() {
         // given
         ReflectionTestUtils.setField(mockUser, "warningCount", 8);
-        mockUser.increaseWarningCount();
-        ReflectionTestUtils.setField(mockUser, "isBanned", true);
 
         BadWordDetectedEvent event = new BadWordDetectedEvent(userId, "바보");
         given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
-        given(notificationRepository.save(any(Notification.class))).willReturn(mockNotification);
+        given(notificationRepository.saveAndFlush(any(Notification.class))).willReturn(mockNotification);
 
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
 
@@ -181,10 +263,17 @@ public class BadWordNotificationProcessorTest {
         badWordNotificationProcessor.processBadWordDetected(event);
 
         // then
-        verify(notificationRepository).save(notificationCaptor.capture());
+        assertThat(mockUser.getWarningCount()).isEqualTo(9);
+        assertThat(mockUser.isBanned()).isTrue();
+        assertThat(mockUser.isLocked()).isTrue();
+        assertThat(mockUser.getBanExpiresAt()).isNull();
+        verify(notificationRepository).saveAndFlush(notificationCaptor.capture());
         Notification actual = notificationCaptor.getValue();
 
         assertThat(actual.getTitle()).contains("🔒 [영구 정지]", "모든 활동이 정지됩니다.");
         assertThat(actual.getContent()).contains("모든 서비스 이용이 영구 제한됩니다. 관리자에게 문의하세요.");
+
+        verify(jwtRegistry).invalidateJwtInformationByUserId(userId);
+        verifyNoInteractions(redisTemplate);
     }
 }

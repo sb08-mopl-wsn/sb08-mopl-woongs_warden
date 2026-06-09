@@ -161,6 +161,6 @@ class NotificationKafkaProducerTest {
     notificationKafkaProducer.produceBadWordDetectedEvent(event);
 
     // then
-    verify(kafkaTemplate).send(eq("notification-badWord-topic"), eq(userId.toString()), eq(event));
+    verify(kafkaTemplate).send(eq("notification-badword-topic"), eq(userId.toString()), eq(event));
   }
 }

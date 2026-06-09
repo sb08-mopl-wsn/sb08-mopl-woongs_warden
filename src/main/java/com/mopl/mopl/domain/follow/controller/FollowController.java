@@ -46,13 +46,13 @@ public class FollowController implements FollowApi{
   }
 
   @GetMapping("/followed-by-me")
-  public ResponseEntity<FollowDto> isFollowedByMe(
+  public ResponseEntity<Boolean> isFollowedByMe(
       @AuthenticationPrincipal(errorOnInvalidType = true) MoplUserDetails userDetails,
       @RequestParam("followeeId") UUID followeeId
   ) {
     UUID followerId = userDetails.getUserDto().id();
-    FollowDto response = followService.isFollowedByMe(followerId, followeeId);
-    return ResponseEntity.ok(response);
+    boolean isFollowed = followService.isFollowedByMe(followerId, followeeId);
+    return ResponseEntity.ok(isFollowed);
   }
 
   @GetMapping("/count")

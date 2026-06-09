@@ -15,6 +15,7 @@ import com.mopl.mopl.infrastructure.ai.service.ContentRecommendService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -44,6 +45,7 @@ public class ContentController implements ContentApi
     private final ContentService contentService;
     private final WatchingSessionService watchingSessionService;
     private final ContentRecommendService contentRecommendService;
+    private final ChatClient chatClient;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ContentDto> createContent(@Valid @RequestPart("request") ContentCreateRequest contentCreateRequest,
@@ -57,7 +59,7 @@ public class ContentController implements ContentApi
     @GetMapping("/{contentId}")
     public ResponseEntity<ContentDto> getContent(@PathVariable UUID contentId)
     {
-        ContentDto contentDto = contentService.getContentWithLiveCount(contentId);
+        ContentDto contentDto = contentService.getContent(contentId);
 
         return ResponseEntity.status(HttpStatus.OK).body(contentDto);
     }
@@ -65,7 +67,7 @@ public class ContentController implements ContentApi
     @GetMapping
     public ResponseEntity<CursorResponseContentDto> getContents(@Valid @ParameterObject ContentSearchRequest contentSearchRequest)
     {
-        CursorResponseContentDto contents = contentService.getContentsWithLiveCount(contentSearchRequest);
+        CursorResponseContentDto contents = contentService.getContents(contentSearchRequest);
 
         return ResponseEntity.status(HttpStatus.OK).body(contents);
     }

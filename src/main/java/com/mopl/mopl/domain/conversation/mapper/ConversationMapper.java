@@ -5,13 +5,12 @@ import com.mopl.mopl.domain.conversation.entity.Conversation;
 import com.mopl.mopl.domain.dm.dto.DirectMessageDto;
 import com.mopl.mopl.domain.user.dto.UserSummary;
 import com.mopl.mopl.domain.user.entity.User;
-import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import java.time.Instant;
 import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring", uses = ImageUrlConverter.class)
+@Mapper(componentModel = "spring")
 public interface ConversationMapper {
 
   /**
@@ -46,7 +45,7 @@ public interface ConversationMapper {
   }
 
   @Mapping(source = "id", target = "userId")
-  @Mapping(source = "profileImageKey", target = "profileImageUrl", qualifiedByName = "toThumbnailUrl")
+  @Mapping(source = "profileImageKey", target = "profileImageUrl")
   UserSummary toUserSummary(User user);
 
 }

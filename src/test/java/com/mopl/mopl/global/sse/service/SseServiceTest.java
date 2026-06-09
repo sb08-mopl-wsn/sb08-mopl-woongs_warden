@@ -13,7 +13,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.mopl.mopl.global.event.UserLogoutEvent;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.redis.dto.RedisPubMessage;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
@@ -59,63 +58,6 @@ class SseServiceTest {
   private ZSetOperations<String, Object> zSetOperations;
 
   private static final Long EXPECTED_TIMEOUT = 30L * 1000 * 60;
-
-  @Test
-  @DisplayName("유저 로그아웃 이벤트 수신 시, 해당 유저의 모든 다중 기기 Emitter를 정상 종료시키고 저장소에서 삭제한다.")
-  void handleUserLogout_Success() throws Exception {
-    // given
-    UUID userId = UUID.randomUUID();
-    UserLogoutEvent event = new UserLogoutEvent(userId);
-
-    SseEmitter mockEmitter1 = mock(SseEmitter.class);
-    SseEmitter mockEmitter2 = mock(SseEmitter.class);
-    given(emitterRepository.findAllByUserId(userId)).willReturn(List.of(mockEmitter1, mockEmitter2));
-
-    // when
-    sseService.handleUserLogout(event);
-
-    // then
-    verify(mockEmitter1, times(1)).complete();
-    verify(mockEmitter2, times(1)).complete();
-    verify(emitterRepository, times(1)).deleteAllByUserId(userId);
-  }
-
-  @Test
-  @DisplayName("유저 로그아웃 처리 중 특정 Emitter에서 예외가 터지더라도, 에러를 catch 블록에서 격리하여 다른 기기의 연결 해제 및 저장소 삭제를 완수한다.")
-  void handleUserLogout_ExceptionIsolated_ContinuesExecution() throws Exception {
-    // given
-    UUID userId = UUID.randomUUID();
-    UserLogoutEvent event = new UserLogoutEvent(userId);
-
-    SseEmitter failEmitter = mock(SseEmitter.class);
-    SseEmitter successEmitter = mock(SseEmitter.class);
-    given(emitterRepository.findAllByUserId(userId)).willReturn(List.of(failEmitter, successEmitter));
-
-    doThrow(new RuntimeException("좀비 커넥션 강제 해제 장애")).when(failEmitter).complete();
-
-    // when
-    sseService.handleUserLogout(event);
-
-    // then
-    verify(failEmitter, times(1)).complete();
-    verify(successEmitter, times(1)).complete();
-    verify(emitterRepository, times(1)).deleteAllByUserId(userId);
-  }
-
-  @Test
-  @DisplayName("로그아웃한 유저의 활성화된 Emitter가 없다면 저장소 삭제 처리를 건너뛰고 조기 종료한다.")
-  void handleUserLogout_NoEmitters_ShortCircuit() {
-    // given
-    UUID userId = UUID.randomUUID();
-    UserLogoutEvent event = new UserLogoutEvent(userId);
-    given(emitterRepository.findAllByUserId(userId)).willReturn(Collections.emptyList());
-
-    // when
-    sseService.handleUserLogout(event);
-
-    // then
-    verify(emitterRepository, never()).deleteAllByUserId(any());
-  }
 
   @Test
   @DisplayName("SSE 구독 - 최초 접속 시 Emitter가 저장되고 더미 이벤트가 발송된다.")

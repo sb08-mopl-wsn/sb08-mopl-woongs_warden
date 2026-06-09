@@ -53,11 +53,11 @@ public class NotificationKafkaConsumer {
     String content = event.followerName() + "님이 회원님을 팔로우하기 시작했습니다.";
 
     Notification notification = Notification.builder()
-            .user(receiver)
-            .title(title)
-            .content(content)
-            .level(NotificationLevel.INFO)
-            .build();
+        .user(receiver)
+        .title(title)
+        .content(content)
+        .level(NotificationLevel.INFO)
+        .build();
 
     Notification saved = notificationRepository.save(notification);
     NotificationDto dto = notificationMapper.toDto(saved);
@@ -87,13 +87,13 @@ public class NotificationKafkaConsumer {
 
     // 팔로워 수 만큼 Notification 엔티티 생성
     List<Notification> notifications = follows.stream()
-            .map(follow -> Notification.builder()
-                    .user(follow.getFollower())
-                    .title(title)
-                    .content(content)
-                    .level(NotificationLevel.INFO)
-                    .build())
-            .toList();
+        .map(follow -> Notification.builder()
+            .user(follow.getFollower())
+            .title(title)
+            .content(content)
+            .level(NotificationLevel.INFO)
+            .build())
+        .toList();
 
     // saveAll로 저장
     List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
@@ -133,11 +133,11 @@ public class NotificationKafkaConsumer {
     String content = senderName + "님: " + messagePreview;
 
     Notification notification = Notification.builder()
-            .user(receiver)
-            .title(title)
-            .content(content)
-            .level(NotificationLevel.INFO)
-            .build();
+        .user(receiver)
+        .title(title)
+        .content(content)
+        .level(NotificationLevel.INFO)
+        .build();
 
     Notification saved = notificationRepository.save(notification);
     NotificationDto dto = notificationMapper.toDto(saved);
@@ -153,11 +153,11 @@ public class NotificationKafkaConsumer {
     User receiver = userRepository.getReferenceById(event.userId());
 
     Notification notification = Notification.builder()
-            .user(receiver)
-            .title("권한 변경 안내")
-            .content(event.name() + "님의 계정 권한이 [" + event.role().name() + "] (으)로 변경되었습니다.")
-            .level(NotificationLevel.INFO)
-            .build();
+        .user(receiver)
+        .title("권한 변경 안내")
+        .content(event.name() + "님의 계정 권한이 [" + event.role().name() + "] (으)로 변경되었습니다.")
+        .level(NotificationLevel.INFO)
+        .build();
 
     Notification saved = notificationRepository.save(notification);
     NotificationDto dto = notificationMapper.toDto(saved);
@@ -173,11 +173,11 @@ public class NotificationKafkaConsumer {
     User receiver = userRepository.getReferenceById(event.playlistOwnerId());
 
     Notification notification = Notification.builder()
-            .user(receiver)
-            .title("새로운 구독자")
-            .content(event.subscriberName() + "님이 회원님의 [" + event.playlistTitle() + "] 플레이리스트를 구독했습니다.")
-            .level(NotificationLevel.INFO)
-            .build();
+        .user(receiver)
+        .title("새로운 구독자")
+        .content(event.subscriberName() + "님이 회원님의 [" + event.playlistTitle() + "] 플레이리스트를 구독했습니다.")
+        .level(NotificationLevel.INFO)
+        .build();
 
     Notification saved = notificationRepository.save(notification);
     NotificationDto dto = notificationMapper.toDto(saved);
@@ -197,13 +197,13 @@ public class NotificationKafkaConsumer {
     }
 
     List<Notification> notifications = subscriptions.stream()
-            .map(sub -> Notification.builder()
-                    .user(sub.getUser())
-                    .title("플레이리스트 업데이트")
-                    .content("구독 중인 [" + event.playlistTitle() + "] 플레이리스트에 새로운 콘텐츠가 추가되었습니다.")
-                    .level(NotificationLevel.INFO)
-                    .build())
-            .toList();
+        .map(sub -> Notification.builder()
+            .user(sub.getUser())
+            .title("플레이리스트 업데이트")
+            .content("구독 중인 [" + event.playlistTitle() + "] 플레이리스트에 새로운 콘텐츠가 추가되었습니다.")
+            .level(NotificationLevel.INFO)
+            .build())
+        .toList();
 
     // 벌크 인서트
     List<Notification> savedNotifications = notificationRepository.saveAll(notifications);
@@ -225,10 +225,10 @@ public class NotificationKafkaConsumer {
     return message.substring(0, maxLength) + "...";
   }
 
-  @KafkaListener(topics = "notification-badWord-topic", groupId = "mopl-group")
+  @KafkaListener(topics = "notification-badword-topic", groupId = "mopl-group")
   public void onBadWordDetected(BadWordDetectedEvent event) {
-      log.info("[Kafka Consumer] BadWordDetectedEvent 수신 - userId: {}, content: {}",
-              event.userId(), event.content());
-      badWordNotificationProcessor.processBadWordDetected(event);
+    log.info("[Kafka Consumer] BadWordDetectedEvent 수신 - userId: {}, content: {}",
+            event.userId(), event.content());
+    badWordNotificationProcessor.processBadWordDetected(event);
   }
 }

@@ -42,7 +42,6 @@ public class RedisKeyExpiredListenerTest {
     @BeforeEach
     void setUp() {
         redisKeyExpiredListener = new RedisKeyExpiredListener(
-                listenerContainer,
                 userRepository,
                 userUnbanProcessor
         );

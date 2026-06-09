@@ -6,7 +6,6 @@ import com.mopl.mopl.global.component.UserUnbanProcessor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 import java.util.UUID;
 
@@ -17,7 +16,6 @@ public class RedisKeyExpiredListener implements MessageListener {
     private final UserUnbanProcessor userUnbanProcessor;
 
     public RedisKeyExpiredListener(
-            RedisMessageListenerContainer listenerContainer,
             UserRepository userRepository,
             UserUnbanProcessor userUnbanProcessor
     ) {

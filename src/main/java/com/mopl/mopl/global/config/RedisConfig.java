@@ -46,11 +46,10 @@ public class RedisConfig {
 
     @Bean
     public RedisKeyExpiredListener redisKeyExpiredListener(
-            RedisMessageListenerContainer redisMessageListenerContainer,
             UserRepository userRepository,
             UserUnbanProcessor userUnbanProcessor
     ) {
-        return new RedisKeyExpiredListener(redisMessageListenerContainer, userRepository, userUnbanProcessor);
+        return new RedisKeyExpiredListener(userRepository, userUnbanProcessor);
     }
 
     @Bean

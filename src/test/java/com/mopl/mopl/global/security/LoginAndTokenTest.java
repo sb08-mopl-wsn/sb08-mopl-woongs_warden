@@ -195,40 +195,6 @@ class LoginAndTokenTest {
     }
 
     @Test
-    @DisplayName("/api/auth/sign-in 로그인 실패 - 3번째 밴으로 계정 잠금된 사용자")
-    void signInFailure_LockedUser() throws Exception {
-        UserDto userDto = new UserDto(
-                UUID.randomUUID(),
-                Instant.parse("2026-05-08T00:00:00Z"),
-                "user@mopl.com",
-                "정지사용자",
-                null,
-                Role.USER,
-                true,
-                true
-        );
-
-        MoplUserDetails userDetails = new MoplUserDetails(
-                userDto,
-                passwordEncoder.encode("User1234!")
-        );
-
-        given(userDetailsService.loadUserByUsername("user@mopl.com"))
-                .willReturn(userDetails);
-
-        mockMvc.perform(post("/api/auth/sign-in")
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("username", "user@mopl.com")
-                        .param("password", "User1234!"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("ACCOUNT_LOCKED"));
-
-        verify(jwtTokenProvider, never()).generateAccessToken(any());
-        verify(jwtRegistry, never()).registerJwtInformation(any());
-    }
-
-    @Test
     @DisplayName("/api/auth/sign-in 로그인 실패 - 잘못된 비밀번호")
     void signInFailure_InvalidPassword() throws Exception {
         UserDto userDto = new UserDto(

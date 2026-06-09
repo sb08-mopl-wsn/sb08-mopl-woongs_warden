@@ -50,7 +50,6 @@ jacocoTestReport {
 					'**/elasticsearch/**',
 					'**/kafka/event/**',
 					'**/ai/recorder/**',
-					'**/content/service/*ContentCacheService*',
 					'**/ai/service/*UserTasteProfileService*',
 					'**/ai/service/*ContentEmbeddingService*',
 					'**/ai/service/*ContentSimilaritySearchService*',

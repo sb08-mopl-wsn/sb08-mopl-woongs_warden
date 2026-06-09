@@ -1,9 +1,8 @@
 package com.mopl.mopl.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mopl.mopl.domain.user.repository.UserRepository;
-import com.mopl.mopl.global.component.UserUnbanProcessor;
-import com.mopl.mopl.global.redis.component.RedisKeyExpiredListener;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mopl.mopl.global.redis.component.WatchingSessionRedisConsumer;
 import com.mopl.mopl.global.redis.service.RedisPublisher;
 import com.mopl.mopl.global.redis.service.RedisSubscriber;
@@ -12,13 +11,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
-import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
-public class RedisConfig {
+public class RedisConfig
+{
     @Bean
     public ChannelTopic watchTopic() {
         return new ChannelTopic("mopl-contents-watch-channel");
@@ -45,19 +44,10 @@ public class RedisConfig {
     }
 
     @Bean
-    public RedisKeyExpiredListener redisKeyExpiredListener(
-            UserRepository userRepository,
-            UserUnbanProcessor userUnbanProcessor
-    ) {
-        return new RedisKeyExpiredListener(userRepository, userUnbanProcessor);
-    }
-
-    @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
             RedisConnectionFactory factory,
             RedisSubscriber redisSubscriber,
             WatchingSessionRedisConsumer watchingConsumer,
-            RedisKeyExpiredListener redisKeyExpiredListener,
             ChannelTopic watchTopic,
             ChannelTopic chatTopic
     ) {
@@ -70,8 +60,6 @@ public class RedisConfig {
 
         container.addMessageListener(watchingConsumer, watchTopic);
         container.addMessageListener(watchingConsumer, chatTopic);
-
-        container.addMessageListener(redisKeyExpiredListener, new PatternTopic("__keyevent@*__:expired"));
 
         return container;
     }

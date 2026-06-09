@@ -53,16 +53,14 @@ public interface FollowApi {
             @PathVariable("followeeId") UUID followeeId
     );
 
-    @Operation(summary = "특정 유저를 내가 팔로우하는지 여부 조회", description = "내가 해당 유저를 팔로우하고 있다면 팔로우 정보(FollowDto)를 반환하고, 아니면 404 Not Found를 반환합니다.")
+    @Operation(summary = "특정 유저를 내가 팔로우하는지 여부 조회", description = "특정 유저에 대한 팔로우 여부를 boolean으로 반환합니다.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "팔로우 중임",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = FollowDto.class))),
+            @ApiResponse(responseCode = "200", description = "성공",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = Boolean.class))),
             @ApiResponse(responseCode = "401", description = "인증 오류",
-                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "팔로우하지 않음",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
-    ResponseEntity<FollowDto> isFollowedByMe(
+    ResponseEntity<Boolean> isFollowedByMe(
             @Parameter(hidden = true) MoplUserDetails userDetails,
             @Parameter(description = "조회할 대상 유저 ID", required = true, example = "01932a4b-1234-7abc-8def-0123456789ab")
             @RequestParam("followeeId") UUID followeeId

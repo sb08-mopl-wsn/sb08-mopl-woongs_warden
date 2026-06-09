@@ -16,8 +16,4 @@ public record ContentDto
         double averageRating,
         int reviewCount,
         int watcherCount
-) {
-    public ContentDto withWatcherCount(int watcherCount) {
-        return new ContentDto(id, title, description, type, thumbnailUrl, tags, averageRating, reviewCount, watcherCount);
-    }
-}
+) {}

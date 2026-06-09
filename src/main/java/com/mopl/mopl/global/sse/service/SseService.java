@@ -1,6 +1,5 @@
 package com.mopl.mopl.global.sse.service;
 
-import com.mopl.mopl.global.event.UserLogoutEvent;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
 import com.mopl.mopl.global.exception.SseConnectionException;
@@ -16,7 +15,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -34,23 +32,6 @@ public class SseService {
   private static final Long TIMEOUT = 30L * 1000 * 60;
   private static final String SSE_HISTORY_PREFIX = "sse_history:";
   private final RedisTemplate<String, Object> redisTemplate;
-
-  @EventListener
-  public void handleUserLogout(UserLogoutEvent event) {
-    UUID userId = event.userId();
-    List<SseEmitter> emitters = emitterRepository.findAllByUserId(userId);
-    if (!emitters.isEmpty()) {
-      for (SseEmitter emitter : emitters) {
-        try {
-          emitter.complete();
-        } catch (Exception e) {
-          log.warn("로그아웃 유저 SSE 종료 중 에러 발생 - userId: {}", userId, e);
-        }
-      }
-      emitterRepository.deleteAllByUserId(userId);
-      log.info("유저 로그아웃으로 인한 SSE 연결 강제 종료 - userId: {}, 종료된 커넥션 수: {}", userId, emitters.size());
-    }
-  }
 
   /**
    * SSE 연결 요청

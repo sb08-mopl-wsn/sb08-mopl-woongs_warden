@@ -3,7 +3,6 @@ package com.mopl.mopl.domain.auth.service;
 import com.mopl.mopl.domain.auth.exception.AuthExpiredTokenException;
 import com.mopl.mopl.domain.auth.exception.AuthFailedRefreshToken;
 import com.mopl.mopl.domain.auth.exception.AuthInvalidTokenException;
-import com.mopl.mopl.domain.auth.exception.AuthRevokedTokenException;
 import com.mopl.mopl.domain.jwt.dto.JwtDTO;
 import com.mopl.mopl.domain.jwt.dto.JwtInformation;
 import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
@@ -93,12 +92,6 @@ public class AuthServiceImpl implements AuthService {
 
         MoplUserDetails userDetails =
                 (MoplUserDetails) userDetailsService.loadUserByUsernameForToken(userEmail);
-
-        if (!userDetails.isAccountNonLocked()) {
-            jwtRegistry.invalidateJwtInformationByUserId(userDetails.getUserDto().id());
-            jwtTokenProvider.expireRefreshCookie(response);
-            throw new AuthRevokedTokenException();
-        }
 
         String newRefreshToken = null;
 

@@ -1,7 +1,6 @@
 package com.mopl.mopl.global.auth.details;
 
 import com.mopl.mopl.domain.auth.dto.OAuth2UserInfo;
-import com.mopl.mopl.domain.user.entity.Role;
 import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.user.mapper.UserMapper;
 import com.mopl.mopl.global.auth.extractor.OAuth2UserInfoExtractor;
@@ -34,10 +33,6 @@ public class OAuth2UserDetailsService extends DefaultOAuth2UserService {
 
         OAuth2UserInfo userInfo = extractUserInfo(registrationId, attributes);
         User user = oAuth2UserAccountService.findOrCreateSocialUser(userInfo);
-
-        if (user.getRole() != Role.ADMIN && user.isLocked()) {
-            throw new OAuth2LoginException(GlobalErrorCode.FORBIDDEN, "잠긴 계정입니다.");
-        }
 
         return new OAuth2UserDetails(userMapper.toDto(user), attributes);
     }

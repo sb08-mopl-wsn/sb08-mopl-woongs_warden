@@ -96,6 +96,6 @@ public class NotificationKafkaProducer {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void produceBadWordDetectedEvent(BadWordDetectedEvent event) {
     log.info("[Kafka Producer] BadWordDetectedEvent 발행 - userId: {}", event.userId());
-    kafkaTemplate.send("notification-badWord-topic", event.userId().toString(), event);
+    kafkaTemplate.send("notification-badword-topic", event.userId().toString(), event);
   }
 }

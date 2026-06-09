@@ -12,8 +12,8 @@ import java.util.UUID;
 public interface ContentService
 {
     ContentDto create(ContentCreateRequest contentCreateRequest, MultipartFile thumbnailImage);
-    ContentDto getContentWithLiveCount(UUID contentId);
-    CursorResponseContentDto getContentsWithLiveCount(ContentSearchRequest contentSearchRequest);
+    ContentDto getContent(UUID contentId);
+    CursorResponseContentDto getContents(ContentSearchRequest contentSearchRequest);
     ContentDto update(UUID contentId, ContentUpdateRequest contentUpdateRequest, MultipartFile thumbnailImage);
     void delete(UUID contentId);
 }

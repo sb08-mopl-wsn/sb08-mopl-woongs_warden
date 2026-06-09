@@ -9,7 +9,11 @@ import com.mopl.mopl.domain.user.exception.UserNotFoundException;
 import com.mopl.mopl.domain.user.repository.UserRepository;
 import com.mopl.mopl.domain.watchingSession.dto.request.ContentChatSendRequest;
 import com.mopl.mopl.domain.watchingSession.dto.request.WatchingSessionPageRequest;
-import com.mopl.mopl.domain.watchingSession.dto.response.*;
+import com.mopl.mopl.domain.watchingSession.dto.response.ContentChatDto;
+import com.mopl.mopl.domain.watchingSession.dto.response.CursorResponseWatchingSessionDto;
+import com.mopl.mopl.domain.watchingSession.dto.response.WatchingSessionChange;
+import com.mopl.mopl.domain.watchingSession.dto.response.WatchingSessionDto;
+import com.mopl.mopl.domain.watchingSession.dto.response.WatchingSessionSearchCondition;
 import com.mopl.mopl.domain.watchingSession.entity.ChangeType;
 import com.mopl.mopl.domain.watchingSession.entity.WatchingSession;
 import com.mopl.mopl.domain.watchingSession.exception.WatchingSessionNotFoundException;
@@ -22,7 +26,6 @@ import com.mopl.mopl.global.event.WatchingSessionEvent;
 import com.mopl.mopl.infrastructure.s3.S3ImageStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.PageRequest;
@@ -34,7 +37,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -72,7 +79,6 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
      * @param contentId 콘텐츠 시청 세션 참여를 위한 콘텐츠 ID
      * @param userId    콘텐츠 시청 세션 참여를 위한 유저 ID
      */
-    @CacheEvict(value = "contents", allEntries = true)
     @Override
     @Transactional
     public void join(UUID contentId, UUID userId) {
@@ -120,7 +126,6 @@ public class WatchingSessionServiceImpl implements WatchingSessionService {
      * @param contentId 콘텐츠 시청 세션 퇴장을 위한 콘텐츠 ID
      * @param userId    콘텐츠 시청 세션 퇴장을 위한 유저 ID
      */
-    @CacheEvict(value = "contents", allEntries = true)
     @Override
     @Transactional
     public void leave(UUID contentId, UUID userId) {

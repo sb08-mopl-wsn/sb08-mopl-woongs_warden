@@ -56,6 +56,6 @@ public class MoplUserDetails implements UserDetails, OAuth2User {
         if (userDto.role() == Role.ADMIN) {
             return true;
         }
-        return !userDto.locked();
+        return !Boolean.TRUE.equals(userDto.locked());
     }
 }

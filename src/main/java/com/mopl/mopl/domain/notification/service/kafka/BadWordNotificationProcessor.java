@@ -1,5 +1,6 @@
 package com.mopl.mopl.domain.notification.service.kafka;
 
+import com.mopl.mopl.domain.jwt.registry.JwtRegistry;
 import com.mopl.mopl.domain.notification.dto.NotificationDto;
 import com.mopl.mopl.domain.notification.entity.Notification;
 import com.mopl.mopl.domain.notification.entity.NotificationLevel;
@@ -31,6 +32,7 @@ public class BadWordNotificationProcessor {
     private final NotificationRepository notificationRepository;
     private final NotificationMapper notificationMapper;
     private final SseService sseService;
+    private final JwtRegistry jwtRegistry;
 
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -52,6 +54,10 @@ public class BadWordNotificationProcessor {
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
         receiver.increaseWarningCount();
+
+        if (receiver.isLocked()) {
+            jwtRegistry.invalidateJwtInformationByUserId(userId);
+        }
 
         Notification notification = Notification.builder()
                 .user(receiver)

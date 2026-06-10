@@ -225,7 +225,7 @@ public class NotificationKafkaConsumer {
     return message.substring(0, maxLength) + "...";
   }
 
-  @KafkaListener(topics = "notification-badword-topic", groupId = "mopl-group")
+  @KafkaListener(topics = "notification-badWord-topic", groupId = "mopl-group")
   public void onBadWordDetected(BadWordDetectedEvent event) {
     log.info("[Kafka Consumer] BadWordDetectedEvent 수신 - userId: {}, content: {}",
             event.userId(), event.content());

@@ -167,28 +167,46 @@ class FollowServiceImplTest {
   }
 
   @Test
-  @DisplayName("팔로우 여부 확인 - 본인 ID가 null이면 false 반환 (비로그인 상태 방어)")
-  void isFollowedByMe_ReturnsFalse_WhenFollowerIdIsNull() {
-    // when
-    boolean isFollowed = followService.isFollowedByMe(null, followeeId);
-
-    // then
-    assertThat(isFollowed).isFalse();
-    verify(followRepository, never()).existsByFollowerIdAndFolloweeId(any(), any());
+  @DisplayName("팔로우 여부 확인 - 본인 ID가 null이면 예외 발생 (비로그인 상태 방어)")
+  void isFollowedByMe_ThrowsException_WhenFollowerIdIsNull() {
+    // when & then
+    assertThatThrownBy(() -> followService.isFollowedByMe(null, followeeId))
+        .isInstanceOf(FollowNotFoundException.class);
+    verify(userRepository, never()).findById(any());
   }
 
   @Test
-  @DisplayName("팔로우 여부 확인 - 팔로우 중이면 true, 아니면 false 반환 (Repository 분기)")
-  void isFollowedByMe_ReturnsRepositoryResult() {
+  @DisplayName("팔로우 여부 확인 - 팔로우 중이면 DTO 반환")
+  void isFollowedByMe_Success() {
     // given
-    given(followRepository.existsByFollowerIdAndFolloweeId(followerId, followeeId)).willReturn(true);
+    Follow follow = Follow.builder().follower(follower).followee(followee).build();
+    FollowDto expectedDto = new FollowDto(UUID.randomUUID(), followeeId, followerId);
+
+    given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.findByFollowerAndFollowee(follower, followee)).willReturn(Optional.of(follow));
+    given(followMapper.toDto(follow)).willReturn(expectedDto);
 
     // when
-    boolean isFollowed = followService.isFollowedByMe(followerId, followeeId);
+    FollowDto result = followService.isFollowedByMe(followerId, followeeId);
 
     // then
-    assertThat(isFollowed).isTrue();
-    verify(followRepository).existsByFollowerIdAndFolloweeId(followerId, followeeId);
+    assertThat(result).isNotNull();
+    assertThat(result.followerId()).isEqualTo(followerId);
+    verify(followRepository).findByFollowerAndFollowee(follower, followee);
+  }
+
+  @Test
+  @DisplayName("팔로우 여부 확인 - 팔로우 중이 아니면 예외 발생")
+  void isFollowedByMe_NotFound_ThrowsException() {
+    // given
+    given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.findByFollowerAndFollowee(follower, followee)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> followService.isFollowedByMe(followerId, followeeId))
+        .isInstanceOf(FollowNotFoundException.class);
   }
 
   @Test

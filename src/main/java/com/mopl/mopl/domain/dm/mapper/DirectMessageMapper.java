@@ -6,10 +6,11 @@ import com.mopl.mopl.domain.user.entity.User;
 import com.mopl.mopl.domain.dm.entity.DirectMessage;
 import com.mopl.mopl.global.exception.BusinessException;
 import com.mopl.mopl.global.exception.GlobalErrorCode;
+import com.mopl.mopl.infrastructure.s3.ImageUrlConverter;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = ImageUrlConverter.class)
 public interface DirectMessageMapper {
 
   @Mapping(source = "conversation.id", target = "conversationId")
@@ -18,7 +19,7 @@ public interface DirectMessageMapper {
   DirectMessageDto toDto(DirectMessage message);
 
   @Mapping(source = "id", target = "userId")
-  @Mapping(source = "profileImageKey", target = "profileImageUrl")
+  @Mapping(source = "profileImageKey", target = "profileImageUrl", qualifiedByName = "toThumbnailUrl")
   UserSummary toUserSummary(User user);
 
   default UserSummary extractReceiver(DirectMessage message) {

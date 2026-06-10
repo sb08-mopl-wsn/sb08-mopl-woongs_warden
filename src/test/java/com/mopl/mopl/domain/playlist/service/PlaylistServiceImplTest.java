@@ -163,7 +163,7 @@ class PlaylistServiceImplTest {
     @DisplayName("정상적으로 검색 쿼리를 던지면 인덱스 기반 커서 정보를 묶어 반환한다.")
     void givenSearchRequest_whenFindPlaylists_thenReturnsCursorDto() {
       // given
-      PlaylistSearchRequest request = new PlaylistSearchRequest(null, null, null, 10, "subscriberCount", "DESCENDING", null, null);
+      PlaylistSearchRequest request = new PlaylistSearchRequest(null, null, null, 10, "subscribeCount", "DESCENDING", null, null);
       Slice<Playlist> slice = new SliceImpl<>(List.of(playlist), Pageable.unpaged(), true);
       Content content = Content.builder().title("영화").contentType(ContentType.movie).build();
       PlaylistContent pc = new PlaylistContent(playlist, content);

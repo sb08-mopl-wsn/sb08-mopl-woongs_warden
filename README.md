@@ -88,6 +88,8 @@
 
 ## 🔍 구현 기능 상세
 ### **홍성휘 (소셜/알림 관리)**
+<img width="1920" height="1080" alt="Image" src="https://github.com/user-attachments/assets/62f1b7b1-4c19-4d8d-9b25-72d03b116c6b" />
+
 <details>
 <summary>팔로우 및 글로벌 알림 (Follow & Notification)</summary>
 
@@ -132,11 +134,14 @@
 <br/>
 
 ### **김경태 (콘텐츠 관리)**
+<img width="1280" height="644" alt="Image" src="https://github.com/user-attachments/assets/5be52e38-8438-4417-bf09-b1295f4e23f0" />
+<img width="1280" height="644" alt="Image" src="https://github.com/user-attachments/assets/c8e64320-9418-4bb4-a63a-587574e944bc" />
+
 <details>
 <summary>콘텐츠 CRUD</summary>
 
 - 콘텐츠 등록/단건 조회/수정/삭제 엔드포인트 구현
-- 콘텐츠 생성 시 Gemini embedding API로 vector 생성 및 phvector 저장
+- 콘텐츠 생성 시 Gemini embedding API로 vector 생성 및 pgvector 저장
 - 썸네일 S3 업로드 후 조회 시 CloudFront CDN URL 자동 변환
 
 </details>
@@ -183,6 +188,9 @@
 <br/>
 
 ### **황진서 (사용자 관리)**
+<img width="1920" height="1080" alt="계정 정지" src="https://github.com/user-attachments/assets/90057455-a59f-45c7-8a3b-43c98f56c57e" />
+<img width="784" height="936" alt="일반 로그인" src="https://github.com/user-attachments/assets/16029990-2bf4-41d0-b78b-da53925f3df5" />
+
 <details>
 <summary>사용자 인증</summary>
 
@@ -225,6 +233,9 @@
 <br/>
 
 ### **이재준 (웹소켓 관리)**
+<img width="1274" height="1066" alt="Image" src="https://github.com/user-attachments/assets/73ec990a-8912-44d5-bcea-744312df9cc8" />
+<img width="1276" height="1066" alt="Image" src="https://github.com/user-attachments/assets/3b95837b-625f-4990-b1c8-fa9946acac8c" />
+
 <details>
 <summary>실시간 시청 세션 입장/퇴장</summary>
 
@@ -283,6 +294,8 @@
 <br/>
 
 ### **선웅제 (콘텐츠 평가 및 큐레이팅 관리)**
+<img width="1280" height="720" alt="Image" src="https://github.com/user-attachments/assets/ff079019-f98d-4240-8736-982431015030" />
+
 <details>
 <summary>리뷰(Review) 평가 시스템 및 아키텍처 최적화</summary>
 

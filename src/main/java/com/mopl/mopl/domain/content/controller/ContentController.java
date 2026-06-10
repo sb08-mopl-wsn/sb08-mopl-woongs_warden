@@ -75,7 +75,7 @@ public class ContentController implements ContentApi
     @PatchMapping("/{contentId}")
     public ResponseEntity<ContentDto> updateContent(@PathVariable UUID contentId,
                                                     @Valid @RequestPart("request") ContentUpdateRequest contentUpdateRequest,
-                                                    @RequestPart(value = "thumbnail", required = true) MultipartFile thumbnailImage)
+                                                    @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnailImage)
     {
         ContentDto contentDto = contentService.update(contentId, contentUpdateRequest, thumbnailImage);
 

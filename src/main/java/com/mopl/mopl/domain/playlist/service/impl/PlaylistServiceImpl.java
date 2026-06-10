@@ -109,7 +109,7 @@ public class PlaylistServiceImpl implements PlaylistService {
 
       String sortBy = request.sortBy() != null ? request.sortBy().toLowerCase() : "updatedat";
 
-      if ("subscribercount".equals(sortBy)) {
+      if ("subscribecount".equals(sortBy)) {
         nextCursor = String.valueOf(lastPlaylist.getSubscriberCount());
       } else {
         // 기본값: updatedAt (최신순)

@@ -94,14 +94,14 @@ public class PlaylistRepositoryCustomImpl implements PlaylistRepositoryCustom {
 
     try {
       switch (sortBy) {
-        case "subscribercount":
+        case "subscribecount":
           Long subCursorValue = Long.parseLong(cursor);
           if (isAsc) {
             return playlist.subscriberCount.gt(subCursorValue)
                 .or(playlist.subscriberCount.eq(subCursorValue).and(playlist.id.gt(idAfter)));
           } else {
             return playlist.subscriberCount.lt(subCursorValue)
-                .or(playlist.subscriberCount.eq(subCursorValue).and(playlist.id.lt(idAfter)));
+                .or(playlist.subscriberCount.eq(subCursorValue).and(playlist.id.gt(idAfter)));
           }
 
         case "updatedat":
@@ -112,7 +112,7 @@ public class PlaylistRepositoryCustomImpl implements PlaylistRepositoryCustom {
                 .or(playlist.updatedAt.eq(updateCursorValue).and(playlist.id.gt(idAfter)));
           } else {
             return playlist.updatedAt.lt(updateCursorValue)
-                .or(playlist.updatedAt.eq(updateCursorValue).and(playlist.id.lt(idAfter)));
+                .or(playlist.updatedAt.eq(updateCursorValue).and(playlist.id.gt(idAfter)));
           }
       }
     } catch (NumberFormatException | DateTimeParseException e) {
@@ -125,7 +125,7 @@ public class PlaylistRepositoryCustomImpl implements PlaylistRepositoryCustom {
     String sortProperty = sortBy != null ? sortBy.toLowerCase() : "updatedat";
 
     OrderSpecifier<?> mainOrder;
-    if ("subscribercount".equals(sortProperty)) {
+    if ("subscribecount".equals(sortProperty)) {
       mainOrder = new OrderSpecifier<>(direction, playlist.subscriberCount);
     } else {
       // 기본값: updatedAt (최신순)
